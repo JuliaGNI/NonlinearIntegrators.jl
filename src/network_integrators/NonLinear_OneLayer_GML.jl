@@ -1,7 +1,7 @@
 using CompactBasisFunctions
 using GeometricIntegrators
 
-struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: LODEMethod
+struct NonLinear_OneLayer_GML{T, NBASIS, NNODES, basisType <: Basis{T}} <: LODEMethod
     basis::basisType
     quadrature::QuadratureRule{T,NNODES}
 
@@ -12,7 +12,7 @@ struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: LODEM
     show_status::Bool
     network_inputs::Matrix{T}
     training_epochs::Int
-    function NonLinear_OneLayer_Lux(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000) where {T}
+    function NonLinear_OneLayer_GML(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000) where {T}
         # get number of quadrature nodes and number of basis functions
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = CompactBasisFunctions.nbasis(basis)
@@ -26,26 +26,26 @@ struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: LODEM
     end
 end
 
-CompactBasisFunctions.basis(method::NonLinear_OneLayer_Lux) = method.basis
-quadrature(method::NonLinear_OneLayer_Lux) = method.quadrature
-CompactBasisFunctions.nbasis(method::NonLinear_OneLayer_Lux) = method.basis.S
-nnodes(method::NonLinear_OneLayer_Lux) = QuadratureRules.nnodes(method.quadrature)
-activation(method::NonLinear_OneLayer_Lux) = method.basis.activation
-nstages(method::NonLinear_OneLayer_Lux) = method.nstages
-show_status(method::NonLinear_OneLayer_Lux) = method.show_status
-training_epochs(method::NonLinear_OneLayer_Lux) = method.training_epochs    
+CompactBasisFunctions.basis(method::NonLinear_OneLayer_GML) = method.basis
+quadrature(method::NonLinear_OneLayer_GML) = method.quadrature
+CompactBasisFunctions.nbasis(method::NonLinear_OneLayer_GML) = method.basis.S
+nnodes(method::NonLinear_OneLayer_GML) = QuadratureRules.nnodes(method.quadrature)
+activation(method::NonLinear_OneLayer_GML) = method.basis.activation
+nstages(method::NonLinear_OneLayer_GML) = method.nstages
+show_status(method::NonLinear_OneLayer_GML) = method.show_status
+training_epochs(method::NonLinear_OneLayer_GML) = method.training_epochs    
 
-isexplicit(::Union{NonLinear_OneLayer_Lux, Type{<:NonLinear_OneLayer_Lux}}) = false
-isimplicit(::Union{NonLinear_OneLayer_Lux, Type{<:NonLinear_OneLayer_Lux}}) = true
-issymmetric(::Union{NonLinear_OneLayer_Lux, Type{<:NonLinear_OneLayer_Lux}}) = missing
-issymplectic(::Union{NonLinear_OneLayer_Lux, Type{<:NonLinear_OneLayer_Lux}}) = missing
+isexplicit(::Union{NonLinear_OneLayer_GML, Type{<:NonLinear_OneLayer_GML}}) = false
+isimplicit(::Union{NonLinear_OneLayer_GML, Type{<:NonLinear_OneLayer_GML}}) = true
+issymmetric(::Union{NonLinear_OneLayer_GML, Type{<:NonLinear_OneLayer_GML}}) = missing
+issymplectic(::Union{NonLinear_OneLayer_GML, Type{<:NonLinear_OneLayer_GML}}) = missing
 
-default_solver(::NonLinear_OneLayer_Lux) = Newton()
-# default_iguess(::NonLinear_OneLayer_Lux) = HermiteExtrapolation()# HarmonicOscillator
-default_iguess(::NonLinear_OneLayer_Lux) = MidpointExtrapolation()#CoupledHarmonicOscillator
-default_iguess_integrator(::NonLinear_OneLayer_Lux) = ImplicitMidpoint()
+default_solver(::NonLinear_OneLayer_GML) = Newton()
+# default_iguess(::NonLinear_OneLayer_GML) = HermiteExtrapolation()# HarmonicOscillator
+default_iguess(::NonLinear_OneLayer_GML) = MidpointExtrapolation()#CoupledHarmonicOscillator
+default_iguess_integrator(::NonLinear_OneLayer_GML) = ImplicitMidpoint()
 
-struct NonLinear_OneLayer_LuxCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
+struct NonLinear_OneLayer_GMLCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -63,8 +63,7 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
     V::Vector{Vector{ST}}
     F::Vector{Vector{ST}}
 
-    W ::Vector{Vector{ST}}
-    bias::Vector{Vector{ST}}
+    ps::Vector{Tuple{NamedTuple{},NamedTuple{}}}
 
     r₀::VecOrMat{ST}
     r₁::VecOrMat{ST}
@@ -86,7 +85,7 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
 
     stage_values::Vector{ST}
     network_labels::VecOrMat{ST}
-    function NonLinear_OneLayer_LuxCache{ST,D,S,R,N}() where {ST,D,S,R,N}
+    function NonLinear_OneLayer_GMLCache{ST,D,S,R,N}() where {ST,D,S,R,N}
         x = zeros(ST,D*(S+1+2*S)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
 
         q̄ = zeros(ST,D)
@@ -106,9 +105,8 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
         V = create_internal_stage_vector(ST,D,R)
         F = create_internal_stage_vector(ST,D,R)
 
-        # create first layer parameter vectors
-        W = create_internal_stage_vector(ST, D, S)
-        bias = create_internal_stage_vector(ST, D, S)
+        # create parameter vectors
+        ps = [((W = zeros(ST,S,1),b = zeros(ST,S)),(W = zeros(ST,1,S),))  for k in 1:D]
 
         r₀ = zeros(ST, S, D)
         r₁ = zeros(ST, S, D)
@@ -127,25 +125,24 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
         dqdbr₀= zeros(ST, S, D)
 
         current_step = zeros(ST, 1)
-
         stage_values = zeros(ST, N, D)
         network_labels = zeros(ST, N+1, D)
 
-        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, W, bias, r₀, r₁, m, a, 
+        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a, 
             dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
             current_step,stage_values,network_labels)
     end
 end
 
-GeometricIntegrators.Integrators.nlsolution(cache::NonLinear_OneLayer_LuxCache) = cache.x
+GeometricIntegrators.Integrators.nlsolution(cache::NonLinear_OneLayer_GMLCache) = cache.x
 
-function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_OneLayer_Lux; kwargs...) where {ST}
-    NonLinear_OneLayer_LuxCache{ST, ndims(problem), nbasis(method), nnodes(method),nstages(method)}(; kwargs...)
+function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML; kwargs...) where {ST}
+    NonLinear_OneLayer_GMLCache{ST, ndims(problem), nbasis(method), nnodes(method),nstages(method)}(; kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_OneLayer_Lux) = NonLinear_OneLayer_LuxCache{ST, ndims(problem), nbasis(method), nnodes(method),nstages(method)}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML) = NonLinear_OneLayer_GMLCache{ST, ndims(problem), nbasis(method), nnodes(method),nstages(method)}
 
-@inline function Base.getindex(c::NonLinear_OneLayer_LuxCache, ST::DataType)
+@inline function Base.getindex(c::NonLinear_OneLayer_GMLCache, ST::DataType)
     key = hash(Threads.threadid(), hash(ST))
     if haskey(c.caches, key)
         c.caches[key]
@@ -154,12 +151,12 @@ end
     end::CacheType(ST, c.problem, c.method)
 end
 
-function GeometricIntegrators.Integrators.reset!(cache::NonLinear_OneLayer_LuxCache, t, q, p)
+function GeometricIntegrators.Integrators.reset!(cache::NonLinear_OneLayer_GMLCache, t, q, p)
     copyto!(cache.q̄, q)
     copyto!(cache.p̄, p)
 end
 
-function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
+function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) 
     local h = int.problem.tstep
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
@@ -188,7 +185,7 @@ function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrato
 
 end
 
-function initial_guess_Extrapolation!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
+function initial_guess_Extrapolation!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local D = ndims(int)
@@ -202,7 +199,7 @@ function initial_guess_Extrapolation!(int::GeometricIntegrator{<:NonLinear_OneLa
     network_labels[1,:] = solstep(int).q #safe check for MidpointExtrapolation
 end
 
-function initial_guess_integrator!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
+function initial_guess_integrator!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
     local network_labels = cache(int).network_labels
     local integrator = method(int).default_iguess_integrator
 
@@ -220,9 +217,13 @@ end
 
 function initial_guess_networktraining!(int)
     local D = ndims(int)
+    local S = nbasis(method(int))
+
     local show_status = method(int).show_status 
     local x = nlsolution(int)
     local NN = method(int).basis.NN
+    local ps = cache(int).ps
+    local nstages = method(int).nstages
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
@@ -233,14 +234,15 @@ function initial_guess_networktraining!(int)
             print(network_labels[:,k])
         end
 
-        ps,st=Lux.setup(Random.default_rng(),NN) #Random.seed!(1)
-        opt = Optimisers.Adam()
-        st_opt = Optimisers.setup(opt, ps)
+        labels = reshape(network_labels[:,k],1,nstages+1)
+
+        ps[k] = AbstractNeuralNetworks.initialparameters(NN,CPU(),Float64)
+        opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
         err = 0
         for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs',network_labels[:,k]',NN,p,st)[1],ps)[1]
-            st_opt, ps = Optimisers.update(st_opt, ps, gs)
-            err = mse_loss(network_inputs',network_labels[:,k]',NN,ps,st)[1]
+            gs = Zygote.gradient(p -> mse_loss(network_inputs,labels,NN,p)[1],ps[k])[1]
+            optimization_step!(opt, NN, ps[k], gs)
+            err = mse_loss(network_inputs,labels,NN,ps[k])[1]
 
             if err < 5e-5
                 show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
@@ -251,9 +253,9 @@ function initial_guess_networktraining!(int)
         end
 
         for i in 1:S
-            x[D*(i-1)+k] = ps.layer_2.weight[i]
-            x[D*(S+1)+D*(i-1)+k] = ps.layer_1.weight[i]
-            x[D*(S+1 + S)+D*(i-1)+k] = ps.layer_1.bias[i]
+            x[D*(i-1)+k] = ps[k][2].W[i]
+            x[D*(S+1)+D*(i-1)+k] = ps[k][1].W[i]
+            x[D*(S+1 + S)+D*(i-1)+k] = ps[k][1].b[i]
         end
 
         if show_status
@@ -269,13 +271,13 @@ function initial_guess_networktraining!(int)
 
 end
 
-function mse_loss(x,y,model, ps, st;λ=1000)
-    y_pred, st = model(x, ps, st)
-    mse_loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1][1]-y[1])
-    return mse_loss, ps,()
+function mse_loss(x,y,NN,ps;λ=1000)
+    y_pred = NN(x,ps)
+    mse_loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1]-y[1])
+    return mse_loss
 end
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}) where {ST}
+function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
     local D = ndims(int)
     local S = nbasis(method(int))
     local σ = int.method.basis.activation
@@ -289,8 +291,9 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
     local P = cache(int, ST).P
     local F = cache(int, ST).F
     local X = cache(int, ST).X
-    local W = cache(int, ST).W
-    local bias = cache(int, ST).bias
+
+    local NN = method(int).basis.NN
+    local ps = cache(int, ST).ps
 
     local r₀ = cache(int, ST).r₀
     local r₁ = cache(int, ST).r₁
@@ -318,67 +321,45 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
         p[k] = x[D*S+k]
     end
 
-    # copy x to hidden layer weights W : [D,S]
-    for i in eachindex(W)
-        for k in eachindex(W[i])
-            W[i][k] = x[D*(S+1)+D*(i-1)+k]
-        end
-    end 
-
-    # copy x to hidden layer bias [D,S]
-    for i in eachindex(bias)
-        for k in eachindex(bias[i])
-            bias[i][k] = x[D*(S+1 + S)+D*(i-1)+k]
+    for i in 1:S 
+        for k in 1:D
+            ps[k][2].W[i] = x[D*(i-1)+k]  
+            ps[k][1].W[i] = x[D*(S+1)+D*(i-1)+k] 
+            ps[k][1].b[i] = x[D*(S+1+S)+D*(i-1)+k]
         end
     end
 
-    # reform the NN parameters
-    WMat = hcat(W...)'
-    biasMat = hcat(bias...)'
-    XMat = hcat(X...)'
-    Dbasis = collect([NonLinearOneLayerBasis(σ,S,WMat[:,d],biasMat[:,d]) for d in 1:D])
-    
     # compute coefficients
     for d in 1:D 
-        for i in eachindex(Dbasis[d])
-            r₀[i,d] = Dbasis[d][zero(ST), i]
-            r₁[i,d] = Dbasis[d][one(ST), i]
-            for j in eachindex(quad_nodes)
-                m[j,i,d] = Dbasis[d][quad_nodes[j], i]
-                a[j,i,d] = first_order_central_difference(Dbasis[d][i],quad_nodes[j])
-            end
+        r₀[:,d] = (NN.layers[1])([0.0],ps[d][1])
+        r₁[:,d] = (NN.layers[1])([1.0],ps[d][1])
+        for j in eachindex(quad_nodes)
+            m[j,:,d] =(NN.layers[1])([quad_nodes[j]],ps[d][1])
+            a[j,:,d] = basis_first_order_central_difference(NN,ps[d],quad_nodes[j])
         end
     end
 
     # compute the derivatives of the coefficients on the quadrature nodes and at the boundaries
+    ϵ=0.00001
     for d in 1:D 
-        QNN(t) = sum(XMat[:,d] .* σ.(WMat[:,d] .*t .+ biasMat[:,d]))
-        ϵ=0.00001
         for j in eachindex(quad_nodes)
-            g = Zygote.gradient(Zygote.Params([WMat,biasMat])) do 
-                QNN(quad_nodes[j]) 
-            end
-            dqdWc[j,:,d] = g[WMat][:,d]
-            dqdbc[j,:,d] = g[biasMat][:,d]
+            g= Zygote.gradient(p->NN([quad_nodes[j]],p)[1],ps[d])[1]
+            dqdWc[j,:,d] = g[1].W[:]
+            dqdbc[j,:,d] = g[1].b[:]
 
-            gv = Zygote.gradient(Zygote.Params([WMat,biasMat])) do 
-                (QNN(quad_nodes[j]+ϵ) - QNN(quad_nodes[j]-ϵ))/(2*ϵ)
-            end
-            dvdWc[j,:,d] = gv[WMat][:,d]
-            dvdbc[j,:,d] = gv[biasMat][:,d]
+            gvf= Zygote.gradient(p->NN([quad_nodes[j]+ϵ],p)[1],ps[d])[1]
+            gvb= Zygote.gradient(p->NN([quad_nodes[j]-ϵ],p)[1],ps[d])[1]
+            dvdWc[j,:,d] = (gvf[1].W[:] .- gvb[1].W[:])/(2*ϵ)
+            dvdbc[j,:,d] = (gvf[1].b[:] .- gvb[1].b[:])/(2*ϵ)
         end
 
-        g0 = Zygote.gradient(Zygote.Params([WMat,biasMat])) do 
-            QNN(0) 
-        end
-        dqdWr₀[:,d] = g0[WMat][:,d]
-        dqdbr₀[:,d] = g0[biasMat][:,d]
+        g0= Zygote.gradient(p->NN([0.0],p)[1],ps[d])[1]
+        dqdWr₀[:,d] = g0[1].W[:]
+        dqdbr₀[:,d] = g0[1].b[:]
 
-        g1 = Zygote.gradient(Zygote.Params([WMat,biasMat])) do 
-            QNN(1) 
-        end
-        dqdWr₁[:,d] = g1[WMat][:,d]
-        dqdbr₁[:,d] = g1[biasMat][:,d]
+        g1 = Zygote.gradient(p->NN([1.0],p)[1],ps[d])[1]
+        dqdWr₁[:,d] = g1[1].W[:]
+        dqdbr₁[:,d] = g1[1].b[:]
     end
 
     # compute Q : q at quaadurature points
@@ -425,7 +406,7 @@ function first_order_central_difference(f,x;ϵ=0.00001)
     return (f(x+ϵ)-f(x-ϵ))/(2*ϵ)
 end
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}) where {ST}
+function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
     local D = ndims(int)
     local S = nbasis(method(int))
     local q̄ = cache(int, ST).q̄ 
@@ -459,7 +440,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, int::Geometri
             end
             b[D*(i-1)+k] = (r₁[i,k] * p̃[k] - r₀[i,k] * p̄[k]) - z
         end
-    end 
+    end
 
     # the continue constraint from hamilton pontryagin principle
     for k in eachindex(q̄)
@@ -470,7 +451,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, int::Geometri
         b[D*S+k] = q̄[k] - y 
     end
 
-    for i in 1:S 
+    for i in 1:S
         for k in 1:D
             z = zero(ST)
             for j in eachindex(P,F)
@@ -494,7 +475,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, int::Geometri
 
 end
 
-function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}) where {ST}
+function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
     @assert axes(x) == axes(b)
 
     # copy previous solution from solstep to cache
@@ -507,7 +488,7 @@ function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::Ab
     GeometricIntegrators.Integrators.residual!(b, int)
 end
 
-function GeometricIntegrators.Integrators.update!(x::AbstractVector{DT}, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}) where {DT}
+function GeometricIntegrators.Integrators.update!(x::AbstractVector{DT}, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {DT}
     # copy previous solution from solstep to cache
     GeometricIntegrators.Integrators.reset!(cache(int, DT), current(solstep(int))...)
 
@@ -520,7 +501,7 @@ function GeometricIntegrators.Integrators.update!(x::AbstractVector{DT}, int::Ge
 end
 
 
-function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux, <:AbstractProblemIODE})
+function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML, <:AbstractProblemIODE})
     # copy previous solution from solstep to cache
     reset!(cache(int), current(solstep(int))...)
 
@@ -540,31 +521,32 @@ function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrat
     stages_compute!(int)
 end
 
-function stages_compute!(int)
+function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     local network_inputs = method(int).network_inputs
     local D = ndims(int)
     local S = nbasis(method(int))
     local NN = method(int).basis.NN
+    local ps = cache(int).ps
 
     if show_status
         print("\n solution x after solving by Newton \n")
         print(x)
     end
 
-    ps,st=Lux.setup(Random.default_rng(),NN)
     for k in 1:D
-        for i in 1:S
-            ps.layer_2.weight[i] = x[D*(i-1)+k]  
-            ps.layer_1.weight[i] = x[D*(S+1)+D*(i-1)+k] 
-            ps.layer_1.bias[i] = x[D*(S+1+S)+D*(i-1)+k]
-        end         
-        stage_values[:,k] = NN(network_inputs',ps,st)[1][2:end]
-    end 
+        for i in 1:S 
+            ps[k][2].W[i] = x[D*(i-1)+k]  
+            ps[k][1].W[i] = x[D*(S+1)+D*(i-1)+k] 
+            ps[k][1].b[i] = x[D*(S+1+S)+D*(i-1)+k]
+        end
+        stage_values[:,k] = NN(network_inputs,ps[k])[1][2:end]
+    end
 
     if show_status
         print("\n stages prediction after solving \n")
         print(stage_values)
     end
+
 end
