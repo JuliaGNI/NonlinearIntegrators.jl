@@ -132,7 +132,6 @@ struct NonLinear_DenseNet_GMLCache{ST,D,S₁,S,R} <: IODEIntegratorCache{ST,D}
         current_step,stage_values,network_labels)
 end
 
-
 function GeometricIntegrators.Integrators.reset!(cache::NonLinear_DenseNet_GMLCache, t, q, p)
     copyto!(cache.q̄, q)
     copyto!(cache.p̄, p)
