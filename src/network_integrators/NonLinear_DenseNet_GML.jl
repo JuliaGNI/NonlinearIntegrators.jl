@@ -1,4 +1,4 @@
-struct NonLinear_DenseNet_GML{T, NBASIS,NHIDDEN, NNODES, basisType <: Basis{T}} <: LODEMethod
+struct NonLinear_DenseNet_GML{T, NBASIS,NHIDDEN, NNODES, basisType <: Basis{T}} <: DenseNetMethod
     basis::basisType
     quadrature::QuadratureRule{T,NNODES}
 

@@ -1,7 +1,7 @@
 using CompactBasisFunctions
 using GeometricIntegrators
 
-struct NonLinear_OneLayer_GML{T, NBASIS, NNODES, basisType <: Basis{T}} <: LODEMethod
+struct NonLinear_OneLayer_GML{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLayerMethod
     basis::basisType
     quadrature::QuadratureRule{T,NNODES}
 
