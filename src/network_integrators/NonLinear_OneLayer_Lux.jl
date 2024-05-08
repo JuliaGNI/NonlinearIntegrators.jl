@@ -10,7 +10,7 @@ struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
 
     nstages::Int
     show_status::Bool
-    network_inputs::Matrix{T}
+    network_inputs::Vector{T}
     training_epochs::Int
     function NonLinear_OneLayer_Lux(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000) where {T}
         # get number of quadrature nodes and number of basis functions
@@ -21,7 +21,7 @@ struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
         quad_weights = QuadratureRules.weights(quadrature)
         quad_nodes = QuadratureRules.nodes(quadrature)
 
-        network_inputs = reshape(collect(0:1/nstages:1),1,nstages+1)
+        network_inputs = collect(0:1/nstages:1)
         new{T, NBASIS, NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, training_epochs)
     end
 end
@@ -84,7 +84,7 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
 
     current_step::Vector{ST}
 
-    stage_values::Vector{ST}
+    stage_values::VecOrMat{ST}
     network_labels::VecOrMat{ST}
     function NonLinear_OneLayer_LuxCache{ST,D,S,R,N}() where {ST,D,S,R,N}
         x = zeros(ST,D*(S+1+2*S)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
@@ -167,20 +167,20 @@ function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrato
     local current_step = cache(int).current_step
 
     show_status ? print("\n current time step: $current_step") : nothing
-    current_step+=1
+    current_step[1]+=1
 
     # choose initial guess method based on the value of h
-    if h > 0.5
+    if h < 0.5
         initial_guess_Extrapolation!(int)
     else
         initial_guess_integrator!(int)
     end 
     
     if show_status
-        print("\n network inputs")
+        print("\n network inputs \n")
         print(network_inputs)
 
-        print("\n network labels from initial guess methods")
+        print("\n network labels from initial guess methods \n")
         print(network_labels)
     end
 
@@ -192,6 +192,7 @@ function initial_guess_Extrapolation!(int::GeometricIntegrator{<:NonLinear_OneLa
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local D = ndims(int)
+    local h = int.problem.tstep
 
     for i in eachindex(network_inputs)
         initialguess!(solstep(int).t̄+network_inputs[i]*h, cache(int).q̃, cache(int).p̃, solstep(int), int.problem, int.iguess)
@@ -204,10 +205,15 @@ end
 
 function initial_guess_integrator!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
     local network_labels = cache(int).network_labels
-    local integrator = method(int).default_iguess_integrator
+    local integrator = default_iguess_integrator(method(int))
+    local h = int.problem.tstep
+    local nstages = method(int).nstages
+    local D = ndims(int)
+    local problem = int.problem
+    local S = nbasis(method(int))   
+    local x = nlsolution(int)
 
-    tem_ode = odeproblem([int.solstep.q[1],int.solstep.p[1]],tstep = h/ñ,tspan=(0,h))
-    #TODO use similar method from GeometricEquations.jl
+    tem_ode=similar(problem,[0.,h],h/nstages,(q = StateVariable(int.solstep.q[:]), p = StateVariable(int.solstep.p[:]), λ = AlgebraicVariable(problem.ics.λ)))
     sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -222,18 +228,20 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
     local D = ndims(int)
     local show_status = method(int).show_status 
     local x = nlsolution(int)
-    local NN = method(int).basis.NN
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
+    local S = nbasis(method(int))  
+    local σ = method(int).basis.activation 
 
     for k in 1:D
+        NN = Lux.Chain(Lux.Dense(1,S,σ),Lux.Dense(S,1,use_bias = false))
         if show_status
             print("\n network lables for dimension $k \n")
             print(network_labels[:,k])
         end
 
-        ps,st=Lux.setup(Random.default_rng(),NN) #Random.seed!(1)
+        ps,st=Lux.setup(Random.seed!(1),NN) #Random.seed!(1)
         opt = Optimisers.Adam()
         st_opt = Optimisers.setup(opt, ps)
         err = 0
@@ -336,7 +344,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
     WMat = hcat(W...)'
     biasMat = hcat(bias...)'
     XMat = hcat(X...)'
-    Dbasis = collect([NonLinearOneLayerBasis(σ,S,WMat[:,d],biasMat[:,d]) for d in 1:D])
+    Dbasis = collect([OneLayerNetwork(σ,S,WMat[:,d],biasMat[:,d]) for d in 1:D])
     
     # compute coefficients
     for d in 1:D 
@@ -543,13 +551,16 @@ function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
     local network_inputs = method(int).network_inputs
     local D = ndims(int)
     local S = nbasis(method(int))
-    local NN = method(int).basis.NN
+    local σ = method(int).basis.activation
+    local show_status = method(int).show_status
+
 
     if show_status
         print("\n solution x after solving by Newton \n")
         print(x)
     end
 
+    NN = Lux.Chain(Lux.Dense(1,S,σ),Lux.Dense(S,1,use_bias = false))
     ps,st=Lux.setup(Random.default_rng(),NN)
     for k in 1:D
         for i in 1:S

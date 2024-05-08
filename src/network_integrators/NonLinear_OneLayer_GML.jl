@@ -15,7 +15,7 @@ struct NonLinear_OneLayer_GML{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
     function NonLinear_OneLayer_GML(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000) where {T}
         # get number of quadrature nodes and number of basis functions
         NNODES = QuadratureRules.nnodes(quadrature)
-        NBASIS = CompactBasisFunctions.nbasis(basis)
+        NBASIS = basis.S
 
         # get quadrature nodes and weights
         quad_weights = QuadratureRules.weights(quadrature)
@@ -161,20 +161,20 @@ function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrato
     local current_step = cache(int).current_step
 
     show_status ? print("\n current time step: $current_step") : nothing
-    current_step+=1
+    current_step[1]+=1
 
     # choose initial guess method based on the value of h
-    if h > 0.5
+    if h < 0.5
         initial_guess_Extrapolation!(int)
     else
         initial_guess_integrator!(int)
     end 
     
     if show_status
-        print("\n network inputs")
+        print("\n network inputs \n")
         print(network_inputs)
 
-        print("\n network labels from initial guess methods")
+        print("\n network labels from initial guess methods \n")
         print(network_labels)
     end
 
@@ -186,6 +186,7 @@ function initial_guess_Extrapolation!(int::GeometricIntegrator{<:NonLinear_OneLa
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local D = ndims(int)
+    local h = int.problem.tstep
 
     for i in eachindex(network_inputs)
         initialguess!(solstep(int).t̄+network_inputs[i]*h, cache(int).q̃, cache(int).p̃, solstep(int), int.problem, int.iguess)
@@ -198,10 +199,15 @@ end
 
 function initial_guess_integrator!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
     local network_labels = cache(int).network_labels
-    local integrator = method(int).default_iguess_integrator
+    local integrator = default_iguess_integrator(method(int))
+    local h = int.problem.tstep
+    local N = method(int).nstages
+    local D = ndims(int)
+    local problem = int.problem
+    local S = nbasis(method(int))   
+    local x = nlsolution(int)
 
-    tem_ode = odeproblem([int.solstep.q[1],int.solstep.p[1]],tstep = h/ñ,tspan=(0,h))
-    #TODO use similar method from GeometricEquations.jl
+    tem_ode=similar(problem,[0.,h],h/N,(q = StateVariable(int.solstep.q[:]), p = StateVariable(int.solstep.p[:]), λ = AlgebraicVariable(problem.ics.λ)))
     sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -518,6 +524,7 @@ function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
     local S = nbasis(method(int))
     local NN = method(int).basis.NN
     local ps = cache(int).ps
+    local show_status = method(int).show_status
 
     if show_status
         print("\n solution x after solving by Newton \n")
@@ -530,7 +537,7 @@ function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
             ps[k][1].W[i] = x[D*(S+1)+D*(i-1)+k] 
             ps[k][1].b[i] = x[D*(S+1+S)+D*(i-1)+k]
         end
-        stage_values[:,k] = NN(network_inputs,ps[k])[1][2:end]
+        stage_values[:,k] = NN(network_inputs,ps[k])[2:end]
     end
 
     if show_status

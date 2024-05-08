@@ -3,8 +3,8 @@ module NonlinearIntegrators
     using GeometricIntegrators
     import GeometricIntegrators.Integrators: IODEIntegratorCache
     import GeometricIntegrators.Integrators: CacheDict, Cache, default_solver, default_iguess,CacheType
-    import GeometricIntegrators.Integrators: create_internal_stage_vector
-    import GeometricIntegrators.Integrators: cache,solstep,nlsolution,solver,method,iguess,problem,current
+    import GeometricIntegrators.Integrators: create_internal_stage_vector,parameters
+    import GeometricIntegrators.Integrators: cache,solstep,nlsolution,solver,method,iguess,problem,current,update!
 
     using NonlinearIntegrators
     using QuadratureRules
@@ -15,9 +15,10 @@ module NonlinearIntegrators
     using Lux
     using Statistics
     using Base
-    using Reexport
     using StaticArrays
     using SimpleSolvers
+    import SimpleSolvers: solve!
+    using GeometricMachineLearning
 
     include("network_integrators/methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod

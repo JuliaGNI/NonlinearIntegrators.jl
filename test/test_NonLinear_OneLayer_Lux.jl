@@ -1,16 +1,16 @@
+using Pkg
+# cd("IntegratorNN/GeometricIntegrators.jl")
+cd("..")
+cd("IntegratorNN")
+
+Pkg.activate(".")
+
 using GeometricIntegrators
 using NonlinearIntegrators
 using QuadratureRules
 using CompactBasisFunctions
 using GeometricProblems.HarmonicOscillator
-using Zygote
-using Random
-using Optimisers
-using Lux
-using Statistics
-using Plots
-using Base
-using Test
+
 
 # Set up the Harmonic Oscillator problem
 int_step = 0.1
@@ -26,4 +26,6 @@ square(x) = x^2
 OLnetwork = OneLayerNetwork(square,S,W,bias)
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 NLOLCGVNI = NonLinear_OneLayer_Lux(OLnetwork,QGau4)
-NLOLsol = integrate(iode, NLOLCGVNI) 
+NLOLsol = integrate(HO_iode, NLOLCGVNI) 
+
+relative_maximum_error(NLOLsol.q,HO_pref.q) 
