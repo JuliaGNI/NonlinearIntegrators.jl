@@ -20,7 +20,7 @@ HO_iode = GeometricProblems.HarmonicOscillator.iodeproblem(tspan = (0,int_timesp
 HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 
 #set up the Coupled Harmonic Oscillator problem
-CHO = GeometricProblems.CoupledHarmonicOscillator.lodeproblem(tstep=0.5,tspan=(0,5))
+CHO = GeometricProblems.CoupledHarmonicOscillator.lodeproblem(tstep=1.,tspan=(0,10))
 
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
@@ -33,10 +33,10 @@ OSS_pref = integrate(OSS, CGVI(BGau4, QGau4))
 
 
 
-S₁ = 5
-S = 3
+S₁ = 4
+S = 2
 square(x) = x^2
-OLnetwork = DenseNet_GML{Float64}(sin,S₁,S)
+OLnetwork = DenseNet_GML{Float64}(tanh,S₁,S)
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 NL_DenseGML = NonLinear_DenseNet_GML(OLnetwork,QGau4)
 
@@ -48,9 +48,7 @@ relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
 
 #CoupledHarmonicOscillator
 CHO_NLOLsol = integrate(CHO, NL_DenseGML)
-CHO_NLOLsol.q
 relative_maximum_error(CHO_NLOLsol.q,CHO_pref.q)
-CHO_pref.q
 
 #OuterSolarSystem
 OSS_NLOLsol = integrate(OSS, NL_DenseGML)
