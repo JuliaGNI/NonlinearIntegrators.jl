@@ -45,7 +45,7 @@ default_solver(::NonLinear_OneLayer_Lux) = Newton()
 default_iguess(::NonLinear_OneLayer_Lux) = MidpointExtrapolation()#CoupledHarmonicOscillator
 default_iguess_integrator(::NonLinear_OneLayer_Lux) = ImplicitMidpoint()
 
-struct NonLinear_OneLayer_LuxCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
+struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -218,7 +218,7 @@ function initial_guess_integrator!(int::GeometricIntegrator{<:NonLinear_OneLayer
     end
 end 
 
-function initial_guess_networktraining!(int)
+function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
     local D = ndims(int)
     local show_status = method(int).show_status 
     local x = nlsolution(int)
@@ -421,9 +421,6 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
 
 end
 
-function first_order_central_difference(f,x;ϵ=0.00001)
-    return (f(x+ϵ)-f(x-ϵ))/(2*ϵ)
-end
 
 function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}) where {ST}
     local D = ndims(int)
@@ -540,7 +537,7 @@ function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrat
     stages_compute!(int)
 end
 
-function stages_compute!(int)
+function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     local network_inputs = method(int).network_inputs

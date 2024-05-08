@@ -1,6 +1,11 @@
 module NonlinearIntegrators
 
     using GeometricIntegrators
+    import GeometricIntegrators.Integrators: IODEIntegratorCache
+    import GeometricIntegrators.Integrators: CacheDict, Cache, default_solver, default_iguess,CacheType
+    import GeometricIntegrators.Integrators: create_internal_stage_vector
+    import GeometricIntegrators.Integrators: cache,solstep,nlsolution,solver,method,iguess,problem,current
+
     using NonlinearIntegrators
     using QuadratureRules
     using CompactBasisFunctions
@@ -11,9 +16,13 @@ module NonlinearIntegrators
     using Statistics
     using Base
     using Reexport
+    using StaticArrays
+    using SimpleSolvers
 
     include("network_integrators/methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
+
+    include("network_integrators/utilities.jl")
 
     include("network_basis/DenseNet_GML.jl")
     include("network_basis/DenseNet_Lux.jl")
@@ -28,8 +37,5 @@ module NonlinearIntegrators
     include("network_integrators/NonLinear_OneLayer_Lux.jl")
     include("network_integrators/NonLinear_DenseNet_GML.jl")
     export NonLinear_OneLayer_GML,NonLinear_OneLayer_Lux,NonLinear_DenseNet_GML
-
-
-
 
 end

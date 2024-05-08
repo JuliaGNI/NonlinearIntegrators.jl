@@ -130,6 +130,7 @@ struct NonLinear_DenseNet_GMLCache{ST,D,S₁,S,R} <: IODEIntegratorCache{ST,D}
         return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a, 
         dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
         current_step,stage_values,network_labels)
+    end
 end
 
 function GeometricIntegrators.Integrators.reset!(cache::NonLinear_DenseNet_GMLCache, t, q, p)
@@ -272,11 +273,6 @@ function initial_guess_networktraining!(int)
 
 end
 
-function mse_loss(x,y,NN,ps;λ=1000)
-    y_pred = NN(x,ps)
-    mse_loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1]-y[1])
-    return mse_loss
-end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {ST}
     # set some local variables for convenience and clarity

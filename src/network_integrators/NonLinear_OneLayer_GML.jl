@@ -45,7 +45,7 @@ default_solver(::NonLinear_OneLayer_GML) = Newton()
 default_iguess(::NonLinear_OneLayer_GML) = MidpointExtrapolation()#CoupledHarmonicOscillator
 default_iguess_integrator(::NonLinear_OneLayer_GML) = ImplicitMidpoint()
 
-struct NonLinear_OneLayer_GMLCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
+struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -77,13 +77,11 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
 
     dqdWr₁::VecOrMat{ST}
     dqdWr₀::VecOrMat{ST}
-
     dqdbr₁::VecOrMat{ST}
     dqdbr₀::VecOrMat{ST}
 
     current_step::Vector{ST}
-
-    stage_values::Vector{ST}
+    stage_values::VecOrMat{ST}
     network_labels::VecOrMat{ST}
     function NonLinear_OneLayer_GMLCache{ST,D,S,R,N}() where {ST,D,S,R,N}
         x = zeros(ST,D*(S+1+2*S)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
@@ -120,7 +118,6 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
         
         dqdWr₁= zeros(ST, S, D)
         dqdWr₀= zeros(ST, S, D)
-    
         dqdbr₁= zeros(ST, S, D)
         dqdbr₀= zeros(ST, S, D)
 
@@ -128,7 +125,7 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
         stage_values = zeros(ST, N, D)
         network_labels = zeros(ST, N+1, D)
 
-        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a, 
+        new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a, 
             dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
             current_step,stage_values,network_labels)
     end
@@ -215,7 +212,7 @@ function initial_guess_integrator!(int::GeometricIntegrator{<:NonLinear_OneLayer
     end
 end 
 
-function initial_guess_networktraining!(int)
+function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
     local D = ndims(int)
     local S = nbasis(method(int))
 
@@ -271,11 +268,6 @@ function initial_guess_networktraining!(int)
 
 end
 
-function mse_loss(x,y,NN,ps;λ=1000)
-    y_pred = NN(x,ps)
-    mse_loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1]-y[1])
-    return mse_loss
-end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
     local D = ndims(int)
@@ -402,9 +394,6 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
 
 end
 
-function first_order_central_difference(f,x;ϵ=0.00001)
-    return (f(x+ϵ)-f(x-ϵ))/(2*ϵ)
-end
 
 function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
     local D = ndims(int)
