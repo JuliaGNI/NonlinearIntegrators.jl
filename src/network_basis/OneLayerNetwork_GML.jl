@@ -1,6 +1,6 @@
 using AbstractNeuralNetworks
 
-struct OneLayerNetwork_GML{T,NT}<:Basis{T}
+struct OneLayerNetwork_GML{T,NT}<:OneLayerNetBasis{T}
     activation
     S::Int
     NN::NT

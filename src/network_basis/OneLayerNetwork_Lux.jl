@@ -1,5 +1,5 @@
 using Lux
-struct OneLayerNetwork_Lux{T,NT}<:Basis{T}
+struct OneLayerNetwork_Lux{T,NT}<:OneLayerNetBasis{T}
     activation
     S::Int
     NN::NT

@@ -1,7 +1,7 @@
 using CompactBasisFunctions
 using ContinuumArrays
 
-struct OneLayerNetwork{T,BT}<:Basis{T} 
+struct OneLayerNetwork{T,BT}<:OneLayerNetBasis{T} 
     b::BT
     activation
     S::Int

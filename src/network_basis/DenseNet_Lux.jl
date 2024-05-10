@@ -2,7 +2,7 @@ using Lux
 using CompactBasisFunctions
 using ContinuumArrays
 
-struct DenseNet_Lux{T,NT}<:Basis{T}
+struct DenseNet_Lux{T,NT}<:DenseNetBasis{T}
     activation
     S₁::Int
     S::Int

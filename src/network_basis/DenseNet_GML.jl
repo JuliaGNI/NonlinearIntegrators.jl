@@ -2,7 +2,7 @@ using CompactBasisFunctions
 using AbstractNeuralNetworks
 using ContinuumArrays
 
-struct DenseNet_GML{T,NT}<:Basis{T}
+struct DenseNet_GML{T,NT}<:DenseNetBasis{T}
     activation
     S₁::Int
     S::Int
