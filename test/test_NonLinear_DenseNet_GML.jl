@@ -17,7 +17,7 @@ using GeometricProblems
 int_step = 0.5
 int_timespan = 5.
 
-HO_iode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
+HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
 HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 
 #set up the Coupled Harmonic Oscillator problem
@@ -32,8 +32,6 @@ OSS = GeometricProblems.OuterSolarSystem.lodeproblem(tstep=int_step,tspan=(0,int
 OSS_pref = integrate(OSS, CGVI(BGau4, QGau4))
 
 
-
-
 S₁ = 4
 S = 2
 square(x) = x^2
@@ -43,9 +41,8 @@ NL_DenseGML = NonLinear_DenseNet_GML(OLnetwork,QGau4)
 
 
 #HarmonicOscillator
-HO_NLOLsol = integrate(HO_iode, NL_DenseGML)
+HO_NLOLsol = integrate(HO_lode, NL_DenseGML)
 relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
-
 
 #CoupledHarmonicOscillator
 CHO_NLOLsol = integrate(CHO, NL_DenseGML)
