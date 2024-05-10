@@ -272,7 +272,7 @@ function initial_guess_networktraining!(int)
 
 
     if show_status
-        print("\n network parameters for dimension $k \n")
+        print("\n network parameters \n")
         print(ps)
 
         print("\n initial guess x from network training \n")

@@ -1,7 +1,7 @@
 using Pkg
 
 # cd("IntegratorNN/GeometricIntegrators.jl")
-cd("..")
+# cd("..")
 cd("IntegratorNN")
 
 Pkg.activate(".")
@@ -40,18 +40,18 @@ S = 2
 square(x) = x^2
 OLnetwork = DenseNet_GML{Float64}(tanh,S₁,S)
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
-NL_DenseGML = Linear_DenseNet_GML(OLnetwork,QGau4)
+L_DenseGML = Linear_DenseNet_GML(OLnetwork,QGau4)
 
 
 #HarmonicOscillator
-HO_NLOLsol = integrate(HO_iode, NL_DenseGML)
+HO_NLOLsol = integrate(HO_iode, L_DenseGML)
 relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
 
 
 #CoupledHarmonicOscillator
-CHO_NLOLsol = integrate(CHO, NL_DenseGML)
+CHO_NLOLsol = integrate(CHO, L_DenseGML)
 relative_maximum_error(CHO_NLOLsol.q,CHO_pref.q)
 
 #OuterSolarSystem
-OSS_NLOLsol = integrate(OSS, NL_DenseGML)
+OSS_NLOLsol = integrate(OSS, L_DenseGML)
 relative_maximum_error(OSS_NLOLsol.q,OSS_pref.q)
