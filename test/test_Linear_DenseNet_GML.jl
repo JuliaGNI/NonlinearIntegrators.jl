@@ -36,7 +36,7 @@ OSS_pref = integrate(OSS, CGVI(BGau4, QGau4))
 
 
 S₁ = 4
-S = 2
+S = 4
 square(x) = x^2
 OLnetwork = DenseNet_GML{Float64}(tanh,S₁,S)
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)

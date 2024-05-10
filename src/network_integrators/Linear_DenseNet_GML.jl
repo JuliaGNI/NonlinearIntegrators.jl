@@ -297,7 +297,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
 
     if ST != Float64 
         for k in 1:D
-            for layers in 1:length(float_ps[k])-2
+            for layers in 1:length(float_ps[k])-1
                 ps[k][layers].W[:] = float_ps[k][layers].W[:]
                 ps[k][layers].b[:] = float_ps[k][layers].b[:]
             end
@@ -474,5 +474,5 @@ function stages_compute!(int::GeometricIntegrator{<:Linear_DenseNet_GML})
         print("\n stages prediction after solving \n")
         print(stage_values)
     end
-
+ß
 end
