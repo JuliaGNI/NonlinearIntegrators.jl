@@ -474,5 +474,5 @@ function stages_compute!(int::GeometricIntegrator{<:Linear_DenseNet_GML})
         print("\n stages prediction after solving \n")
         print(stage_values)
     end
-ß
+
 end
