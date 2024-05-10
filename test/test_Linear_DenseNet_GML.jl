@@ -1,4 +1,5 @@
 using Pkg
+
 # cd("IntegratorNN/GeometricIntegrators.jl")
 cd("..")
 cd("IntegratorNN")
@@ -39,7 +40,7 @@ S = 2
 square(x) = x^2
 OLnetwork = DenseNet_GML{Float64}(tanh,S₁,S)
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
-NL_DenseGML = NonLinear_DenseNet_GML(OLnetwork,QGau4)
+NL_DenseGML = Linear_DenseNet_GML(OLnetwork,QGau4)
 
 
 #HarmonicOscillator
