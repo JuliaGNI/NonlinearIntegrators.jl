@@ -37,6 +37,7 @@ module NonlinearIntegrators
     include("network_integrators/NonLinear_OneLayer_GML.jl")
     include("network_integrators/NonLinear_OneLayer_Lux.jl")
     include("network_integrators/NonLinear_DenseNet_GML.jl")
-    export NonLinear_OneLayer_GML,NonLinear_OneLayer_Lux,NonLinear_DenseNet_GML
+    include("network_integrators/Linear_DenseNet_GML.jl")
+    export NonLinear_OneLayer_GML,NonLinear_OneLayer_Lux,NonLinear_DenseNet_GML,Linear_DenseNet_GML
 
 end
