@@ -15,8 +15,8 @@ using GeometricProblems
 # Set up the Harmonic Oscillator problem
 int_step = 0.1
 int_timespan = 1
-HO_iode = HarmonicOscillator.iodeproblem(tspan = (0,int_timespan),tstep = int_step)
-HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
+HO_iode = GeometricProblems.HarmonicOscillator.iodeproblem(tspan = (0,int_timespan),tstep = int_step)
+HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 
 
 
