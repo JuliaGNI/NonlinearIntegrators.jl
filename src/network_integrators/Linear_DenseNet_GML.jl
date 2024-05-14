@@ -211,6 +211,7 @@ function initial_guess_networktraining!(int)
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
+    local backend = method(int).basis.backend
 
     for k in 1:D
         if show_status
@@ -220,7 +221,7 @@ function initial_guess_networktraining!(int)
 
         labels = reshape(network_labels[:,k],1,nstages+1)
 
-        ps[k] = AbstractNeuralNetworks.initialparameters(NN,CPU(),Float64)
+        ps[k] = AbstractNeuralNetworks.initialparameters(NN,backend,Float64)
         opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
         err = 0
         for ep in 1:nepochs
@@ -237,7 +238,7 @@ function initial_guess_networktraining!(int)
         end
 
         for i in 1:S
-            x[D*(i-1)+k] = ps[k][end].W[i]
+            x[D*(i-1)+k] = Array(ps[k][end].W[i])
         end
 
     end

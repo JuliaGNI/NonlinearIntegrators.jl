@@ -1,13 +1,14 @@
 using AbstractNeuralNetworks
 
-struct OneLayerNetwork_GML{T,NT}<:OneLayerNetBasis{T}
+struct OneLayerNetwork_GML{T,NT,BT}<:OneLayerNetBasis{T}
     activation
     S::Int
     NN::NT
-    function OneLayerNetwork_GML{T}(activation,S) where {T}
+    backend::BT
+    function OneLayerNetwork_GML{T}(activation,S;backend=CPU()) where {T}
         NN = AbstractNeuralNetworks.Chain(AbstractNeuralNetworks.Dense(1,S,activation),
             AbstractNeuralNetworks.Dense(S,1,identity,use_bias= false))
-        new{T,typeof(NN)}(activation,S,NN)
+        new{T,typeof(NN),typeof(backend)}(activation,S,NN,backend)
     end
 end
 

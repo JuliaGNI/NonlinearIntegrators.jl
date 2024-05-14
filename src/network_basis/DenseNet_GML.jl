@@ -2,18 +2,19 @@ using CompactBasisFunctions
 using AbstractNeuralNetworks
 using ContinuumArrays
 
-struct DenseNet_GML{T,NT}<:DenseNetBasis{T}
+struct DenseNet_GML{T,NT,BT}<:DenseNetBasis{T}
     activation
     S₁::Int
     S::Int
     layers::Int
     NN::NT
-    function DenseNet_GML{T}(activation,S₁,S;layers=4) where {T}
+    backend::BT
+    function DenseNet_GML{T}(activation,S₁,S;layers=4,backend=CPU()) where {T}
         NN = AbstractNeuralNetworks.Chain(AbstractNeuralNetworks.Dense(1,S₁,activation),
                                         AbstractNeuralNetworks.Dense(S₁,S₁,activation),
                                         AbstractNeuralNetworks.Dense(S₁,S,activation),
                                         AbstractNeuralNetworks.Dense(S,1,identity,use_bias= false))
-        new{T,typeof(NN)}(activation,S₁,S,layers,NN)
+        new{T,typeof(NN),typeof(backend)}(activation,S₁,S,layers,NN,backend)
     end
 end
 
