@@ -1,6 +1,7 @@
 using Pkg
+
 # cd("IntegratorNN/GeometricIntegrators.jl")
-cd("..")
+# cd("..")
 cd("IntegratorNN")
 
 Pkg.activate(".")
