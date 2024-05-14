@@ -30,7 +30,7 @@ end
 function mse_loss(x,y::AbstractArray{T},NN,ps;λ=1000) where T
     y_pred = NN(x,ps)
     index_vec = vcat(KernelAbstractions.ones(get_backend(y),T,1), KernelAbstractions.zeros(get_backend(y),T,10))
-    mse_loss = mean(abs,y_pred - y) + λ*abs2(index_vec'*(y_pred - y))
+    mse_loss = mean(abs,y_pred - y) + λ*abs2((y_pred - y) * index_vec)
     return mse_loss
 end
 
