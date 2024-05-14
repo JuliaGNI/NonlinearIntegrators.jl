@@ -241,6 +241,7 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
         labels = reshape(network_labels[:,k],1,nstages+1)
 
         if backend ==CUDABackend()
+            network_inputs =  CuArray(network_inputs)
             labels = CuArray(labels)
         end
 
