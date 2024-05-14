@@ -20,6 +20,7 @@ module NonlinearIntegrators
     import SimpleSolvers: solve!
     using GeometricMachineLearning
     using CUDA
+    using KernelAbstractions
 
     include("network_integrators/methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
