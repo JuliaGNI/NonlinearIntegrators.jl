@@ -29,7 +29,8 @@ end
 
 function mse_loss(x,y,NN,ps;λ=1000)
     y_pred = NN(x,ps)
-    mse_loss = mean(abs,y_pred - y) + λ*abs2((CUDA.@allowscalar y_pred[1]) - (CUDA.@allowscalar y[1]))
+    index_vec = vcat(CUDA.ones(1), CUDA.zeros(10))
+    mse_loss = mean(abs,y_pred - y) + λ*abs2(index_vec'*(y_pred - y))
     return mse_loss
 end
 
