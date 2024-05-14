@@ -237,8 +237,12 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
             print("\n network lables for dimension $k \n")
             print(network_labels[:,k])
         end
-
+        
         labels = reshape(network_labels[:,k],1,nstages+1)
+
+        if backend ==CUDABackend()
+            labels = CuArray(labels)
+        end
 
         ps[k] = AbstractNeuralNetworks.initialparameters(NN,backend,Float64)
         opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
