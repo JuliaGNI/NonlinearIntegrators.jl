@@ -10,29 +10,10 @@ function first_order_forward_difference(f,x;ϵ=0.00001)
     return (f(x+ϵ)-f(x))/ϵ
 end
 
-# @kernel function index_first_element_kernel(output::AbstractArray{T}, y::AbstractArray{T}) where T
-#     i = @index(Global)
-#     output[i] = y[i]
-    
-#     nothing
-# end
-
-# function get_first_element(y::AbstractVector{T}) where T
-#     backend = KernelAbstractions.get_backend(y)
-#     output = KernelAbstractions.zeros(T, 1)
-#     index_first_element! = index_first_element!
-
-#     index_first_element!(output, y, ndrange = length(output))
-
-#     sum(output)
-# end
 
 function mse_loss(x,y::AbstractArray{T},NN,ps;λ=1000) where T
     y_pred = NN(x,ps)
-    index_vec = vcat(KernelAbstractions.ones(get_backend(y),T,1), KernelAbstractions.zeros(get_backend(y),T,10))
-    @show size(index_vec)
-    @show size(y_pred - y)
-    mse_loss = mean(abs,y_pred - y) + λ*abs2(sum((y_pred - y) * index_vec))
+    mse_loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1] - y[1])
     return mse_loss
 end
 
