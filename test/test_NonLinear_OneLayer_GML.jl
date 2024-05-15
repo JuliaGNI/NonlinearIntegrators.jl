@@ -35,11 +35,12 @@ OSS_pref = integrate(OSS, CGVI(BGau4, QGau4))
 
 S = 4
 square(x) = x^2
+QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 OLnetwork = OneLayerNetwork_GML{Float64}(square,S)
 NLOLCGVNI = NonLinear_OneLayer_GML(OLnetwork,QGau4)
 
 #HarmonicOscillator
-HO_NLOLsol = integrate(HO_iode, NLOLCGVNI)
+@time HO_NLOLsol = integrate(HO_iode, NLOLCGVNI)
 relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
 
 
