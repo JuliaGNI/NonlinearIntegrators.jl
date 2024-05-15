@@ -262,9 +262,9 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
         end
 
         for i in 1:S
-            x[D*(i-1)+k] = Array(ps[k][2].W[i])
-            x[D*(S+1)+D*(i-1)+k] = Array(ps[k][1].W[i])
-            x[D*(S+1 + S)+D*(i-1)+k] = Array(ps[k][1].b[i])
+            x[D*(i-1)+k] = ps[k][2].W[i]
+            x[D*(S+1)+D*(i-1)+k] = ps[k][1].W[i]
+            x[D*(S+1 + S)+D*(i-1)+k] = ps[k][1].b[i]
         end
     end
 

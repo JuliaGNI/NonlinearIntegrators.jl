@@ -16,7 +16,7 @@ using GeometricProblems
 # Set up the Harmonic Oscillator problem
 int_step = 0.1
 int_timespan = 1
-HO_iode = GeometricProblems.HarmonicOscillator.iodeproblem(tspan = (0,int_timespan),tstep = int_step)
+HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
 HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 
 
@@ -40,7 +40,7 @@ OLnetwork = OneLayerNetwork_GML{Float64}(square,S)
 NLOLCGVNI = NonLinear_OneLayer_GML(OLnetwork,QGau4)
 
 #HarmonicOscillator
-@time HO_NLOLsol = integrate(HO_iode, NLOLCGVNI)
+@time HO_NLOLsol = integrate(HO_lode, NLOLCGVNI)
 relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
 
 
