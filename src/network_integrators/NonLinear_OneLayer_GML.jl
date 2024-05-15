@@ -231,6 +231,7 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
     local backend = method(int).basis.backend
+    local current_step = cache(int).current_step
 
     for k in 1:D
         if show_status
@@ -245,7 +246,10 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
             labels = CuArray(labels)
         end
 
+        # if current_step[1] == 1 
         ps[k] = AbstractNeuralNetworks.initialparameters(NN,backend,Float64)
+        # end
+
         opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
         err = 0
         for ep in 1:nepochs
@@ -517,6 +521,11 @@ function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrat
 
     #compute the trajectory after solving by newton method
     stages_compute!(int)
+
+    #check for NaNs
+    if sum(isnan.(cache(int).q̃[:])) > 0 
+        error("NaN value encountered, terminating program.")
+    end
 end
 
 function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})

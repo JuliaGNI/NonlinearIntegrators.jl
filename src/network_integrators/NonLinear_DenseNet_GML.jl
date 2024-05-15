@@ -222,7 +222,7 @@ function initial_guess_integrator!(int::GeometricIntegrator{<:NonLinear_DenseNet
     end
 end 
 
-function initial_guess_networktraining!(int)
+function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
     local D = ndims(int)
     local S = nbasis(method(int))
     local S₁ = int.method.basis.S₁
@@ -236,6 +236,7 @@ function initial_guess_networktraining!(int)
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
     local backend = method(int).basis.backend
+    local current_step = cache(int).current_step
 
     for k in 1:D
         if show_status
@@ -245,7 +246,10 @@ function initial_guess_networktraining!(int)
 
         labels = reshape(network_labels[:,k],1,nstages+1)
 
+        # if current_step[1] == 1 
         ps[k] = AbstractNeuralNetworks.initialparameters(NN,backend,Float64)
+        # end
+
         opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
         err = 0
         for ep in 1:nepochs
@@ -262,11 +266,11 @@ function initial_guess_networktraining!(int)
         end
 
         for i in 1:S
-            x[D*(i-1)+k] = Array(ps[k][end].W[i])
+            x[D*(i-1)+k] = ps[k][end].W[i]
             for kk in 1:S₁
-                x[D*(S+1)+D*(i-1)*S₁+D*(kk-1)+k] = Array(ps[k][end-1].W[i,kk])
+                x[D*(S+1)+D*(i-1)*S₁+D*(kk-1)+k] = ps[k][end-1].W[i,kk]
             end
-            x[D*(S+1+S₁*S)+D*(i-1)+k] = Array(ps[k][end-1].b[i])
+            x[D*(S+1+S₁*S)+D*(i-1)+k] = ps[k][end-1].b[i]
         end
 
     end
@@ -542,6 +546,11 @@ function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrat
 
     #compute the trajectory after solving by newton method
     stages_compute!(int)
+    
+    #check for NaNs
+    if sum(isnan.(cache(int).q̃[:])) > 0 
+        error("NaN value encountered, terminating program.")
+    end
 end
 
 function stages_compute!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML})

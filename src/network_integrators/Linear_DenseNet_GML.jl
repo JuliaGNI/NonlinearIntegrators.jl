@@ -238,7 +238,7 @@ function initial_guess_networktraining!(int)
         end
 
         for i in 1:S
-            x[D*(i-1)+k] = Array(ps[k][end].W[i])
+            x[D*(i-1)+k] = ps[k][end].W[i]
         end
 
     end

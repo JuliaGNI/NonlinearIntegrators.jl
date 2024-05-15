@@ -15,7 +15,7 @@ using GeometricProblems
 
 # Set up the Harmonic Oscillator problem
 int_step = 0.1
-int_timespan = 1
+int_timespan = 300
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
 HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 
@@ -24,7 +24,7 @@ HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
 #set up the Coupled Harmonic Oscillator problem
-CHO = GeometricProblems.CoupledHarmonicOscillator.lodeproblem(tstep=0.1,tspan=(0,1))
+CHO = GeometricProblems.CoupledHarmonicOscillator.lodeproblem(tstep=0.5,tspan=(0,20))
 CHO_pref = integrate(CHO, CGVI(BGau4, QGau4))
 
 #set up the OuterSolarSystem
@@ -33,16 +33,15 @@ OSS_pref = integrate(OSS, CGVI(BGau4, QGau4))
 
 
 
-S = 4
+S = 6
 square(x) = x^2
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
-OLnetwork = OneLayerNetwork_GML{Float64}(square,S)
-NLOLCGVNI = NonLinear_OneLayer_GML(OLnetwork,QGau4)
+OLnetwork = OneLayerNetwork_GML{Float64}(sin,S)
+NLOLCGVNI = NonLinear_OneLayer_GML(OLnetwork,QGau4,training_epochs = 50000)
 
 #HarmonicOscillator
 @time HO_NLOLsol = integrate(HO_lode, NLOLCGVNI)
 relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
-
 
 #CoupledHarmonicOscillator
 CHO_NLOLsol = integrate(CHO, NLOLCGVNI)

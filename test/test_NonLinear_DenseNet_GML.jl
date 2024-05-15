@@ -1,6 +1,6 @@
 using Pkg
 # cd("IntegratorNN/GeometricIntegrators.jl")
-cd("..")
+# cd("..")
 cd("IntegratorNN")
 
 Pkg.activate(".")
@@ -15,7 +15,7 @@ using GeometricProblems
 
 # Set up the Harmonic Oscillator problem
 int_step = 0.5
-int_timespan = 5.
+int_timespan = 20.
 
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
 HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
@@ -32,10 +32,10 @@ OSS = GeometricProblems.OuterSolarSystem.lodeproblem(tstep=int_step,tspan=(0,int
 OSS_pref = integrate(OSS, CGVI(BGau4, QGau4))
 
 
-S₁ = 4
-S = 2
-square(x) = x^2
-OLnetwork = DenseNet_GML{Float64}(tanh,S₁,S,backend=CPU())
+S₁ = 6
+S = 4
+square(x) = x^3
+OLnetwork = DenseNet_GML{Float64}(cos,S₁,S)
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 NL_DenseGML = NonLinear_DenseNet_GML(OLnetwork,QGau4)
 

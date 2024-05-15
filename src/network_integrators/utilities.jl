@@ -11,9 +11,9 @@ function first_order_forward_difference(f,x;ϵ=0.00001)
 end
 
 
-function mse_loss(x,y::AbstractArray{T},NN,ps;λ=1000,μ = 0.1) where T
+function mse_loss(x,y::AbstractArray{T},NN,ps;λ=1000,μ = 0.00001) where T
     y_pred = NN(x,ps)
-    mse_loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1] - y[1]) + μ*norm(ps)
+    mse_loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1] - y[1])
     return mse_loss
 end
 
