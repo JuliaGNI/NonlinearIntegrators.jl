@@ -61,7 +61,7 @@ struct NonLinear_DenseNet_GMLCache{ST,D,S₁,S,R,N} <: IODEIntegratorCache{ST,D}
     V::Vector{Vector{ST}}
     F::Vector{Vector{ST}}
 
-    ps::Vector{Tuple{NamedTuple{},NamedTuple{},NamedTuple{},NamedTuple{}}}
+    ps::Vector{Tuple{NamedTuple{},NamedTuple{},NamedTuple{}}}
 
     r₀::VecOrMat{ST}
     r₁::VecOrMat{ST}
@@ -105,7 +105,6 @@ struct NonLinear_DenseNet_GMLCache{ST,D,S₁,S,R,N} <: IODEIntegratorCache{ST,D}
 
         # create hidden layer parameter vectors
         ps = [((W = zeros(ST,S₁,1),b = zeros(ST,S₁)),
-                (W = zeros(ST,S₁,S₁),b = zeros(ST,S₁)),
                 (W = zeros(ST,S,S₁),b = zeros(ST,S)),
                 (W = zeros(ST,1,S),))  for k in 1:D]
 
@@ -246,11 +245,10 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_Den
 
         labels = reshape(network_labels[:,k],1,nstages+1)
 
-        # if current_step[1] == 1 
         ps[k] = AbstractNeuralNetworks.initialparameters(NN,backend,Float64)
-        # end
 
-        opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
+        # opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
+        opt = GeometricMachineLearning.Optimizer(AdamOptimizerWithDecay(nepochs,1e-3, 5e-5), ps[k])
         err = 0
         for ep in 1:nepochs
             gs = Zygote.gradient(p -> mse_loss(network_inputs,labels,NN,p)[1],ps[k])[1]
@@ -546,7 +544,7 @@ function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrat
 
     #compute the trajectory after solving by newton method
     stages_compute!(int)
-    
+
     #check for NaNs
     if sum(isnan.(cache(int).q̃[:])) > 0 
         error("NaN value encountered, terminating program.")

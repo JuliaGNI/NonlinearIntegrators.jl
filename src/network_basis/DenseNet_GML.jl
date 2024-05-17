@@ -9,9 +9,8 @@ struct DenseNet_GML{T,NT,BT}<:DenseNetBasis{T}
     layers::Int
     NN::NT
     backend::BT
-    function DenseNet_GML{T}(activation,S₁,S;layers=4,backend=CPU()) where {T}
+    function DenseNet_GML{T}(activation,S₁,S;layers=3,backend=CPU()) where {T}
         NN = AbstractNeuralNetworks.Chain(AbstractNeuralNetworks.Dense(1,S₁,activation),
-                                        AbstractNeuralNetworks.Dense(S₁,S₁,activation),
                                         AbstractNeuralNetworks.Dense(S₁,S,activation),
                                         AbstractNeuralNetworks.Dense(S,1,identity,use_bias= false))
         new{T,typeof(NN),typeof(backend)}(activation,S₁,S,layers,NN,backend)
@@ -22,7 +21,7 @@ end
 function Base.show(io::IO,basis::DenseNet_GML)
     print(io, "\n")
     print(io, "  =========================================", "\n")
-    print(io, "  =======4 Layer NetworkBasis by GML=======", "\n")
+    print(io, "  =======3 Layer NetworkBasis by GML=======", "\n")
     print(io, "  =========================================", "\n")
     print(io, "\n")
     print(io, "    Activation function σ  = ", basis.activation, "\n")

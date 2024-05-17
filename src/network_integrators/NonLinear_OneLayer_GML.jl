@@ -250,7 +250,9 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
         ps[k] = AbstractNeuralNetworks.initialparameters(NN,backend,Float64)
         # end
 
-        opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
+        # opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
+        opt = GeometricMachineLearning.Optimizer(AdamOptimizerWithDecay(nepochs,1e-3, 5e-5), ps[k])
+
         err = 0
         for ep in 1:nepochs
             gs = Zygote.gradient(p -> mse_loss(network_inputs,labels,NN,p)[1],ps[k])[1]
@@ -523,9 +525,9 @@ function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrat
     stages_compute!(int)
 
     #check for NaNs
-    if sum(isnan.(cache(int).q̃[:])) > 0 
-        error("NaN value encountered, terminating program.")
-    end
+    # if sum(isnan.(cache(int).q̃[:])) > 0 
+    #     error("NaN value encountered, terminating program.")
+    # end
 end
 
 function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
