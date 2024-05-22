@@ -241,7 +241,7 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
             print(network_labels[:,k])
         end
 
-        ps,st=Lux.setup(Random.seed!(1),NN) #Random.seed!(1)
+        ps,st=Lux.setup(Random.default_rng(),NN) #Random.seed!(1)
         opt = Optimisers.Adam()
         st_opt = Optimisers.setup(opt, ps)
         err = 0
@@ -264,11 +264,13 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
             x[D*(S+1 + S)+D*(i-1)+k] = ps.layer_1.bias[i]
         end
 
+        if show_status
+            print("\n network parameters \n")
+            print(ps)
+        end
     end
 
     if show_status
-        print("\n network parameters \n")
-        print(ps)
         print("\n initial guess x from network training \n")
         print(x)
     end
