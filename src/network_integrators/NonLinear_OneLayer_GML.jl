@@ -164,11 +164,11 @@ function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrato
     current_step[1]+=1
 
     # choose initial guess method based on the value of h
-    if h < 0.5
-        initial_guess_Extrapolation!(int)
-    else
-        initial_guess_integrator!(int)
-    end 
+    # if h < 0.5
+    #     initial_guess_Extrapolation!(int)
+    # else
+    initial_guess_integrator!(int)
+    # end 
     
     if show_status
         print("\n network inputs \n")
@@ -258,14 +258,9 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
             gs = Zygote.gradient(p -> mse_loss(network_inputs,labels,NN,p)[1],ps[k])[1]
             optimization_step!(opt, NN, ps[k], gs)
             err = mse_loss(network_inputs,labels,NN,ps[k])[1]
-
-            if err < 5e-5
-                show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
-                break
-            elseif ep == nepochs
-                show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
-            end
         end
+
+        show_status ? print("\n dimension $k,final loss: $err by $nepochs epochs") : nothing
 
         for i in 1:S
             x[D*(i-1)+k] = ps[k][2].W[i]
@@ -557,6 +552,10 @@ function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
     if show_status
         print("\n stages prediction after solving \n")
         print(stage_values)
+        print("\n sol from this step \n")
+        print("q:",solstep(int).q,"\n")
+        print("p:",solstep(int).p,"\n")
+
     end
 
 end
