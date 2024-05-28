@@ -546,9 +546,9 @@ function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrat
     stages_compute!(int)
 
     #check for NaNs
-    if sum(isnan.(cache(int).q̃[:])) > 0 
-        error("NaN value encountered, terminating program.")
-    end
+    # if sum(isnan.(cache(int).q̃[:])) > 0 
+    #     error("NaN value encountered, terminating program.")
+    # end
 end
 
 function stages_compute!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML})

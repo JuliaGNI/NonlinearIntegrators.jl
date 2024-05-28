@@ -10,7 +10,7 @@ struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
 
     nstages::Int
     show_status::Bool
-    network_inputs::Vector{T}
+    network_inputs::Matrix{T}
     training_epochs::Int
     function NonLinear_OneLayer_Lux(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000) where {T}
         # get number of quadrature nodes and number of basis functions
@@ -21,7 +21,7 @@ struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
         quad_weights = QuadratureRules.weights(quadrature)
         quad_nodes = QuadratureRules.nodes(quadrature)
 
-        network_inputs = collect(0:1/nstages:1)
+        network_inputs = reshape(collect(0:1/nstages:1),1,nstages+1)
         new{T, NBASIS, NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, training_epochs)
     end
 end
@@ -41,9 +41,9 @@ issymmetric(::Union{NonLinear_OneLayer_Lux, Type{<:NonLinear_OneLayer_Lux}}) = m
 issymplectic(::Union{NonLinear_OneLayer_Lux, Type{<:NonLinear_OneLayer_Lux}}) = missing
 
 default_solver(::NonLinear_OneLayer_Lux) = Newton()
-# default_iguess(::NonLinear_OneLayer_Lux) = HermiteExtrapolation()# HarmonicOscillator
 default_iguess(::NonLinear_OneLayer_Lux) = MidpointExtrapolation()#CoupledHarmonicOscillator
-default_iguess_integrator(::NonLinear_OneLayer_Lux) = ImplicitMidpoint()
+# default_iguess_integrator(::NonLinear_OneLayer_Lux) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
+default_iguess_integrator(::NonLinear_OneLayer_Lux) =  ImplicitMidpoint()
 
 struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
     x::Vector{ST}
@@ -253,6 +253,7 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
             err = mse_loss(network_inputs',network_labels[:,k]',NN,ps[k],st)[1]
             show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
         end
+        show_status ? print("\n dimension $k,final loss: $errs by $nepochs epochs") : nothing
 
         for i in 1:S
             x[D*(i-1)+k] = ps[k].layer_2.weight[i]
@@ -260,11 +261,13 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
             x[D*(S+1 + S)+D*(i-1)+k] = ps[k].layer_1.bias[i]
         end
 
+        if show_status
+            print("\n network parameters \n")
+            print(ps)
+        end
     end
 
     if show_status
-        print("\n network parameters \n")
-        print(ps)
         print("\n initial guess x from network training \n")
         print(x)
     end
@@ -273,7 +276,7 @@ end
 
 function mse_loss(x,y,model, ps, st;λ=1000)
     y_pred, st = model(x, ps, st)
-    mse_loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1][1]-y[1])
+    mse_loss = mean(abs2,y_pred - y) + λ*abs2(y_pred[1][1]-y[1])
     return mse_loss, ps,()
 end
 
@@ -539,7 +542,7 @@ function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
             ps.layer_1.weight[i] = x[D*(S+1)+D*(i-1)+k] 
             ps.layer_1.bias[i] = x[D*(S+1+S)+D*(i-1)+k]
         end         
-        stage_values[:,k] = NN(network_inputs',ps,st)[1][2:end]
+        stage_values[:,k] = NN(network_inputs,ps,st)[1][2:end]
     end 
 
     if show_status

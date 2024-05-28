@@ -9,7 +9,7 @@ using GeometricIntegrators
 using NonlinearIntegrators
 using QuadratureRules
 using CompactBasisFunctions
-using GeometricProblems.HarmonicOscillator
+using GeometricProblems
 
 
 # Set up the Harmonic Oscillator problem
@@ -25,5 +25,12 @@ OLnetwork = NonlinearIntegrators.OneLayerNetwork_Lux{Float64}(S,square)
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 NLOLCGVNI = NonlinearIntegrators.NonLinear_OneLayer_Lux(OLnetwork,QGau4)
 NLOLsol = integrate(HO_iode, NLOLCGVNI) 
-
 relative_maximum_error(NLOLsol.q,HO_pref.q) 
+
+DP_NLOLsol = integrate(DP_lode, NLOLCGVNI) 
+relative_maximum_error(DP_NLOLsol.q,DP_pref.q) 
+
+NonlinearIntegrators.draw_comparison(DP_lode,GeometricProblems.DoublePendulum.hamiltonian,
+                ["CGVN","Gauss(8)",],
+                DP_NLOLsol,DP_pref)
+
