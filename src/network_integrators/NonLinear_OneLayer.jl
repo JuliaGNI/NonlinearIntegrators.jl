@@ -15,7 +15,7 @@ struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
     function NonLinear_OneLayer_Lux(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000) where {T}
         # get number of quadrature nodes and number of basis functions
         NNODES = QuadratureRules.nnodes(quadrature)
-        NBASIS = basis.S
+        NBASIS = CompactBasisFunctions.nbasis(basis)
 
         # get quadrature nodes and weights
         quad_weights = QuadratureRules.weights(quadrature)
@@ -63,8 +63,8 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
     V::Vector{Vector{ST}}
     F::Vector{Vector{ST}}
 
-    ps::Vector{@NamedTuple{layer_1::@NamedTuple{weight::Matrix{Float64}, bias::Matrix{Float64}}, layer_2::@NamedTuple{weight::Matrix{Float64}}}}
-    st::@NamedTuple{}
+    W ::Vector{Vector{ST}}
+    bias::Vector{Vector{ST}}
 
     r₀::VecOrMat{ST}
     r₁::VecOrMat{ST}
@@ -107,8 +107,8 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
         F = create_internal_stage_vector(ST,D,R)
 
         # create first layer parameter vectors
-        ps = [(layer_1 = (weight = zeros(ST,S,1), bias = zeros(ST,S,1)), layer_2 = (weight = zeros(ST,1,S),))  for k in 1:D]
-        st = NamedTuple()
+        W = create_internal_stage_vector(ST, D, S)
+        bias = create_internal_stage_vector(ST, D, S)
 
         r₀ = zeros(ST, S, D)
         r₁ = zeros(ST, S, D)
@@ -131,7 +131,7 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
         stage_values = zeros(ST, N, D)
         network_labels = zeros(ST, N+1, D)
 
-        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, st, r₀, r₁, m, a, 
+        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, W, bias, r₀, r₁, m, a, 
             dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
             current_step,stage_values,network_labels)
     end
@@ -228,36 +228,40 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
     local D = ndims(int)
     local show_status = method(int).show_status 
     local x = nlsolution(int)
-    local S = nbasis(method(int))  
-
-    local nepochs = method(int).training_epochs
-    local NN = method(int).basis.NN
-    local ps = cache(int).ps
-    local st = cache(int).st
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
+    local nepochs = method(int).training_epochs
+    local S = nbasis(method(int))  
+    local σ = method(int).basis.activation 
 
     for k in 1:D
+        NN = Lux.Chain(Lux.Dense(1,S,σ),Lux.Dense(S,1,use_bias = false))
         if show_status
             print("\n network lables for dimension $k \n")
             print(network_labels[:,k])
         end
 
-        ps[k],st=Lux.setup(Random.default_rng(),NN) #Random.seed!(1)
+        ps,st=Lux.setup(Random.seed!(1),NN) #Random.seed!(1)
         opt = Optimisers.Adam()
-        st_opt = Optimisers.setup(opt, ps[k])
+        st_opt = Optimisers.setup(opt, ps)
         err = 0
         for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs',network_labels[:,k]',NN,p,st)[1],ps[k])[1]
-            st_opt, ps = Optimisers.update(st_opt, ps[k], gs)
-            err = mse_loss(network_inputs',network_labels[:,k]',NN,ps[k],st)[1]
-            show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
+            gs = Zygote.gradient(p -> mse_loss(network_inputs',network_labels[:,k]',NN,p,st)[1],ps)[1]
+            st_opt, ps = Optimisers.update(st_opt, ps, gs)
+            err = mse_loss(network_inputs',network_labels[:,k]',NN,ps,st)[1]
+
+            if err < 5e-5
+                show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
+                break
+            elseif ep == nepochs
+                show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
+            end
         end
 
         for i in 1:S
-            x[D*(i-1)+k] = ps[k].layer_2.weight[i]
-            x[D*(S+1)+D*(i-1)+k] = ps[k].layer_1.weight[i]
-            x[D*(S+1 + S)+D*(i-1)+k] = ps[k].layer_1.bias[i]
+            x[D*(i-1)+k] = ps.layer_2.weight[i]
+            x[D*(S+1)+D*(i-1)+k] = ps.layer_1.weight[i]
+            x[D*(S+1 + S)+D*(i-1)+k] = ps.layer_1.bias[i]
         end
 
     end
@@ -291,9 +295,8 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
     local P = cache(int, ST).P
     local F = cache(int, ST).F
     local X = cache(int, ST).X
-    local NN = method(int).basis.NN
-    local ps = cache(int, ST).ps
-    local st = cache(int, ST).st
+    local W = cache(int, ST).W
+    local bias = cache(int, ST).bias
 
     local r₀ = cache(int, ST).r₀
     local r₁ = cache(int, ST).r₁
@@ -321,43 +324,67 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
         p[k] = x[D*S+k]
     end
 
-    for i in 1:S
-        ps[k].layer_2.weight[i] = x[D*(i-1)+k] 
-        ps[k].layer_1.weight[i] = x[D*(S+1)+D*(i-1)+k] 
-        ps[k].layer_1.bias[i] = x[D*(S+1 + S)+D*(i-1)+k] 
+    # copy x to hidden layer weights W : [D,S]
+    for i in eachindex(W)
+        for k in eachindex(W[i])
+            W[i][k] = x[D*(S+1)+D*(i-1)+k]
+        end
+    end 
+
+    # copy x to hidden layer bias [D,S]
+    for i in eachindex(bias)
+        for k in eachindex(bias[i])
+            bias[i][k] = x[D*(S+1 + S)+D*(i-1)+k]
+        end
     end
 
+    # reform the NN parameters
+    WMat = hcat(W...)'
+    biasMat = hcat(bias...)'
+    XMat = hcat(X...)'
+    Dbasis = collect([OneLayerNetwork(σ,S,WMat[:,d],biasMat[:,d]) for d in 1:D])
+    
     # compute coefficients
     for d in 1:D 
-        r₀[:,d] = NN[1]([0.0],ps[d],st)[1]
-        r₁[:,d] = NN[1]([1.0],ps[d],st)[1]
-        for j in eachindex(quad_nodes)
-            m[j,:,d] = NN[1]([quad_nodes[j]],ps[d],st)[1]
-            a[j,:,d] = basis_first_order_central_difference(NN,ps[d],st,quad_nodes[j])
+        for i in eachindex(Dbasis[d])
+            r₀[i,d] = Dbasis[d][zero(ST), i]
+            r₁[i,d] = Dbasis[d][one(ST), i]
+            for j in eachindex(quad_nodes)
+                m[j,i,d] = Dbasis[d][quad_nodes[j], i]
+                a[j,i,d] = first_order_central_difference(Dbasis[d][i],quad_nodes[j])
+            end
         end
     end
 
     # compute the derivatives of the coefficients on the quadrature nodes and at the boundaries
-    ϵ=0.00001
     for d in 1:D 
+        QNN(t) = sum(XMat[:,d] .* σ.(WMat[:,d] .*t .+ biasMat[:,d]))
+        ϵ=0.00001
         for j in eachindex(quad_nodes)
-            g= Zygote.gradient(p->NN([quad_nodes[j]],p,st)[1][1],ps[d])[1]
-            dqdWc[j,:,d] = g[1].weight[:]
-            dqdbc[j,:,d] = g[1].bias[:]
+            g = Zygote.gradient(Zygote.Params([WMat,biasMat])) do 
+                QNN(quad_nodes[j]) 
+            end
+            dqdWc[j,:,d] = g[WMat][:,d]
+            dqdbc[j,:,d] = g[biasMat][:,d]
 
-            gvf= Zygote.gradient(p->NN([quad_nodes[j]+ϵ],p,st)[1][1],ps[d])[1]
-            gvb= Zygote.gradient(p->NN([quad_nodes[j]-ϵ],p,st)[1][1],ps[d])[1]
-            dvdWc[j,:,d] = (gvf[1].weight[:] .- gvb[1].weight[:])/(2*ϵ)
-            dvdbc[j,:,d] = (gvf[1].bias[:] .- gvb[1].bias[:])/(2*ϵ)
+            gv = Zygote.gradient(Zygote.Params([WMat,biasMat])) do 
+                (QNN(quad_nodes[j]+ϵ) - QNN(quad_nodes[j]-ϵ))/(2*ϵ)
+            end
+            dvdWc[j,:,d] = gv[WMat][:,d]
+            dvdbc[j,:,d] = gv[biasMat][:,d]
         end
 
-        g0= Zygote.gradient(p->NN([0.0],p,st)[1][1],ps[d])[1]
-        dqdWr₀[:,d] = g0[1].weight[:]
-        dqdbr₀[:,d] = g0[1].bias[:]
+        g0 = Zygote.gradient(Zygote.Params([WMat,biasMat])) do 
+            QNN(0) 
+        end
+        dqdWr₀[:,d] = g0[WMat][:,d]
+        dqdbr₀[:,d] = g0[biasMat][:,d]
 
-        g1 = Zygote.gradient(p->NN([1.0],p,st)[1][1],ps[d])[1]
-        dqdWr₁[:,d] = g1[1].weight[:]
-        dqdbr₁[:,d] = g1[1].bias[:]
+        g1 = Zygote.gradient(Zygote.Params([WMat,biasMat])) do 
+            QNN(1) 
+        end
+        dqdWr₁[:,d] = g1[WMat][:,d]
+        dqdbr₁[:,d] = g1[biasMat][:,d]
     end
 
     # compute Q : q at quaadurature points
@@ -524,15 +551,15 @@ function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
     local S = nbasis(method(int))
     local σ = method(int).basis.activation
     local show_status = method(int).show_status
-    local ps = cache(int).ps
-    local st = cache(int).st
-    local NN = method(int).basis.NN
+
 
     if show_status
         print("\n solution x after solving by Newton \n")
         print(x)
     end
 
+    NN = Lux.Chain(Lux.Dense(1,S,σ),Lux.Dense(S,1,use_bias = false))
+    ps,st=Lux.setup(Random.default_rng(),NN)
     for k in 1:D
         for i in 1:S
             ps.layer_2.weight[i] = x[D*(i-1)+k]  

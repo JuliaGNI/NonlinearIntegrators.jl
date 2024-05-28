@@ -22,3 +22,9 @@ function basis_first_order_central_difference(NN,ps,quad_nodes;ϵ=0.00001)
     fd = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([quad_nodes+ϵ],ps[1:end-1])
     return (fd .- bd) ./ (2*ϵ)
 end
+
+function basis_first_order_central_difference(NN,ps,st,quad_nodes;ϵ=0.00001)
+    bd = NN[1]([quad_nodes-ϵ],ps[d],st)[1]
+    fd = NN[1]([quad_nodes+ϵ],ps[d],st)[1]
+    return (fd .- bd) ./ (2*ϵ)
+end

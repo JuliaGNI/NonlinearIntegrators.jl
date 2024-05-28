@@ -231,7 +231,6 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
     local backend = method(int).basis.backend
-    local current_step = cache(int).current_step
 
     for k in 1:D
         if show_status
@@ -241,14 +240,13 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
         
         labels = reshape(network_labels[:,k],1,nstages+1)
 
-        if backend ==CUDABackend()
+        if backend == CUDABackend()
+            #TODO add a CUDA version
             network_inputs =  CuArray(network_inputs)
             labels = CuArray(labels)
         end
 
-        # if current_step[1] == 1 
         ps[k] = AbstractNeuralNetworks.initialparameters(NN,backend,Float64)
-        # end
 
         # opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
         opt = GeometricMachineLearning.Optimizer(AdamOptimizerWithDecay(nepochs,1e-3, 5e-5), ps[k])
