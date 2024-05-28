@@ -109,7 +109,7 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
         # create first layer parameter vectors
         ps = [(layer_1 = (weight = zeros(ST,S,1), bias = zeros(ST,S,1)), layer_2 = (weight = zeros(ST,1,S),))  for k in 1:D]
         st = NamedTuple()
-
+    ???wyf
         r₀ = zeros(ST, S, D)
         r₁ = zeros(ST, S, D)
         m  = zeros(ST, R, S, D)
