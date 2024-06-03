@@ -109,7 +109,7 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
         # create first layer parameter vectors
         ps = [(layer_1 = (weight = zeros(ST,S,1), bias = zeros(ST,S,1)), layer_2 = (weight = zeros(ST,1,S),))  for k in 1:D]
         st = NamedTuple()
-    ???wyf
+
         r₀ = zeros(ST, S, D)
         r₁ = zeros(ST, S, D)
         m  = zeros(ST, R, S, D)
@@ -247,10 +247,11 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
         opt = Optimisers.Adam()
         st_opt = Optimisers.setup(opt, ps[k])
         err = 0
+        label = network_labels[:,k]'
         for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs',network_labels[:,k]',NN,p,st)[1],ps[k])[1]
+            gs = Zygote.gradient(p -> mse_loss(network_inputs,label,NN,p,st)[1],ps[k])[1]
             st_opt, ps = Optimisers.update(st_opt, ps[k], gs)
-            err = mse_loss(network_inputs',network_labels[:,k]',NN,ps[k],st)[1]
+            err = mse_loss(network_inputs,label,NN,ps[k],st)[1]
             show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
         end
         show_status ? print("\n dimension $k,final loss: $errs by $nepochs epochs") : nothing
