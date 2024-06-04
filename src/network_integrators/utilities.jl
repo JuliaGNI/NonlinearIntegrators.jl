@@ -1,6 +1,8 @@
 #######
 #General functions that are used in the network integrators
 #######
+using NonlinearIntegrators
+using CompactBasisFunctions
 
 function first_order_central_difference(f,x;ϵ=0.00001)
     return (f(x+ϵ)-f(x-ϵ))/(2*ϵ)
@@ -17,15 +19,22 @@ function mse_loss(x,y::AbstractArray{T},NN,ps;λ=1000,μ = 0.00001) where T
     return mse_loss
 end
 
-function basis_first_order_central_difference(NN,ps,quad_nodes;ϵ=0.00001)
-    bd = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([quad_nodes-ϵ],ps[1:end-1])
-    fd = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([quad_nodes+ϵ],ps[1:end-1])
+function basis_first_order_central_difference(NN,ps,x;ϵ=0.00001)
+    bd = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([x-ϵ],ps[1:end-1])
+    fd = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([x+ϵ],ps[1:end-1])
     return (fd .- bd) ./ (2*ϵ)
 end
 
-function basis_first_order_central_difference(NN,ps,st,quad_nodes;ϵ=0.00001)
-    bd = NN[1]([quad_nodes-ϵ],ps[d],st)[1]
-    fd = NN[1]([quad_nodes+ϵ],ps[d],st)[1]
+function OneLayerbasis_first_order_central_difference(basis,ps,st,x;ϵ=0.00001)
+    local NN = basis.NN
+    bd = NN[1]([x-ϵ],ps[1],st[1])[1]
+    fd = NN[1]([x+ϵ],ps[1],st[1])[1]
+    return (fd .- bd) ./ (2*ϵ)
+end
+
+function basis_first_order_central_difference(NN,ps,st,x;ϵ=0.00001)
+    bd = NN([x-ϵ],ps,st)[1]
+    fd = NN([x+ϵ],ps,st)[1]
     return (fd .- bd) ./ (2*ϵ)
 end
 

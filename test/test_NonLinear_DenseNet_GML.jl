@@ -33,7 +33,6 @@ OSS_pref = integrate(OSS, CGVI(BGau4, QGau4))
 
 #set up the DoublePendulum
 DP = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
-
 DP_pref_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=0.1,tspan=(0,int_timespan))
 DP_pref = integrate(DP_pref_lode, CGVI(BGau4, QGau4))
 
@@ -45,7 +44,7 @@ sigmoid(x) = 1 / (1 + exp(-x))
 
 Densenetwork = DenseNet_GML{Float64}(tanh,S₁,S)
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
-NL_DenseGML = NonLinear_DenseNet_GML(Densenetwork,QGau4,training_epochs =100000 )
+NL_DenseGML = NonLinear_DenseNet_GML(Densenetwork,QGau4,training_epochs =1 )
 
 
 #HarmonicOscillator

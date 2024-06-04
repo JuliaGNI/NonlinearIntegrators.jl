@@ -1,7 +1,4 @@
-using CompactBasisFunctions
 using AbstractNeuralNetworks
-using ContinuumArrays
-
 struct DenseNet_GML{T,NT,BT}<:DenseNetBasis{T}
     activation
     S₁::Int
@@ -29,18 +26,3 @@ function Base.show(io::IO,basis::DenseNet_GML)
     print(io, "    Last Layer Nodes, Number of Basis S  = ", basis.S, "\n")
     print(io, "\n")
 end
-
-(L::DenseNet_GML)(x::Number, j::Integer) = L.b[j](x)
-Base.eachindex(L::DenseNet_GML) = Base.eachindex(L.b)
-Base.axes(L::DenseNet_GML) = (Inclusion(0..1), eachindex(L))
-
-Base.getindex(L::DenseNet_GML, j::Integer)  = L.b[j]
-Base.getindex(L::DenseNet_GML, x::Number, j::Integer) = L(x,j)
-Base.getindex(L::DenseNet_GML, x::Number,  ::Colon) = [b(x) for b in L.b]
-Base.getindex(L::DenseNet_GML, X::AbstractVector, j::Integer) = L.(X,j)
-Base.getindex(L::DenseNet_GML, X::AbstractVector,  ::Colon) = [b(x) for x in X, b in L.b]
-
-CompactBasisFunctions.basis(L::DenseNet_GML) = L.b
-CompactBasisFunctions.nbasis(L::DenseNet_GML) = L.S
-
-ContinuumArrays.grid(L::DenseNet_GML) = L.x
