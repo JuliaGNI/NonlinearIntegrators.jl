@@ -41,6 +41,9 @@ module NonlinearIntegrators
     include("network_basis/OneLayerNetwork.jl")
     export OneLayerNetwork_GML,OneLayerNetwork_Lux,OneLayerNetwork
 
+    include("network_basis/OneLayerVectorValueNet_Lux.jl")
+    export OneLayerVectorValueNet_Lux
+
     include("network_integrators/NonLinear_OneLayer_GML.jl")
     include("network_integrators/NonLinear_OneLayer_Lux.jl")
 
@@ -50,5 +53,8 @@ module NonlinearIntegrators
     export NonLinear_OneLayer_GML,NonLinear_OneLayer_Lux,
             NonLinear_DenseNet_GML,NonLinear_DenseNet_Lux,
             Linear_DenseNet_GML
+
+    include("network_integrators/NonLinear_OneLayer_VectorValue_Lux.jl")
+    export NonLinear_OneLayer_VectorValue_Lux
 
 end

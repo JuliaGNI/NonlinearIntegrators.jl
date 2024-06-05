@@ -27,9 +27,17 @@ end
 
 function OneLayerbasis_first_order_central_difference(basis,ps,st,x;ϵ=0.00001)
     local NN = basis.NN
-    bd = NN[1]([x-ϵ],ps[1],st[1])[1]
-    fd = NN[1]([x+ϵ],ps[1],st[1])[1]
+    bd = NN[1]([x .- ϵ],ps[1],st[1])[1]
+    fd = NN[1]([x .+ ϵ],ps[1],st[1])[1]
     return (fd .- bd) ./ (2*ϵ)
+end
+
+function vector_central_difference(basis,ps,st,x;ϵ=0.00001)
+    local NN = basis.NN
+    bd = NN[1](x .- ϵ,ps[1],st[1])[1]
+    fd = NN[1](x .+ ϵ,ps[1],st[1])[1]
+    return (fd .- bd) ./ (2*ϵ)
+    
 end
 
 function basis_first_order_central_difference(NN,ps,st,x;ϵ=0.00001)
