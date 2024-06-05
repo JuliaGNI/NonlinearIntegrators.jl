@@ -169,12 +169,8 @@ function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrato
     current_step[1]+=1
 
     # choose initial guess method based on the value of h
-    if h < 0.5
-        initial_guess_Extrapolation!(int)
-    else
-        initial_guess_integrator!(int)
-    end 
-    
+    initial_guess_integrator!(int)
+
     if show_status
         print("\n network inputs \n")
         print(network_inputs)
@@ -322,7 +318,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
 
     for k in 1:D
         for i in 1:S
-            ps[2].weight[k,i] =  x[D*(i-1)+k] 
+            ps[2].weight[k,i] = x[D*(i-1)+k] 
             ps[1].weight[i] = x[D*(S+1)+i] 
             ps[1].bias[i] = x[D*(S+1)+S+i] 
         end

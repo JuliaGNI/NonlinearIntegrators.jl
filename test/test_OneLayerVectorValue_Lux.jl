@@ -27,7 +27,7 @@ S = 4
 D = 2
 square(x) = x^2
 OLnetwork = NonlinearIntegrators.OneLayerVectorValueNet_Lux{Float64}(S,tanh,2)
-NLOLCGVNI = NonlinearIntegrators.NonLinear_OneLayer_VectorValue_Lux(OLnetwork,QGau4,training_epochs=50000)
+NLOLCGVNI = NonlinearIntegrators.NonLinear_OneLayer_VectorValue_Lux(OLnetwork,QGau4,training_epochs=1)
 
 DP_NLOLsol = integrate(DP_lode, NLOLCGVNI) 
 relative_maximum_error(DP_NLOLsol.q,DP_pref.q) 
