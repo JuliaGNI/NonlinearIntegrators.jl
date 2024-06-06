@@ -12,7 +12,12 @@ struct NonLinear_OneLayer_VectorValue_Lux{T, NBASIS, NNODES, basisType <: Basis{
     show_status::Bool
     network_inputs::Matrix{T}
     training_epochs::Int
-    function NonLinear_OneLayer_VectorValue_Lux(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000) where {T}
+
+    problem_module::Module
+    problem_initial_hamitltonian::Float64
+    use_hamiltonian_loss::Bool
+    function NonLinear_OneLayer_VectorValue_Lux(basis::Basis{T}, quadrature::QuadratureRule{T},problem_module
+        ;nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000,problem_initial_hamitltonian = 0.0,use_hamiltonian_loss=true) where {T}
         # get number of quadrature nodes and number of basis functions
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = basis.S
@@ -22,7 +27,8 @@ struct NonLinear_OneLayer_VectorValue_Lux{T, NBASIS, NNODES, basisType <: Basis{
         quad_nodes = QuadratureRules.nodes(quadrature)
 
         network_inputs = reshape(collect(0:1/nstages:1),1,nstages+1)
-        new{T, NBASIS, NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, training_epochs)
+        new{T, NBASIS, NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, 
+        training_epochs,problem_module,problem_initial_hamitltonian,use_hamiltonian_loss)
     end
 end
 
@@ -229,22 +235,28 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
     local NN = method(int).basis.NN
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
-
-
+    local problem_module = method(int).problem_module 
+    local initial_hamiltonian = method(int).problem_initial_hamitltonian
+    local use_hamiltonian_loss = method(int).use_hamiltonian_loss
     if show_status
         print("\n network lables \n")
-        print(network_labels)
+        print(network_labels')
     end
 
     ps,st=Lux.setup(Random.default_rng(),NN) #Random.seed!(1), create a temperoary ps,st 
     opt = Optimisers.Adam()
     st_opt = Optimisers.setup(opt, ps)
     err = 0
-
     for ep in 1:nepochs
-        gs = Zygote.gradient(p -> vector_mse_loss(network_inputs,network_labels',NN,p,st)[1],ps)[1]
-        st_opt, ps = Optimisers.update(st_opt, ps, gs)
-        err = vector_mse_loss(network_inputs,network_labels',NN,ps,st)[1]
+        if use_hamiltonian_loss
+            gs = Zygote.gradient(p -> vector_mse_energy_loss(network_inputs,network_labels',NN,p,st,problem_module,initial_hamiltonian)[1],ps)[1]
+            st_opt, ps = Optimisers.update(st_opt, ps, gs)
+            err = vector_mse_energy_loss(network_inputs,network_labels',NN,ps,st,problem_module,initial_hamiltonian)[1]
+        else
+            gs = Zygote.gradient(p -> vector_mse_loss(network_inputs,network_labels',NN,p,st)[1],ps)[1]
+            st_opt, ps = Optimisers.update(st_opt, ps, gs)
+            err = vector_mse_loss(network_inputs,network_labels',NN,ps,st)[1]
+        end
     end
     show_status ? print("\n final loss: $err by $nepochs epochs") : nothing
 
@@ -257,21 +269,34 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
     end
 
     if show_status
-        print("\n network parameters \n")
-        print(ps)
-    end
+        print("\n network prediction \n")
+        pre = NN(network_inputs,ps,st)[1]
+        print(pre')
 
-    if show_status
+        # print("\n network parameters \n")
+        # print(ps)
+
         print("\n initial guess x from network training \n")
         print(x)
     end
-
+ 
 end
+
 
 function vector_mse_loss(x,y,model, ps, st;λ=1000)
     y_pred, st = model(x, ps, st)
     mse_loss = mean(abs2,y_pred - y) + λ*sum(abs2,y_pred[:,1]-y[:,1])
     return mse_loss, ps,()
+end
+
+function vector_mse_energy_loss(x,y,model,ps,st,problem_module,initial_hamiltonian;λ=1000,ϵ = 0.00001,μ = 0.001)
+    local problem_params = problem_module.default_parameters
+
+    y_pred, st = model(x, ps, st)
+    v_pred = (model(x .+ ϵ, ps, st)[1] - model(x .- ϵ, ps, st)[1])/(2*ϵ)
+    hamiltonian_pred = [problem_module.ϑ(0.0, y_pred[:,i], v_pred[:,i], problem_params)'*v_pred[:,i]- problem_module.lagrangian(0.0, y_pred[:,i], v_pred[:,i], problem_params) for i in 1:size(y_pred,2)]
+    energy_loss = mean(abs2,y_pred - y) + λ*sum(abs2,y_pred[:,1]-y[:,1]) + μ*sum(abs2,hamiltonian_pred .- initial_hamiltonian)
+    return energy_loss, ps,()
 end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_VectorValue_Lux}) where {ST}
@@ -327,9 +352,8 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
     # compute coefficients
     r₀[:] = NN[1]([0.0],ps[1],st[1])[1]
     r₁[:] = NN[1]([1.0],ps[1],st[1])[1]
-    m = NN[1](quad_nodes',ps[1],st[1])[1]
-    a = vector_central_difference(method(int).basis,ps,st,quad_nodes')
-
+    m = NN[1](quad_nodes',ps[1],st[1])[1]'
+    a = vector_central_difference(method(int).basis,ps,st,quad_nodes')'
 
     # compute the derivatives of the coefficients on the quadrature nodes and at the boundaries
     ϵ=0.00001
