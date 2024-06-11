@@ -16,8 +16,8 @@ struct NonLinear_OneLayer_VectorValue_Lux{T, NBASIS, NNODES, basisType <: Basis{
     problem_module::Module
     problem_initial_hamitltonian::Float64
     use_hamiltonian_loss::Bool
-    function NonLinear_OneLayer_VectorValue_Lux(basis::Basis{T}, quadrature::QuadratureRule{T},problem_module
-        ;nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000,problem_initial_hamitltonian = 0.0,use_hamiltonian_loss=true) where {T}
+    function NonLinear_OneLayer_VectorValue_Lux(basis::Basis{T}, quadrature::QuadratureRule{T},problem_module;
+        nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000,problem_initial_hamitltonian = 0.0,use_hamiltonian_loss=true) where {T}
         # get number of quadrature nodes and number of basis functions
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = basis.S
@@ -284,20 +284,6 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
  
 end
 
-
-function vector_mse_loss(x,y,model, ps, st;λ=1000)
-    y_pred, st = model(x, ps, st)
-    mse_loss = mean(abs2,y_pred - y) + λ*sum(abs2,y_pred[:,1]-y[:,1])
-    return mse_loss, ps,()
-end
-
-function vector_mse_energy_loss(x,y,model,ps,st,problem_module,params,initial_hamiltonian;λ=1000,ϵ = 0.00001,μ = 0.1)
-    y_pred, st = model(x, ps, st)
-    v_pred = (model(x .+ ϵ, ps, st)[1] - model(x .- ϵ, ps, st)[1])/(2*ϵ)
-    hamiltonian_pred = [problem_module.ϑ(0.0, y_pred[:,i], v_pred[:,i], params)'*v_pred[:,i]- problem_module.lagrangian(0.0, y_pred[:,i], v_pred[:,i], params) for i in 1:size(y_pred,2)]
-    energy_loss = mean(abs2,y_pred - y) + λ*sum(abs2,y_pred[:,1]-y[:,1]) + μ*sum(abs2,hamiltonian_pred .- initial_hamiltonian)
-    return energy_loss, ps,()
-end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_VectorValue_Lux}) where {ST}
     local D = ndims(int)

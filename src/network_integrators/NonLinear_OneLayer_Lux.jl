@@ -12,7 +12,12 @@ struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
     show_status::Bool
     network_inputs::Matrix{T}
     training_epochs::Int
-    function NonLinear_OneLayer_Lux(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000) where {T}
+
+    problem_module::Module
+    problem_initial_hamitltonian::Float64
+    use_hamiltonian_loss::Bool
+    function NonLinear_OneLayer_Lux(basis::Basis{T}, quadrature::QuadratureRule{T},problem_module;
+        nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000,problem_initial_hamitltonian::Float64 = 0.0,use_hamiltonian_loss::Bool=true) where {T}
         # get number of quadrature nodes and number of basis functions
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = basis.S
@@ -22,7 +27,8 @@ struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
         quad_nodes = QuadratureRules.nodes(quadrature)
 
         network_inputs = reshape(collect(0:1/nstages:1),1,nstages+1)
-        new{T, NBASIS, NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, training_epochs)
+        new{T, NBASIS, NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, training_epochs,
+        problem_module,problem_initial_hamitltonian,use_hamiltonian_loss)
     end
 end
 
@@ -180,7 +186,7 @@ function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrato
         print(network_inputs)
 
         print("\n network labels from initial guess methods \n")
-        print(network_labels)
+        print(network_labels')
     end
 
     initial_guess_networktraining!(int)
@@ -234,51 +240,46 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
     local ps = cache(int).ps
     local st = cache(int).st
     local network_inputs = method(int).network_inputs
-    local network_labels = cache(int).network_labels
+    local network_labels = cache(int).network_labels'
+    local problem_module = method(int).problem_module 
+    local initial_hamiltonian = method(int).problem_initial_hamitltonian
+    local use_hamiltonian_loss = method(int).use_hamiltonian_loss
+    local problem_params = method(int).problem_module.default_parameters
+
+    ps_tem,st_tem=Lux.setup(Random.seed!(10),NN) #Random.seed!(1), create a temperoary ps,st 
+    opt = Optimisers.Adam()
+    st_opt = Optimisers.setup(opt, ps_tem)
+    err = 0
+    for ep in 1:nepochs
+        if use_hamiltonian_loss
+            gs = Zygote.gradient(p -> vector_mse_energy_loss(network_inputs,network_labels,NN,p,st_tem,problem_module,problem_params,initial_hamiltonian)[1],ps_tem)[1]
+            st_opt, ps_tem = Optimisers.update(st_opt, ps_tem, gs)
+            err = vector_mse_energy_loss(network_inputs,network_labels,NN,ps_tem,st_tem,problem_module,problem_params,initial_hamiltonian)[1]
+        else
+            gs = Zygote.gradient(p -> vector_mse_loss(network_inputs,network_labels,NN,p,st_tem)[1],ps_tem)[1]
+            st_opt, ps_tem = Optimisers.update(st_opt, ps_tem, gs)
+            err = vector_mse_loss(network_inputs,network_labels,NN,ps_tem,st_tem)[1]
+        end
+    end
+    show_status ? print("\n final loss: $err by $nepochs epochs") : nothing
 
     for k in 1:D
-        if show_status
-            print("\n network lables for dimension $k \n")
-            print(network_labels[:,k])
-        end
-
-        ps_tem,st_tem=Lux.setup(Random.default_rng(),NN) #Random.seed!(1), create a temperoary ps,st 
-        opt = Optimisers.Adam()
-        st_opt = Optimisers.setup(opt, ps_tem)
-        err = 0
-        label = network_labels[:,k]'
-        for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs,label,NN,p,st_tem)[1],ps_tem)[1]
-            st_opt, ps_tem = Optimisers.update(st_opt, ps_tem, gs)
-            err = mse_loss(network_inputs,label,NN,ps_tem,st_tem)[1]
-        end
-        show_status ? print("\n dimension $k,final loss: $err by $nepochs epochs") : nothing
-
-        ps[k] = ps_tem
-        st = st_tem
+        ps[k] = ps_tem[k]
         for i in 1:S
             x[D*(i-1)+k] = ps[k][2].weight[i]
             x[D*(S+1)+D*(i-1)+k] = ps[k][1].weight[i]
             x[D*(S+1 + S)+D*(i-1)+k] = ps[k][1].bias[i]
         end
-
-        if show_status
-            print("\n network parameters \n")
-            print(ps)
-        end
     end
+    st = st_tem[1]
 
     if show_status
+        print("\n network parameters \n")
+        print(ps)
         print("\n initial guess x from network training \n")
         print(x)
     end
 
-end
-
-function mse_loss(x,y,model, ps, st;λ=1000)
-    y_pred, st = model(x, ps, st)
-    mse_loss = mean(abs2,y_pred - y) + λ*abs2(y_pred[1][1]-y[1])
-    return mse_loss, ps,()
 end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}) where {ST}
@@ -293,7 +294,8 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
     local P = cache(int, ST).P
     local F = cache(int, ST).F
     local X = cache(int, ST).X
-    local NN = method(int).basis.NN
+
+    local SubNN = method(int).basis.SubNN
     local ps = cache(int, ST).ps
     local st = cache(int, ST).st
 
@@ -333,11 +335,11 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
 
     # compute coefficients
     for d in 1:D 
-        r₀[:,d] = NN[1]([0.0],ps[d][1],st[1])[1]
-        r₁[:,d] = NN[1]([1.0],ps[d][1],st[1])[1]
+        r₀[:,d] = SubNN[1]([0.0],ps[d][1],st[1])[1]
+        r₁[:,d] = SubNN[1]([1.0],ps[d][1],st[1])[1]
         for j in eachindex(quad_nodes)
-            m[j,:,d] = NN[1]([quad_nodes[j]],ps[d][1],st[1])[1]
-            a[j,:,d] = OneLayerbasis_first_order_central_difference(method(int).basis,ps[d],st,quad_nodes[j])
+            m[j,:,d] = SubNN[1]([quad_nodes[j]],ps[d][1],st[1])[1]
+            a[j,:,d] = OneLayerbasis_first_order_central_difference(SubNN,ps[d],st,quad_nodes[j])
         end
     end
 
@@ -345,21 +347,21 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
     ϵ=0.00001
     for d in 1:D 
         for j in eachindex(quad_nodes)
-            g= Zygote.gradient(p->NN([quad_nodes[j]],p,st)[1][1],ps[d])[1]
+            g= Zygote.gradient(p->SubNN([quad_nodes[j]],p,st)[1][1],ps[d])[1]
             dqdWc[j,:,d] = g[1].weight[:]
             dqdbc[j,:,d] = g[1].bias[:]
 
-            gvf= Zygote.gradient(p->NN([quad_nodes[j]+ϵ],p,st)[1][1],ps[d])[1]
-            gvb= Zygote.gradient(p->NN([quad_nodes[j]-ϵ],p,st)[1][1],ps[d])[1]
+            gvf= Zygote.gradient(p->SubNN([quad_nodes[j]+ϵ],p,st)[1][1],ps[d])[1]
+            gvb= Zygote.gradient(p->SubNN([quad_nodes[j]-ϵ],p,st)[1][1],ps[d])[1]
             dvdWc[j,:,d] = (gvf[1].weight[:] .- gvb[1].weight[:])/(2*ϵ)
             dvdbc[j,:,d] = (gvf[1].bias[:] .- gvb[1].bias[:])/(2*ϵ)
         end
 
-        g0= Zygote.gradient(p->NN([0.0],p,st)[1][1],ps[d])[1]
+        g0= Zygote.gradient(p->SubNN([0.0],p,st)[1][1],ps[d])[1]
         dqdWr₀[:,d] = g0[1].weight[:]
         dqdbr₀[:,d] = g0[1].bias[:]
 
-        g1 = Zygote.gradient(p->NN([1.0],p,st)[1][1],ps[d])[1]
+        g1 = Zygote.gradient(p->SubNN([1.0],p,st)[1][1],ps[d])[1]
         dqdWr₁[:,d] = g1[1].weight[:]
         dqdbr₁[:,d] = g1[1].bias[:]
     end
@@ -530,7 +532,7 @@ function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
     local show_status = method(int).show_status
     local ps = cache(int).ps
     local st = cache(int).st
-    local NN = method(int).basis.NN
+    local SubNN = method(int).basis.SubNN
 
     if show_status
         print("\n solution x after solving by Newton \n")
@@ -543,11 +545,11 @@ function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
             ps[k].layer_1.weight[i] = x[D*(S+1)+D*(i-1)+k] 
             ps[k].layer_1.bias[i] = x[D*(S+1+S)+D*(i-1)+k]
         end         
-        stage_values[:,k] = NN(network_inputs,ps[k],st)[1][2:end]
+        stage_values[:,k] = SubNN(network_inputs,ps[k],st)[1][2:end]
     end 
 
     if show_status
         print("\n stages prediction after solving \n")
-        print(stage_values)
+        print(stage_values')
     end
 end

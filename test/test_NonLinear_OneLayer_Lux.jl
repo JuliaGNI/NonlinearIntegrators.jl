@@ -10,13 +10,13 @@ using NonlinearIntegrators
 using QuadratureRules
 using CompactBasisFunctions
 using GeometricProblems
-
+using Test
 
 # Set up the Harmonic Oscillator problem
-int_step = 1.0
+int_step = 2.0
 int_timespan = 10.0
-HO_iode = GeometricProblems.HarmonicOscillator.iodeproblem(tspan = (0,int_timespan),tstep = int_step)
-HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
+# HO_iode = GeometricProblems.HarmonicOscillator.iodeproblem(tspan = (0,int_timespan),tstep = int_step)
+# HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 
 
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
@@ -25,20 +25,21 @@ BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
 # Set up the DoublePendulum problem
 DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
 DP_pref = integrate(DP_lode,Gauss(8))
+DP_CGVI = integrate(DP_lode,CGVI(BGau4,QGau4))
+initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0,DP_lode.ics.q,DP_lode.ics.p,DP_lode.parameters)
 
 # Set up the NonLinearOneLayerBasis
-S = 10
+S = 14
 square(x) = x^2
-OLnetwork = NonlinearIntegrators.OneLayerNetwork_Lux{Float64}(S,cos)
-NLOLCGVNI = NonlinearIntegrators.NonLinear_OneLayer_Lux(OLnetwork,QGau4)
+OLnetwork = NonlinearIntegrators.OneLayerNetwork_Lux{Float64}(S,cos,2)
+NLOLCGVNI = NonlinearIntegrators.NonLinear_OneLayer_Lux(OLnetwork,QGau4,GeometricProblems.DoublePendulum,
+problem_initial_hamitltonian =initial_hamiltonian, use_hamiltonian_loss=true,show_status=true)
 
-NLOLsol = integrate(HO_iode, NLOLCGVNI) 
-relative_maximum_error(NLOLsol.q,HO_pref.q) 
+# NLOLsol = integrate(HO_iode, NLOLCGVNI) 
+# relative_maximum_error(NLOLsol.q,HO_pref.q) 
 
-@time DP_NLOLsol = integrate(DP_lode, NLOLCGVNI) 
-relative_maximum_error(DP_NLOLsol.q,DP_pref.q) 
+DP_NLOLsol = integrate(DP_lode, NLOLCGVNI) 
+@show relative_maximum_error(DP_NLOLsol.q,DP_pref.q)
+@show relative_maximum_error(DP_CGVI.q,DP_pref.q)
 
-NonlinearIntegrators.draw_comparison(DP_lode,GeometricProblems.DoublePendulum.hamiltonian,
-                ["CGVN","Gauss(8)",],
-                DP_NLOLsol,DP_pref)
 

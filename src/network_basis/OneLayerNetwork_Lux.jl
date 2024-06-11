@@ -1,12 +1,15 @@
 using Lux
-struct OneLayerNetwork_Lux{T,NT}<:OneLayerNetBasis{T}
+struct OneLayerNetwork_Lux{T,SNT,NT}<:OneLayerNetBasis{T}
     activation
     S::Int
+    SubNN::SNT
     NN::NT
-
-    function OneLayerNetwork_Lux{T}(S,activation) where {T}
-        NN = Lux.Chain(Lux.Dense(1,S,activation),Lux.Dense(S,1,use_bias = false))
-        new{T,typeof(NN)}(activation,S,NN)
+    function OneLayerNetwork_Lux{T}(S,activation,D) where {T}
+        SubNN = Lux.Chain(Lux.Dense(1,S,activation),Lux.Dense(S,1,use_bias = false))
+        layers = [SubNN for _ in 1:D]
+        connection(outputs...) = vcat(outputs...)
+        NN = Lux.Parallel(connection, layers...)
+        new{T,typeof(SubNN),typeof(NN)}(activation,S,SubNN,NN)
     end
 end
 

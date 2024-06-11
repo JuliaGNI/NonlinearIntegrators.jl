@@ -25,8 +25,7 @@ function basis_first_order_central_difference(NN,ps,x;ϵ=0.00001)
     return (fd .- bd) ./ (2*ϵ)
 end
 
-function OneLayerbasis_first_order_central_difference(basis,ps,st,x;ϵ=0.00001)
-    local NN = basis.NN
+function OneLayerbasis_first_order_central_difference(NN,ps,st,x;ϵ=0.00001)
     bd = NN[1]([x .- ϵ],ps[1],st[1])[1]
     fd = NN[1]([x .+ ϵ],ps[1],st[1])[1]
     return (fd .- bd) ./ (2*ϵ)
@@ -51,6 +50,20 @@ function basis_first_order_central_difference(NN,ps,st,x;ϵ=0.00001)
     bd = NN([x-ϵ],ps,st)[1]
     fd = NN([x+ϵ],ps,st)[1]
     return (fd .- bd) ./ (2*ϵ)
+end
+
+function vector_mse_loss(x,y,model, ps, st;λ=1000)
+    y_pred, st = model(x, ps, st)
+    mse_loss = mean(abs2,y_pred - y) + λ*sum(abs2,y_pred[:,1]-y[:,1])
+    return mse_loss, ps,()
+end
+
+function vector_mse_energy_loss(x,y,model,ps,st,problem_module,params,initial_hamiltonian;λ=1000,ϵ = 0.00001,μ = 0.1)
+    y_pred, st = model(x, ps, st)
+    v_pred = (model(x .+ ϵ, ps, st)[1] - model(x .- ϵ, ps, st)[1])/(2*ϵ)
+    hamiltonian_pred = [problem_module.ϑ(0.0, y_pred[:,i], v_pred[:,i], params)'*v_pred[:,i]- problem_module.lagrangian(0.0, y_pred[:,i], v_pred[:,i], params) for i in 1:size(y_pred,2)]
+    energy_loss = mean(abs2,y_pred - y) + λ*sum(abs2,y_pred[:,1]-y[:,1]) + μ*sum(abs2,hamiltonian_pred .- initial_hamiltonian)
+    return energy_loss, ps,()
 end
 
 function draw_comparison(titlename,ode_problem,problem_hamiltonian,truth_name,truth,names,sols...;problem_name = "Problem",h=1,plotrange = 50)
