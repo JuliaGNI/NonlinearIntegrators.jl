@@ -37,6 +37,13 @@ function vector_central_difference(basis,ps,st,x;ϵ=0.00001)
     bd = NN[1](x .- ϵ,ps[1],st[1])[1]
     fd = NN[1](x .+ ϵ,ps[1],st[1])[1]
     return (fd .- bd) ./ (2*ϵ)
+end
+
+function vector_central_difference(basis,ps,x;ϵ=0.00001)
+    local NN = basis.NN
+    bd = (NN.layers[1])(x .- ϵ,ps[1])
+    fd = (NN.layers[1])(x .+ ϵ,ps[1])
+    return (fd .- bd) ./ (2*ϵ)
     
 end
 
