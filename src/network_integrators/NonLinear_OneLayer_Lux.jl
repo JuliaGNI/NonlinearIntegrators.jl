@@ -22,7 +22,7 @@ struct NonLinear_OneLayer_Lux{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
     function NonLinear_OneLayer_Lux(basis::Basis{T}, quadrature::QuadratureRule{T},problem_module;
         nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000,problem_initial_hamitltonian::Float64 = 0.0,use_hamiltonian_loss::Bool=true,initial_guess_methods ="OGA1d") where {T}
         # get number of quadrature nodes and number of basis functions
-        initial_guess_methods_list= ["training","extrapolation","OGA1d"]
+        initial_guess_methods_list= ["training","OGA1d"]
         @assert initial_guess_methods in initial_guess_methods_list "initial_guess_methods should be one of $(initial_guess_methods_list)"
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = basis.S
@@ -181,12 +181,10 @@ function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrato
     current_step[1]+=1
 
     # choose initial guess method based on the value of h
-    if initial_guess_methods == "extrapolation"
+    if h<0.5
         initial_guess_Extrapolation!(int)
-    elseif initial_guess_methods == "training"
-        initial_guess_integrator!(int)
     else
-        initial_guess_OGA1d!(int)
+        initial_guess_integrator!(int)
     end 
     
     if show_status
@@ -197,8 +195,13 @@ function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrato
         print(network_labels')
     end
 
-    initial_guess_networktraining!(int)
-
+    
+    if initial_guess_methods == "training"
+        initial_guess_networktraining!(int)
+    else
+        initial_guess_OGA1d!(int)
+    end 
+    
 end
 
 function initial_guess_Extrapolation!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
@@ -290,7 +293,7 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
 
 end
 
-function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux};bias_interval = [-2,2],dict_amount = 10000)
+function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux};bias_interval = [-pi,pi],dict_amount = 20000)
     local S = nbasis(method(int))  
     local D = ndims(int)
     local quad_nodes = method(int).network_inputs
@@ -299,19 +302,22 @@ function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}
     local st = cache(int).st
     local network_labels = cache(int).network_labels'
     local activation = method(int).basis.activation
+    local x = nlsolution(int)
+    local show_status = method(int).show_status
 
-    quad_weights = (1 / 30) * [1, 4, 2, 4, 2, 4, 2, 4, 2, 4, 1]# Simpson's rule for 11 quad points 0:0.1:1
+    quad_weights = (1 / 3) * [1, 4, 2, 4, 2, 4, 2, 4, 2, 4, 1]# Simpson's rule for 11 quad points 0:0.1:1
     numpts = length(quad_nodes)
-    W = zeros(S,1)        # all parameters w
-    Bias = zeros(S,1)      # all parameters b
-    C = zeros(S,numpts)
+
 
     for d in 1:D
+        W = zeros(S,1)        # all parameters w
+        Bias = zeros(S,1)      # all parameters b
+        C = zeros(S,numpts)
         for k = 1 : S 
             #     The subproblem is key to the greedy algorithm, where the 
             #     inner products |(u,g) - (f,g)| should be maximized.
             #     Part of the inner products can be computed in advance.
-            uk_quad = SubNN(quad_nodes',ps[d],st)[1]'
+            uk_quad = SubNN(quad_nodes,ps[d],st)[1]'
             # f = target.(quad_nodes);
 
             #select the Optimal basis
@@ -319,10 +325,10 @@ function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}
             w_list = vcat(-1*ones(length(B),1), ones(length(B),1))
             b_list = vcat(collect(B),collect(B))
             A = hcat(w_list,b_list)
-            quad_nodes_mat = hcat(quad_nodes,ones(length(quad_nodes)))'
+            quad_nodes_mat = hcat(quad_nodes',ones(length(quad_nodes)))'
             gx_quad = activation.(A*quad_nodes_mat)
 
-            f_weight = network_labels.*quad_weights
+            f_weight = network_labels[d,:].*quad_weights
             uk_weight = uk_quad.*quad_weights
 
             loss = -(1/2)*(gx_quad*(uk_weight-f_weight)).^2
@@ -335,26 +341,29 @@ function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}
             selected_g = activation.(C[1:k,:])
 
             Gk = selected_g*(selected_g .* quad_weights')'
-            rhs = selected_g*(network_labels.*quad_weights)
+            rhs = selected_g*( network_labels[d,:].*quad_weights)
             xk = Gk \ rhs
 
             ps[d][1].weight[:] .= W
             ps[d][1].bias[:] .= Bias
             ps[d][2].weight[1:k] = xk
 
-            errs = sum(network_labels - SubNN(quad_nodes',ps[d],st)[1]').^2
-            @show errs
+            errs = sum(network_labels[d,:] - SubNN(quad_nodes,ps[d],st)[1]').^2
+            show_status ? print("\n OGA error $errs ") : nothing
+
         end
+        show_status ? print("\n Finish OGA for dimension $d ") : nothing
+
     end
 
     #Compare loss vs training
-    local NN = method(int).basis.NN
-    ps_tem,st_tem = Lux.setup(Random.seed!(10),NN) # create a temperoary ps,st
-    for d in 1:D 
-        ps_tem[d] = ps[d]
-    end
-    err = vector_mse_loss(network_inputs,network_labels,NN,ps_tem,st_tem)[1]
-    show_status ? print("\n OGA, final loss: $err by $S neurons") : nothing
+    # local NN = method(int).basis.NN
+    # ps_tem,st_tem = Lux.setup(Random.seed!(10),NN) # create a temperoary ps,st
+    # for d in 1:D 
+    #     ps_tem[d] = ps[d]
+    # end
+    # err = vector_mse_loss(network_inputs,network_labels,NN,ps_tem,st_tem)[1]
+    # show_status ? print("\n OGA, final loss: $err by $S neurons") : nothing
 
     for k in 1:D
         for i in 1:S
@@ -363,8 +372,9 @@ function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}
             x[D*(S+1 + S)+D*(i-1)+k] = ps[k][1].bias[i]
         end
     end
-    st = st_tem[1]
-
+    # st = st_tem[1]
+    show_status ? print("\n initial guess for DOF from OGA  ") : nothing
+    show_status ? print("\n ", x ) : nothing
 
 end
 
