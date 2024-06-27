@@ -281,7 +281,6 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
         print("\n initial guess x from network training \n")
         print(x)
     end
- 
 end
 
 
