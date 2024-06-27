@@ -300,7 +300,7 @@ function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}
     local network_labels = cache(int).network_labels'
     local activation = method(int).basis.activation
 
-    quad_weights = h / 3 * [1, 4, 2, 4, 2, 4, 2, 4, 2, 4, 1]# Simpson's rule for 11 quad points 0:0.1:1
+    quad_weights = (1 / 30) * [1, 4, 2, 4, 2, 4, 2, 4, 2, 4, 1]# Simpson's rule for 11 quad points 0:0.1:1
     numpts = length(quad_nodes)
     W = zeros(S,1)        # all parameters w
     Bias = zeros(S,1)      # all parameters b
@@ -355,6 +355,16 @@ function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}
     end
     err = vector_mse_loss(network_inputs,network_labels,NN,ps_tem,st_tem)[1]
     show_status ? print("\n OGA, final loss: $err by $S neurons") : nothing
+
+    for k in 1:D
+        for i in 1:S
+            x[D*(i-1)+k] = ps[k][2].weight[i]
+            x[D*(S+1)+D*(i-1)+k] = ps[k][1].weight[i]
+            x[D*(S+1 + S)+D*(i-1)+k] = ps[k][1].bias[i]
+        end
+    end
+    st = st_tem[1]
+
 
 end
 

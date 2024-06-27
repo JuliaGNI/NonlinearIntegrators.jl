@@ -1,9 +1,9 @@
 using Pkg
 # cd("IntegratorNN/GeometricIntegrators.jl")
 # cd("..")
-# cd("IntegratorNN")
+cd("IntegratorNN")
 
-# Pkg.activate(".")
+Pkg.activate(".")
 
 using GeometricIntegrators
 using NonlinearIntegrators
@@ -32,7 +32,7 @@ initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0,DP_lode.i
 S = 8
 square(x) = x^2
 relu2(x) = max(0,x)^2
-OLnetwork = NonlinearIntegrators.OneLayerNetwork_Lux{Float64}(S,square,2)
+OLnetwork = NonlinearIntegrators.OneLayerNetwork_Lux{Float64}(S,relu2,2)
 NLOLCGVNI = NonlinearIntegrators.NonLinear_OneLayer_Lux(OLnetwork,QGau4,GeometricProblems.DoublePendulum,
 problem_initial_hamitltonian = initial_hamiltonian, use_hamiltonian_loss=false,show_status=true)
 
