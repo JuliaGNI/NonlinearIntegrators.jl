@@ -66,7 +66,7 @@ function vector_mse_energy_loss(x,y,model,ps,st,problem_module,params,initial_ha
     return energy_loss, ps,()
 end
 
-function draw_comparison(titlename,ode_problem,problem_hamiltonian,truth_name,truth,names,sols...;problem_name = "Problem",h=1,plotrange = 50)
+function draw_comparison(titlename,ode_problem,problem_hamiltonian,truth_name,truth,names,sols...;problem_name = "Problem",h=1,plotrange = 50,save_path ="" )
     """
         ode_problem: the ode problem
         names: Array{String}, name of the solution for plot
@@ -103,6 +103,10 @@ function draw_comparison(titlename,ode_problem,problem_hamiltonian,truth_name,tr
         ham = [problem_hamiltonian(0,q,p,ode_problem.parameters) for (q,p) in zip(collect(prefs[2].q[:]),collect(prefs[2].p[:]))]
         plot!(p[5],0:h:plotrange,ham,label= prefs[1],xaxis="time",yaxis="Hamiltonian")
         # scatter!(p[5],0:h:plotrange,ham,label="",markersize = 1,ylims = (-60,-40))
+    end
+    
+    if save_path != ""
+        savefig(save_path)
     end
     return p
 end

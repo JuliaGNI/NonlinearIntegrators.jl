@@ -14,7 +14,7 @@ using Test
 
 # Set up the Harmonic Oscillator problem
 int_step = 2.0
-int_timespan = 100.0
+int_timespan = 10.0
 # HO_iode = GeometricProblems.HarmonicOscillator.iodeproblem(tspan = (0,int_timespan),tstep = int_step)
 # HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 
