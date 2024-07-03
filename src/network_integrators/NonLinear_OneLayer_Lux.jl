@@ -293,7 +293,7 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
 
 end
 
-function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux};bias_interval = [-pi,pi],dict_amount = 20000)
+function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux};bias_interval = [-1,1],dict_amount = 20000)
     local S = nbasis(method(int))  
     local D = ndims(int)
     local quad_nodes = method(int).network_inputs
