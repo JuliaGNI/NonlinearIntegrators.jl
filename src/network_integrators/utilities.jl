@@ -73,7 +73,7 @@ function draw_comparison(titlename,ode_problem,problem_hamiltonian,truth_name,tr
     """
     p = plot(layout=@layout([a b;c]),label ="",size = (700,700),plot_title = titlename)# d;e
 
-    plot!(p[1],0:0.1:plotrange,collect(truth.q[:,1]),label = truth_name,ylims = (-2,2))
+    plot!(p[1],0:0.1:plotrange,collect(truth.q[:,1]),label = truth_name,ylims = (-0.75,0.75))
     for prefs in zip(names,sols)
         plot!(p[1],0:h:plotrange,collect(prefs[2].q[:,1]),label=prefs[1],xaxis="time",yaxis="q₁")
         # scatter!(p[1],0:h:plotrange,collect(prefs[2].q[:,1]),label="",markersize = 1,ylims = (-3,3))
@@ -85,7 +85,7 @@ function draw_comparison(titlename,ode_problem,problem_hamiltonian,truth_name,tr
     #     # scatter!(p[2],0:h:plotrange,collect(prefs[2].q[:,2]),label="",markersize = 1,ylims = (-3,3))
     # end
 
-    plot!(p[2],0:0.1:plotrange,collect(truth.p[:,1]),label = truth_name,ylims = (-5,5))
+    plot!(p[2],0:0.1:plotrange,collect(truth.p[:,1]),label = truth_name,ylims = (-1,1))
     for prefs in zip(names,sols)
         plot!(p[2],0:h:plotrange,collect(prefs[2].p[:,1]),label=prefs[1],xaxis="time",yaxis="p₁")
         # scatter!(p[3],0:h:plotrange,collect(prefs[2].p[:,1]),label="",markersize = 1,ylims = (-60,60))
