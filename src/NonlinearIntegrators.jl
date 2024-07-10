@@ -22,7 +22,7 @@ module NonlinearIntegrators
     using CUDA
     using LinearAlgebra
     using Plots
-
+    using NonlinearSolve
 
     include("network_integrators/methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
