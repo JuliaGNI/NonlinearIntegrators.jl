@@ -293,7 +293,7 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
 
 end
 
-function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux};bias_interval = [-1,1],dict_amount = 20000)
+function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux};bias_interval = [-1,1],dict_amount = 200)
     local S = nbasis(method(int))  
     local D = ndims(int)
     local quad_nodes = method(int).network_inputs
@@ -344,9 +344,13 @@ function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}
             rhs = selected_g*( network_labels[d,:].*quad_weights)
             xk = Gk \ rhs
 
+            print("1",typeof(W),typeof(Bias),typeof(xk))
+
+
             ps[d][1].weight[:] .= W
             ps[d][1].bias[:] .= Bias
             ps[d][2].weight[1:k] = xk
+
 
             errs = sum(network_labels[d,:] - SubNN(quad_nodes,ps[d],st)[1]').^2
             show_status ? print("\n OGA error $errs ") : nothing
@@ -375,6 +379,8 @@ function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}
     # st = st_tem[1]
     show_status ? print("\n initial guess for DOF from OGA  ") : nothing
     show_status ? print("\n ", x ) : nothing
+
+    print("2",typeof(x))
 
 end
 
@@ -428,7 +434,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
             ps[k][1].bias[i] = x[D*(S+1 + S)+D*(i-1)+k] 
         end
     end
-
+    
     # compute coefficients
     for d in 1:D 
         r₀[:,d] = SubNN[1]([0.0],ps[d][1],st[1])[1]
