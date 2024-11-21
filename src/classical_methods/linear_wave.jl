@@ -15,7 +15,7 @@ module LinearWave
     export hamiltonian, lagrangian
     export hodeproblem, lodeproblem  
 
-    include("/Users/zeyuanli/Documents/Codes/MultiSymplectic.jl/src/bump_initial_condition.jl")
+    include("bump_initial_condition.jl")
 
     const μ̃ = 0.5
     const Ñ = 256
