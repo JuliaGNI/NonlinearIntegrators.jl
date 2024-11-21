@@ -24,7 +24,7 @@ module NonlinearIntegrators
     using Plots
     using NonlinearSolve
 
-    include("network_integrators/methods.jl")
+    include("methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
 
     include("network_integrators/utilities.jl")

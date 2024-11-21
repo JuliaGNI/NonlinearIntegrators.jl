@@ -181,11 +181,11 @@ function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrato
     current_step[1]+=1
 
     # choose initial guess method based on the value of h
-    if h<0.5
-        initial_guess_Extrapolation!(int)
-    else
-        initial_guess_integrator!(int)
-    end 
+    # if h<0.5
+    #     initial_guess_Extrapolation!(int)
+    # else
+    initial_guess_integrator!(int)
+    # end 
     
     if show_status
         print("\n network inputs \n")
@@ -293,7 +293,7 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
 
 end
 
-function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux};bias_interval = [-1,1],dict_amount = 200)
+function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux};bias_interval = [-pi,pi],dict_amount = 5000)
     local S = nbasis(method(int))  
     local D = ndims(int)
     local quad_nodes = method(int).network_inputs
@@ -304,15 +304,14 @@ function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}
     local activation = method(int).basis.activation
     local x = nlsolution(int)
     local show_status = method(int).show_status
+    local nstages = method(int).nstages
 
-    quad_weights = (1 / 3) * [1, 4, 2, 4, 2, 4, 2, 4, 2, 4, 1]# Simpson's rule for 11 quad points 0:0.1:1
-    numpts = length(quad_nodes)
-
+    quad_weights = simpson_quadrature(nstages)# Simpson's rule for 11 quad points 0:0.1:1
 
     for d in 1:D
         W = zeros(S,1)        # all parameters w
         Bias = zeros(S,1)      # all parameters b
-        C = zeros(S,numpts)
+        C = zeros(S,nstages+1)
         for k = 1 : S 
             #     The subproblem is key to the greedy algorithm, where the 
             #     inner products |(u,g) - (f,g)| should be maximized.
@@ -344,13 +343,9 @@ function initial_guess_OGA1d!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}
             rhs = selected_g*( network_labels[d,:].*quad_weights)
             xk = Gk \ rhs
 
-            print("1",typeof(W),typeof(Bias),typeof(xk))
-
-
             ps[d][1].weight[:] .= W
             ps[d][1].bias[:] .= Bias
             ps[d][2].weight[1:k] = xk
-
 
             errs = sum(network_labels[d,:] - SubNN(quad_nodes,ps[d],st)[1]').^2
             show_status ? print("\n OGA error $errs ") : nothing
