@@ -111,3 +111,26 @@ function draw_comparison(titlename,ode_problem,problem_hamiltonian,truth_name,tr
     end
     return p
 end
+
+function simpson_quadrature(N::Int)
+    if N % 2 != 0
+        error("N must be even for Simpson's rule.")
+    end
+    
+    # Step size
+    h = 1.0 / N
+        
+    # Generate weights
+    w = zeros(Float64, N + 1)
+    for i in 1:(N + 1)
+        if i == 1 || i == N + 1
+            w[i] = h / 3 # First and last weights
+        elseif i % 2 == 0
+            w[i] = 4 * h / 3 # Even-indexed weights
+        else
+            w[i] = 2 * h / 3 # Odd-indexed weights
+        end
+    end
+    
+    return w
+end
