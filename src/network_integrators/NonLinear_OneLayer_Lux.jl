@@ -77,25 +77,26 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
     ps::Vector{@NamedTuple{layer_1::@NamedTuple{weight::Matrix{ST}, bias::Matrix{ST}}, layer_2::@NamedTuple{weight::Matrix{ST}}}}
     st::@NamedTuple{layer_1::@NamedTuple{}, layer_2::@NamedTuple{}}
 
-    r₀::VecOrMat{ST}
-    r₁::VecOrMat{ST}
-    m::Array{ST} 
-    a::Array{ST}
+    r₀::Matrix{ST}
+    r₁::Matrix{ST}
+    m::Array{ST,3} 
+    a::Array{ST,3}
 
-    dqdWc::Array{ST}
-    dqdbc::Array{ST}
-    dvdWc::Array{ST}
-    dvdbc::Array{ST}
+    dqdWc::Array{ST,3}
+    dqdbc::Array{ST,3}
+    dvdWc::Array{ST,3}
+    dvdbc::Array{ST,3}
 
-    dqdWr₁::VecOrMat{ST}
-    dqdWr₀::VecOrMat{ST}
+    dqdWr₁::Matrix{ST}
+    dqdWr₀::Matrix{ST}
 
-    dqdbr₁::VecOrMat{ST}
-    dqdbr₀::VecOrMat{ST}
+    dqdbr₁::Matrix{ST}
+    dqdbr₀::Matrix{ST}
 
     current_step::Vector{ST}
-    stage_values::VecOrMat{ST}
-    network_labels::VecOrMat{ST}
+    stage_values::Matrix{ST}
+    network_labels::Matrix{ST}
+
     function NonLinear_OneLayer_LuxCache{ST,D,S,R,N}() where {ST,D,S,R,N}
         x = zeros(ST,D*(S+1+2*S)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
 
