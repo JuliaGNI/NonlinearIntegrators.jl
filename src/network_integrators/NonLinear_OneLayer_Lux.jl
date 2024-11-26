@@ -138,7 +138,7 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
 
         current_step = zeros(ST, 1)
 
-        stage_values = zeros(ST, N, D)
+        stage_values = zeros(ST, 41, D)
         network_labels = zeros(ST, N+1, D)
 
         return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, st, r₀, r₁, m, a, 
@@ -233,9 +233,9 @@ function initial_guess_integrator!(int::GeometricIntegrator{<:NonLinear_OneLayer
     sol = integrate(tem_ode, integrator)
 
     for k in 1:D
-        network_labels[:,k]=sol.s.q[:,k]
-        cache(int).q̃[k] = sol.s.q[:,k][end]
-        cache(int).p̃[k] = sol.s.p[:,k][end]
+        network_labels[:,k]=sol[1].s.q[:,k]
+        cache(int).q̃[k] = sol[1].s.q[:,k][end]
+        cache(int).p̃[k] = sol[1].s.p[:,k][end]
         x[D*S+k] = cache(int).p̃[k]
     end
 end 
@@ -630,6 +630,8 @@ function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
     local ps = cache(int).ps
     local st = cache(int).st
     local SubNN = method(int).basis.SubNN
+    
+    network_inputs = reshape(collect(0:1/40:1),1,41)
 
     if show_status
         print("\n solution x after solving by Newton \n")
@@ -642,7 +644,7 @@ function stages_compute!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux})
             ps[k].layer_1.weight[i] = x[D*(S+1)+D*(i-1)+k] 
             ps[k].layer_1.bias[i] = x[D*(S+1+S)+D*(i-1)+k]
         end         
-        stage_values[:,k] = SubNN(network_inputs,ps[k],st)[1][2:end]
+        stage_values[:,k] = SubNN(network_inputs,ps[k],st)[1][:]
     end 
 
     if show_status
