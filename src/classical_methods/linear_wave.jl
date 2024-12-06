@@ -10,7 +10,6 @@ module LinearWave
     using EulerLagrange
     using LinearAlgebra 
     using Parameters 
-    using GeometricIntegrators
 
     export hamiltonian, lagrangian
     export hodeproblem, lodeproblem  
@@ -18,7 +17,7 @@ module LinearWave
     include("bump_initial_condition.jl")
 
     const μ̃ = 0.5
-    const Ñ = 256
+    const Ñ = 249
 
     const default_parameters = (μ = μ̃, N = Ñ)
 
@@ -51,8 +50,11 @@ module LinearWave
     const n_time_steps = 200
     const tstep = _tstep(tspan, n_time_steps)
 
-    const q₀ = compute_initial_condition2(μ̃, Ñ + 2).q 
-    const p₀ = compute_initial_condition2(μ̃, Ñ + 2).p 
+    # const q₀ = compute_initial_condition2(μ̃, Ñ + 2).q 
+    # const p₀ = compute_initial_condition2(μ̃, Ñ + 2).p 
+
+    const q₀ = compute_initial_condition3(μ̃, Ñ + 2).q 
+    const p₀ = compute_initial_condition3(μ̃, Ñ + 2).p 
 
     # const q₀ = initial_position(Ñ + 2)
     # const p₀ = initial_velocity(Ñ + 2)
@@ -74,7 +76,7 @@ module LinearWave
         t, x, v = lagrangian_variables(Ñ + 2)
         sparams = symbolize(parameters)
         lag_sys = LagrangianSystem(lagrangian(t, x, v, sparams), t, x, v, sparams)
-        lodeproblem(lag_sys, tspan, tstep, q₀, p₀; parameters = parameters)
+        LODEProblem(lag_sys, tspan, tstep, q₀, p₀; parameters = parameters)
     end
 
 end

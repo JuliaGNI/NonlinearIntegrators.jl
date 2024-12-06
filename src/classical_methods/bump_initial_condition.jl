@@ -3,11 +3,11 @@ Third-degree spline that is used as a basis to construct the initial conditions.
 """
 function h(x::T) where T <: Real
     if 0 ≤ x ≤ 1
-        1 - 3 * x ^ 2 / 2 + 3 * x ^ 3 / 4 
+        1 - 3 * x ^ 2 / 2 + 3 * x ^ 3 / 4 +2
     elseif 1 < x ≤ 2
-        (2 - x) ^ 3 / 4
+        (2 - x) ^ 3 / 4 +2
     else
-        zero(T)
+        zero(T) +2 
     end 
 end
 
@@ -84,13 +84,7 @@ function compute_initial_condition2(μ::T, N::Integer) where T
     (q =u₀(Ω, μ), p = compute_p₀(Ω, μ))
 end 
 
-
-function initial_position(N)
-    x = range(-1/2,1/2,length=N)
-    sin.(4pi.*x)
-end
-
-function initial_velocity(N)
-    x = range(-1/2,1/2,length=N)
-    4pi .* cos.(4pi.*x)
-end
+function compute_initial_condition3(μ::T, N::Integer) where T 
+    Ω = compute_domain(N, T)
+    (q =cos.(2pi*Ω), p = 2pi * sin.(2pi*Ω))
+end 
