@@ -1,5 +1,4 @@
 using Pkg
-# cd("IntegratorNN/GeometricIntegrators.jl")
 # cd("..")
 cd("IntegratorNN")
 
@@ -15,7 +14,7 @@ using Test
 
 # Set up the Harmonic Oscillator problem
 int_step = 0.0625
-int_timespan = 100*int_step
+int_timespan = 10*int_step
 # HO_iode = GeometricProblems.HarmonicOscillator.iodeproblem(tspan = (0,int_timespan),tstep = int_step)
 # HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 # initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0,HO_iode.ics.q,HO_iode.ics.p,HO_iode.parameters)

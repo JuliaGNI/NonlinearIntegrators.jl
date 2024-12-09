@@ -19,10 +19,8 @@ module NonlinearIntegrators
     using SimpleSolvers
     import SimpleSolvers: solve!
     using GeometricMachineLearning
-    using CUDA
     using LinearAlgebra
     using Plots
-    using NonlinearSolve
 
     include("methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
