@@ -315,7 +315,7 @@ function initial_guess!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux},metho
             # f = target.(quad_nodes);
 
             #select the Optimal basis
-            B = bias_interval[1]:(1/dict_amount):bias_interval[2]
+            B = bias_interval[1]:(bias_interval[2]-bias_interval[1])/dict_amount:bias_interval[2]
             w_list = vcat(-1 * ones(length(B), 1), ones(length(B), 1))
             b_list = vcat(collect(B), collect(B))
             A = hcat(w_list, b_list)
@@ -341,6 +341,15 @@ function initial_guess!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux},metho
             ps[d][1].weight[:] .= W
             ps[d][1].bias[:] .= Bias
             ps[d][2].weight[1:k] = xk
+
+            opt = Optimisers.Descent(0.0001)
+            st_opt = Optimisers.setup(opt, ps[d])
+
+            errs = sum(network_labels[d,:] - SubNN(quad_nodes,ps[d],st)[1]').^2
+            show_status ? print("\n OGA error $errs before training \n ") : nothing
+    
+            gs = Zygote.gradient(p -> sum(network_labels[d,:] - SubNN(quad_nodes,p,st)[1]').^2,ps[d])[1]
+            st_opt, ps[d] = Optimisers.update(st_opt, ps[d], gs)
 
             opt = Optimisers.Descent(0.0001)
             st_opt = Optimisers.setup(opt, ps[d])
