@@ -37,7 +37,7 @@ square(x) = x^2
 relu2(x) = max(0,x)^2
 OLnetwork = NonlinearIntegrators.OneLayerNetwork_Lux{Float64}(S,tanh,2)
 NLOLCGVNI = NonlinearIntegrators.NonLinear_OneLayer_Lux(OLnetwork,QGau4,GeometricProblems.HarmonicOscillator,
-problem_initial_hamitltonian = initial_hamiltonian, use_hamiltonian_loss=false,show_status=true,initial_guess_methods = "OGA1d")#OGA1d
+problem_initial_hamitltonian = initial_hamiltonian, use_hamiltonian_loss=false,show_status=true,initial_guess_method = :OGA1d)#OGA1d
 print(" R = $R h =$(int_step) S = $(S)\n")
 @time NLOLsol = integrate(DP_lode, NLOLCGVNI) 
 @show relative_maximum_error(NLOLsol.q,DP_pref.q) 

@@ -624,7 +624,7 @@ function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrat
 
     # compute final update
     update!(nlsolution(int), int)
-
+  
     #compute the trajectory after solving by newton method
     stages_compute!(int)
 end
