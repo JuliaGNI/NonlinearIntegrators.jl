@@ -4,7 +4,7 @@ module NonlinearIntegrators
     import GeometricIntegrators.Integrators: IODEIntegratorCache
     import GeometricIntegrators.Integrators: CacheDict, Cache, default_solver, default_iguess,CacheType
     import GeometricIntegrators.Integrators: create_internal_stage_vector,parameters
-    import GeometricIntegrators.Integrators: cache,solstep,nlsolution,solver,method,iguess,problem,current,update!
+    import GeometricIntegrators.Integrators: cache,nlsolution,solver,method,iguess,problem,current,update!
 
     using NonlinearIntegrators
     using QuadratureRules
@@ -18,12 +18,14 @@ module NonlinearIntegrators
     using StaticArrays
     using SimpleSolvers
     import SimpleSolvers: solve!
-    using GeometricMachineLearning
+    import GeometricMachineLearning
     using LinearAlgebra
     using Plots
 
     include("methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
+    export IntegratorExtrapolation
+    export InitialParametersMethod, TrainingMethod, OGA1d
 
     include("network_integrators/utilities.jl")
 

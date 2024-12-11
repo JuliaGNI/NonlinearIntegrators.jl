@@ -1,16 +1,19 @@
 
-using GeometricIntegrators:LODEMethod
+using GeometricIntegrators: LODEMethod
 
-abstract type NetworkIntegratorMethod<:LODEMethod end
+abstract type NetworkIntegratorMethod <: LODEMethod end
 
 abstract type OneLayerMethod <: NetworkIntegratorMethod end
 abstract type DenseNetMethod <: NetworkIntegratorMethod end
 
 
-using GeometricIntegrators:GeometricMethod
+using GeometricIntegrators: GeometricMethod
 abstract type TimeDependentPDEMethod <: GeometricMethod end
 abstract type NinePointStencil <: TimeDependentPDEMethod end
 
-# using GeometricIntegrators:IntegratorCache
-# abstract type TimeDependentPDEMethodCache{ST,N} <: IntegratorCache{ST} end
-# abstract type NinePointStencilCache{ST,N} <: TimeDependentPDEMethodCache{ST,N} end
+using GeometricIntegrators: Extrapolation
+struct IntegratorExtrapolation <: Extrapolation end
+
+abstract type InitialParametersMethod end
+struct TrainingMethod <: InitialParametersMethod end
+struct OGA1d <: InitialParametersMethod end

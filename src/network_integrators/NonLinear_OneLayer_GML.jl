@@ -1,7 +1,4 @@
-using CompactBasisFunctions
-using GeometricIntegrators
-
-struct NonLinear_OneLayer_GML{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLayerMethod
+struct NonLinear_OneLayer_GML{T,NBASIS,NNODES,basisType<:Basis{T}, ET <: IntegratorExtrapolation, IPMT <: InitialParametersMethod, MT <: Module} <: OneLayerMethod
     basis::basisType
     quadrature::QuadratureRule{T,NNODES}
 
@@ -11,9 +8,29 @@ struct NonLinear_OneLayer_GML{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
     nstages::Int
     show_status::Bool
     network_inputs::Matrix{T}
+
+    initial_trajectory::ET
+    initial_guess_method::IPMT
+
     training_epochs::Int
-    function NonLinear_OneLayer_GML(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000) where {T}
+    problem_module::MT
+    problem_initial_hamitltonian::Float64
+    use_hamiltonian_loss::Bool
+
+    bias_interval::Vector{T}
+    dict_amount::Int
+    function NonLinear_OneLayer_GML(basis::Basis{T}, quadrature::QuadratureRule{T}, problem_module::MT;
+        nstages::Int=10, show_status::Bool=true, training_epochs::Int=50000, problem_initial_hamitltonian::Float64=0.0, use_hamiltonian_loss::Bool=true, 
+        initial_trajectory::ET=IntegratorExtrapolation(), 
+        initial_guess_method::IPMT=OGA1d(),
+        bias_interval =[-pi, pi],dict_amount=5000) where {T, MT <: Module, ET <: Extrapolation, IPMT <: OGA1d}
         # get number of quadrature nodes and number of basis functions
+        # initial_trajectory_list = subtypes(Extrapolation)
+        # @assert initial_trajectory in initial_trajectory_list "initial_trajectory should be one of $(initial_trajectory_list)"
+
+        # initial_guess_methods_list = subtypes(InitialParametersMethod)
+        # @assert initial_guess_method in initial_guess_methods_list "initial_guess_methods should be one of $(initial_guess_methods_list)"
+
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = basis.S
 
@@ -21,8 +38,9 @@ struct NonLinear_OneLayer_GML{T, NBASIS, NNODES, basisType <: Basis{T}} <: OneLa
         quad_weights = QuadratureRules.weights(quadrature)
         quad_nodes = QuadratureRules.nodes(quadrature)
 
-        network_inputs = reshape(collect(0:1/nstages:1),1,nstages+1)
-        new{T, NBASIS, NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, training_epochs)
+        network_inputs = reshape(collect(0:1/nstages:1), 1, nstages + 1)
+        new{T,NBASIS,NNODES,typeof(basis), ET, IPMT, MT}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, initial_trajectory, initial_guess_method,
+            training_epochs, problem_module, problem_initial_hamitltonian, use_hamiltonian_loss,bias_interval,dict_amount)
     end
 end
 
@@ -33,16 +51,18 @@ nnodes(method::NonLinear_OneLayer_GML) = QuadratureRules.nnodes(method.quadratur
 activation(method::NonLinear_OneLayer_GML) = method.basis.activation
 nstages(method::NonLinear_OneLayer_GML) = method.nstages
 show_status(method::NonLinear_OneLayer_GML) = method.show_status
-training_epochs(method::NonLinear_OneLayer_GML) = method.training_epochs    
+training_epochs(method::NonLinear_OneLayer_GML) = method.training_epochs
 
-isexplicit(::Union{NonLinear_OneLayer_GML, Type{<:NonLinear_OneLayer_GML}}) = false
-isimplicit(::Union{NonLinear_OneLayer_GML, Type{<:NonLinear_OneLayer_GML}}) = true
-issymmetric(::Union{NonLinear_OneLayer_GML, Type{<:NonLinear_OneLayer_GML}}) = missing
-issymplectic(::Union{NonLinear_OneLayer_GML, Type{<:NonLinear_OneLayer_GML}}) = missing
+isexplicit(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = false
+isimplicit(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = true
+issymmetric(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
+issymplectic(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
 
 default_solver(::NonLinear_OneLayer_GML) = Newton()
-# default_iguess(::NonLinear_OneLayer_GML) = HermiteExtrapolation()# HarmonicOscillator
-default_iguess(::NonLinear_OneLayer_GML) = MidpointExtrapolation()#CoupledHarmonicOscillator
+default_iguess(::NonLinear_OneLayer_GML) = IntegratorExtrapolation()#CoupledHarmonicOscillator
+default_iparams(::NonLinear_OneLayer_GML) = OGA1d()
+# default_iguess_integrator(::NonLinear_OneLayer_GML) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
+
 default_iguess_integrator(::NonLinear_OneLayer_GML) = ImplicitMidpoint()
 
 struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
@@ -153,72 +173,93 @@ function GeometricIntegrators.Integrators.reset!(cache::NonLinear_OneLayer_GMLCa
     copyto!(cache.p̄, p)
 end
 
-function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) 
-    local h = int.problem.tstep
+function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
-    local show_status = method(int).show_status 
+    local show_status = method(int).show_status
     local current_step = cache(int).current_step
+    local initial_trajectory = method(int).initial_trajectory
+    local initial_guess_method = method(int).initial_guess_method
 
     show_status ? print("\n current time step: $current_step") : nothing
-    current_step[1]+=1
+    current_step[1] += 1
 
-    # choose initial guess method based on the value of h
-    # if h < 0.5
-    #     initial_guess_Extrapolation!(int)
-    # else
-    initial_guess_integrator!(int)
-    # end 
-    
+    initial_trajectory!(sol, history, params, int, initial_trajectory)
+
     if show_status
         print("\n network inputs \n")
         print(network_inputs)
 
         print("\n network labels from initial guess methods \n")
-        print(network_labels)
+        print(network_labels')
     end
 
-    initial_guess_networktraining!(int)
-
+    initial_params!(int, initial_guess_method)
 end
 
-function initial_guess_Extrapolation!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
-    local network_inputs = method(int).network_inputs
-    local network_labels = cache(int).network_labels
+function initial_trajectory!(sol, history, params, ::GeometricIntegrator, initial_trajectory::Extrapolation)
+    error("For extrapolation $(initial_trajectory) method is not implemented!")
+end
+
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initial_trajectory::HermiteExtrapolation)
     local D = ndims(int)
-    local h = int.problem.tstep
+    local S = nbasis(method(int))
+    local x = nlsolution(int)
+
+    # TODO: here we should not initialise with the solution q but with the degree of freedom x,
+    # obtained e.g. from an L2 projection of q onto the basis
 
     for i in eachindex(network_inputs)
-        initialguess!(solstep(int).t̄+network_inputs[i]*h, cache(int).q̃, cache(int).p̃, solstep(int), int.problem, int.iguess)
+        soltmp = (
+            t=sol.t + network_inputs[i] * timestep(int),
+            q=cache(int).q̃,
+            p=cache(int).p̃,
+            v=cache(int).ṽ,
+            f=cache(int).f̃,
+        )
+        solutionstep!(soltmp, history, problem(int), iguess(int))
+
         for k in 1:D
-            network_labels[i,k] = cache(int).q̃[k]
+            x[D*(i-1)+k] = cache(int).q̃[k]
         end
     end
-    network_labels[1,:] = solstep(int).q #safe check for MidpointExtrapolation
+
+    soltmp = (
+        t=sol.t,
+        q=cache(int).q̃,
+        p=cache(int).p̃,
+        v=cache(int).ṽ,
+        f=cache(int).f̃,
+    )
+    solutionstep!(soltmp, history, problem(int), iguess(int))
+
+    for k in 1:D
+        x[D*S+k] = cache(int).p̃[k]
+    end
 end
 
-function initial_guess_integrator!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initial_trajectory::IntegratorExtrapolation)
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
     local h = int.problem.tstep
-    local N = method(int).nstages
+    local nstages = method(int).nstages
     local D = ndims(int)
     local problem = int.problem
-    local S = nbasis(method(int))   
+    local S = nbasis(method(int))
     local x = nlsolution(int)
 
-    tem_ode=similar(problem,[0.,h],h/N,(q = StateVariable(int.solstep.q[:]), p = StateVariable(int.solstep.p[:]), λ = AlgebraicVariable(problem.ics.λ)))
-    sol = integrate(tem_ode, integrator)
+    tem_ode = similar(problem, [0.0, h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
-        network_labels[:,k]=sol.s.q[:,k]
-        cache(int).q̃[k] = sol.s.q[:,k][end]
-        cache(int).p̃[k] = sol.s.p[:,k][end]
+        network_labels[:, k] = tem_sol.q[:, k]
+        cache(int).q̃[k] = tem_sol.q[:, k][end]
+        cache(int).p̃[k] = tem_sol.p[:, k][end]
         x[D*S+k] = cache(int).p̃[k]
     end
-end 
+end
 
-function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
+function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, InitialParams::TrainingMethod)
     local D = ndims(int)
     local S = nbasis(method(int))
 
@@ -239,12 +280,6 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
         end
         
         labels = reshape(network_labels[:,k],1,nstages+1)
-
-        if backend == CUDABackend()
-            #TODO add a CUDA version
-            network_inputs =  CuArray(network_inputs)
-            labels = CuArray(labels)
-        end
 
         ps[k] = AbstractNeuralNetworks.initialparameters(NN,backend,Float64)
 
@@ -276,6 +311,94 @@ function initial_guess_networktraining!(int::GeometricIntegrator{<:NonLinear_One
 
 end
 
+
+function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, InitialParams::OGA1d)
+    local S = nbasis(method(int))
+    local D = ndims(int)
+    local quad_nodes = method(int).network_inputs
+    local SubNN = method(int).basis.SubNN
+    local ps = cache(int).ps
+    local st = cache(int).st
+    local network_labels = cache(int).network_labels'
+    local activation = method(int).basis.activation
+    local x = nlsolution(int)
+    local show_status = method(int).show_status
+    local nstages = method(int).nstages
+    local bias_interval = method(int).bias_interval
+    local dict_amount = method(int).dict_amount
+
+    quad_weights = simpson_quadrature(nstages)# Simpson's rule for 11 quad points 0:0.1:1
+    
+    for d in 1:D
+        W = zeros(S, 1)        # all parameters w
+        Bias = zeros(S, 1)      # all parameters b
+        C = zeros(S, nstages + 1)
+        for k = 1:S
+            #     The subproblem is key to the greedy algorithm, where the 
+            #     inner products |(u,g) - (f,g)| should be maximized.
+            #     Part of the inner products can be computed in advance.
+            uk_quad = SubNN(quad_nodes, ps[d], st)[1]'
+
+            #select the Optimal basis
+            B = bias_interval[1]:(bias_interval[2]-bias_interval[1])/dict_amount:bias_interval[2]
+            w_list = vcat(-1 * ones(length(B), 1), ones(length(B), 1))
+            b_list = vcat(collect(B), collect(B))
+            A = hcat(w_list, b_list)
+            quad_nodes_mat = hcat(quad_nodes', ones(length(quad_nodes)))'
+            gx_quad = activation.(A * quad_nodes_mat)
+
+            f_weight = network_labels[d, :] .* quad_weights
+            uk_weight = uk_quad .* quad_weights
+
+            loss = -(1 / 2) * (gx_quad * (uk_weight - f_weight)) .^ 2
+            argmin_index = argmin(loss)
+            W[k] = A[argmin_index[1], :][1]
+            Bias[k] = A[argmin_index[1], :][2]
+
+            ak = hcat(W[k], Bias[k])
+            C[k, :] = ak * quad_nodes_mat
+            selected_g = activation.(C[1:k, :])
+
+            Gk = selected_g * (selected_g .* quad_weights')'
+            rhs = selected_g * (network_labels[d, :] .* quad_weights)
+            xk = Gk \ rhs
+
+            ps[d][1].weight[:] .= W
+            ps[d][1].bias[:] .= Bias
+            ps[d][2].weight[1:k] = xk
+
+            opt = Optimisers.Descent(0.0001)
+            st_opt = Optimisers.setup(opt, ps[d])
+
+            errs = sum(network_labels[d, :] - SubNN(quad_nodes, ps[d], st)[1]') .^ 2
+            show_status ? print("\n OGA error $errs before training \n ") : nothing
+
+            gs = Zygote.gradient(p -> sum(network_labels[d, :] - SubNN(quad_nodes, p, st)[1]') .^ 2, ps[d])[1]
+
+            gs.layer_1.weight[:] = Float64[x === nothing ? 0.0 : x for x in gs.layer_1.weight[:]]
+            gs.layer_1.bias[:] = Float64[x === nothing ? 0.0 : x for x in gs.layer_1.bias[:]]
+
+            st_opt, ps[d] = Optimisers.update(st_opt, ps[d], gs)
+
+            errs = sum(network_labels[d, :] - SubNN(quad_nodes, ps[d], st)[1]') .^ 2
+            show_status ? print("\n OGA error $errs ") : nothing
+        end
+        show_status ? print("\n Finish OGA for dimension $d ") : nothing
+
+    end
+
+    for k in 1:D
+        for i in 1:S
+            x[D*(i-1)+k] = ps[k][2].weight[i]
+            x[D*(S+1)+D*(i-1)+k] = ps[k][1].weight[i]
+            x[D*(S+1+S)+D*(i-1)+k] = ps[k][1].bias[i]
+        end
+    end
+    # st = st_tem[1]
+    show_status ? print("\n initial guess for DOF from OGA  ") : nothing
+    show_status ? print("\n ", x) : nothing
+
+end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
     local D = ndims(int)
