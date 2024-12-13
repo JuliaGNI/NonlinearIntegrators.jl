@@ -66,52 +66,6 @@ function vector_mse_energy_loss(x,y,model,ps,st,problem_module,params,initial_ha
     return energy_loss, ps,()
 end
 
-function draw_comparison(titlename,ode_problem,problem_hamiltonian,truth_name,truth,names,sols...;problem_name = "Problem",h=1,plotrange = 50,save_path ="" )
-    """
-        ode_problem: the ode problem
-        names: Array{String}, name of the solution for plot
-    """
-    p = plot(layout=@layout([a b;c]),label ="",size = (700,700),plot_title = titlename)# d;e
-
-    plot!(p[1],0:0.1:plotrange,collect(truth.q[:,1]),label = truth_name,ylims = (-0.75,0.75))
-    for prefs in zip(names,sols)
-        plot!(p[1],0:h:plotrange,collect(prefs[2].q[:,1]),label=prefs[1],xaxis="time",yaxis="q₁")
-        # scatter!(p[1],0:h:plotrange,collect(prefs[2].q[:,1]),label="",markersize = 1,ylims = (-3,3))
-    end
-
-    # plot!(p[2],0:0.1:plotrange,collect(truth.q[:,2]),label = truth_name,ylims = (-2,2))
-    # for prefs in zip(names,sols)
-    #     plot!(p[2],0:h:plotrange,collect(prefs[2].q[:,2]),label= prefs[1],xaxis="time",yaxis="q₂")
-    #     # scatter!(p[2],0:h:plotrange,collect(prefs[2].q[:,2]),label="",markersize = 1,ylims = (-3,3))
-    # end
-
-    plot!(p[2],0:0.1:plotrange,collect(truth.p[:,1]),label = truth_name,ylims = (-1,1))
-    for prefs in zip(names,sols)
-        plot!(p[2],0:h:plotrange,collect(prefs[2].p[:,1]),label=prefs[1],xaxis="time",yaxis="p₁")
-        # scatter!(p[3],0:h:plotrange,collect(prefs[2].p[:,1]),label="",markersize = 1,ylims = (-60,60))
-    end
-
-    # plot!(p[4],0:0.1:plotrange,collect(truth.p[:,2]),label = truth_name,ylims = (-5,5))
-    # for prefs in zip(names,sols)
-    #     plot!(p[4],0:h:plotrange,collect(prefs[2].p[:,2]),label=prefs[1],xaxis="time",yaxis="p₂")
-    #     # scatter!(p[4],0:h:plotrange,collect(prefs[2].p[:,2]),label="",markersize = 1,ylims = (-60,60))
-    # end
-
-    true_ham = [problem_hamiltonian(0,q,p,ode_problem.parameters) for (q,p) in zip(collect(truth.q[:]),collect(truth.p[:]))]
-    # plot!(p[3],0:0.1:plotrange,true_ham,label = truth_name,)
-    for prefs in zip(names,sols)
-        ham = [problem_hamiltonian(0,q,p,ode_problem.parameters) for (q,p) in zip(collect(prefs[2].q[:]),collect(prefs[2].p[:]))]
-        plot!(p[3],0:h:plotrange,(ham .- true_ham[1])/true_ham[1],label= prefs[1],xaxis="time",yaxis="Relative Hamiltonian error")
-        # scatter!(p[5],0:h:plotrange,ham,label="",markersize = 1,ylims = (-60,-40))
-    end
-    
-    
-    if save_path != ""
-        savefig(save_path)
-    end
-    return p
-end
-
 function simpson_quadrature(N::Int)
     if N % 2 != 0
         error("N must be even for Simpson's rule.")
@@ -133,4 +87,13 @@ function simpson_quadrature(N::Int)
     end
     
     return w
+end
+
+"""
+    initial_trajectory!(sol, history, params, int, initial_trajectory)
+
+Initial trajectory for the [`NonLinear_OneLayer_Lux`](@ref) integrator.
+"""
+function initial_trajectory!(sol, history, params, ::GeometricIntegrator, initial_trajectory::Extrapolation)
+    error("For extrapolation $(initial_trajectory) method is not implemented!")
 end

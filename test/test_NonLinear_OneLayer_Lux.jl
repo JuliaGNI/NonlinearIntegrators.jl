@@ -13,7 +13,7 @@ using GeometricProblems
 using Test
 
 # Set up the Harmonic Oscillator problem
-int_step = 0.0625
+int_step = 1.0
 int_timespan = 10*int_step
 # HO_iode = GeometricProblems.HarmonicOscillator.iodeproblem(tspan = (0,int_timespan),tstep = int_step)
 # HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
@@ -34,12 +34,14 @@ initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0,DP_lode.i
 
 S =6
 square(x) = x^2
-relu2(x) = max(0,x)^2
 OLnetwork = NonlinearIntegrators.OneLayerNetwork_Lux{Float64}(S,tanh,2)
-NLOLCGVNI = NonlinearIntegrators.NonLinear_OneLayer_Lux(OLnetwork,QGau4,GeometricProblems.HarmonicOscillator,
-problem_initial_hamitltonian = initial_hamiltonian, use_hamiltonian_loss=false,show_status=true,initial_guess_method = :OGA1d)#OGA1d
+NLOLCGVNI = NonlinearIntegrators.NonLinear_OneLayer_Lux(OLnetwork,QGau4,
+problem_initial_hamitltonian = initial_hamiltonian, use_hamiltonian_loss=false,show_status=true,dict_amount = 100000)#OGA1d
 print(" R = $R h =$(int_step) S = $(S)\n")
+DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
+
 @time NLOLsol = integrate(DP_lode, NLOLCGVNI) 
+NLOLsol.q
 @show relative_maximum_error(NLOLsol.q,DP_pref.q) 
 
 NLOLsol_hams = [GeometricProblems.DoublePendulum.hamiltonian(0,q,p,DP_lode.parameters) for (q,p) in zip(collect(NLOLsol.q[:]),collect(NLOLsol.p[:]))]

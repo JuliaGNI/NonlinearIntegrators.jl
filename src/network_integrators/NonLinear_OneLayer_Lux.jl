@@ -1,4 +1,4 @@
-struct NonLinear_OneLayer_Lux{T,NBASIS,NNODES,basisType<:Basis{T}, ET <: IntegratorExtrapolation, IPMT <: InitialParametersMethod, MT <: Module} <: OneLayerMethod
+struct NonLinear_OneLayer_Lux{T,NBASIS,NNODES,basisType<:Basis{T}, ET <: IntegratorExtrapolation, IPMT <: InitialParametersMethod} <: OneLayerMethod
     basis::basisType
     quadrature::QuadratureRule{T,NNODES}
 
@@ -13,17 +13,16 @@ struct NonLinear_OneLayer_Lux{T,NBASIS,NNODES,basisType<:Basis{T}, ET <: Integra
     initial_guess_method::IPMT
 
     training_epochs::Int
-    problem_module::MT
     problem_initial_hamitltonian::Float64
     use_hamiltonian_loss::Bool
 
     bias_interval::Vector{T}
     dict_amount::Int
-    function NonLinear_OneLayer_Lux(basis::Basis{T}, quadrature::QuadratureRule{T}, problem_module::MT;
+    function NonLinear_OneLayer_Lux(basis::Basis{T}, quadrature::QuadratureRule{T};
         nstages::Int=10, show_status::Bool=true, training_epochs::Int=50000, problem_initial_hamitltonian::Float64=0.0, use_hamiltonian_loss::Bool=true, 
         initial_trajectory::ET=IntegratorExtrapolation(), 
         initial_guess_method::IPMT=OGA1d(),
-        bias_interval =[-pi, pi],dict_amount=5000) where {T, MT <: Module, ET <: Extrapolation, IPMT <: OGA1d}
+        bias_interval =[-pi, pi],dict_amount=5000) where {T, ET <: Extrapolation, IPMT <: InitialParametersMethod}
         # get number of quadrature nodes and number of basis functions
         # initial_trajectory_list = subtypes(Extrapolation)
         # @assert initial_trajectory in initial_trajectory_list "initial_trajectory should be one of $(initial_trajectory_list)"
@@ -39,8 +38,8 @@ struct NonLinear_OneLayer_Lux{T,NBASIS,NNODES,basisType<:Basis{T}, ET <: Integra
         quad_nodes = QuadratureRules.nodes(quadrature)
 
         network_inputs = reshape(collect(0:1/nstages:1), 1, nstages + 1)
-        new{T,NBASIS,NNODES,typeof(basis), ET, IPMT, MT}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, initial_trajectory, initial_guess_method,
-            training_epochs, problem_module, problem_initial_hamitltonian, use_hamiltonian_loss,bias_interval,dict_amount)
+        new{T,NBASIS,NNODES,typeof(basis), ET, IPMT}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, initial_trajectory, initial_guess_method,
+            training_epochs, problem_initial_hamitltonian, use_hamiltonian_loss,bias_interval,dict_amount)
     end
 end
 
@@ -203,14 +202,8 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
     initial_params!(int, initial_guess_method)
 end
 
-"""
-    initial_trajectory!(sol, history, params, int, initial_trajectory)
 
-Initial trajectory for the [`NonLinear_OneLayer_Lux`](@ref) integrator.
-"""
-function initial_trajectory!(sol, history, params, ::GeometricIntegrator, initial_trajectory::Extrapolation)
-    error("For extrapolation $(initial_trajectory) method is not implemented!")
-end
+
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}, initial_trajectory::HermiteExtrapolation)
     local D = ndims(int)
@@ -339,7 +332,6 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}, Ini
     local dict_amount = method(int).dict_amount
 
     quad_weights = simpson_quadrature(nstages)# Simpson's rule for 11 quad points 0:0.1:1
-    
     for d in 1:D
         W = zeros(S, 1)        # all parameters w
         Bias = zeros(S, 1)      # all parameters b
@@ -378,18 +370,18 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}, Ini
             ps[d][1].bias[:] .= Bias
             ps[d][2].weight[1:k] = xk
 
-            opt = Optimisers.Descent(0.0001)
-            st_opt = Optimisers.setup(opt, ps[d])
+            # opt = Optimisers.Descent(0.0001)
+            # st_opt = Optimisers.setup(opt, ps[d])
 
-            errs = sum(network_labels[d, :] - SubNN(quad_nodes, ps[d], st)[1]') .^ 2
-            show_status ? print("\n OGA error $errs before training \n ") : nothing
+            # errs = sum(network_labels[d, :] - SubNN(quad_nodes, ps[d], st)[1]') .^ 2
+            # show_status ? print("\n OGA error $errs before training \n ") : nothing
 
-            gs = Zygote.gradient(p -> sum(network_labels[d, :] - SubNN(quad_nodes, p, st)[1]') .^ 2, ps[d])[1]
+            # gs = Zygote.gradient(p -> sum(network_labels[d, :] - SubNN(quad_nodes, p, st)[1]') .^ 2, ps[d])[1]
 
-            gs.layer_1.weight[:] = Float64[x === nothing ? 0.0 : x for x in gs.layer_1.weight[:]]
-            gs.layer_1.bias[:] = Float64[x === nothing ? 0.0 : x for x in gs.layer_1.bias[:]]
+            # gs.layer_1.weight[:] = Float64[x === nothing ? 0.0 : x for x in gs.layer_1.weight[:]]
+            # gs.layer_1.bias[:] = Float64[x === nothing ? 0.0 : x for x in gs.layer_1.bias[:]]
 
-            st_opt, ps[d] = Optimisers.update(st_opt, ps[d], gs)
+            # st_opt, ps[d] = Optimisers.update(st_opt, ps[d], gs)
 
             errs = sum(network_labels[d, :] - SubNN(quad_nodes, ps[d], st)[1]') .^ 2
             show_status ? print("\n OGA error $errs ") : nothing
@@ -420,7 +412,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}, Ini
 
 end
 
-function components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}) where {ST}
+function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}) where {ST}
     local D = ndims(int)
     local S = nbasis(method(int))
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
@@ -620,10 +612,10 @@ function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::Ab
     @assert axes(x) == axes(b)
 
     # compute stages from nonlinear solver solution x
-    components!(x, sol, params, int)
+    GeometricIntegrators.Integrators.components!(x, sol, params, int)
 
     # compute residual vector
-    residual!(b, sol, params, int)
+    GeometricIntegrators.Integrators.residual!(b, sol, params, int)
 end
 
 
@@ -634,10 +626,10 @@ end
 
 function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}) where {DT}
     # compute vector field at internal stages
-    components!(x, sol, params, int)
+    GeometricIntegrators.Integrators.components!(x, sol, params, int)
 
     # compute final update
-    update!(sol, params, int, DT)
+    GeometricIntegrators.Integrators.update!(sol, params, int, DT)
 end
 
 
@@ -652,7 +644,7 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
     # check_solver_status(int.solver.status, int.solver.params)
 
     # compute final update
-    update!(sol, params, nlsolution(int), int)
+    GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
 
     #compute the trajectory after solving by newton method
     stages_compute!(int)

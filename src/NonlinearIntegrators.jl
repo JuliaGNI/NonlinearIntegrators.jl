@@ -19,8 +19,9 @@ module NonlinearIntegrators
     using SimpleSolvers
     import SimpleSolvers: solve!
     import GeometricMachineLearning
+    using SymbolicNeuralNetworks
+    using AbstractNeuralNetworks
     using LinearAlgebra
-    using Plots
 
     include("methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
