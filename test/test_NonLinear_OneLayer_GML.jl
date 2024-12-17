@@ -2,7 +2,7 @@ using Pkg
 
 # cd("IntegratorNN/GeometricIntegrators.jl")
 # cd("..")
-cd("IntegratorNN")
+# cd("IntegratorNN")
 
 Pkg.activate(".")
 
@@ -14,7 +14,7 @@ using GeometricProblems
 
 
 # Set up the Harmonic Oscillator problem
-int_step = 1.0
+int_step = 0.5
 int_timespan = 5.0
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
 HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
@@ -34,15 +34,15 @@ BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
 
 
 S = 6
-relu2 = x->max(0,x) .^2
+relu2 = x->max(0,x) .^3
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 OLnetwork = OneLayerNetwork_GML{Float64}(relu2,S)
-NLOLCGVNI = NonLinear_OneLayer_GML(OLnetwork,QGau4,show_status = true,bias_interval = [-1.,1.],dict_amount = 10000)
+NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork,QGau4,show_status = true,bias_interval = [-pi,pi],dict_amount = 100000)
 
 #HarmonicOscillator
-@time HO_NLOLsol = integrate(HO_lode, NLOLCGVNI)
+HO_NLOLsol = integrate(HO_lode, NLOLCGVNI_Gml)
 relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
-
+HO_NLOLsol.q
 # DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
 # DP_NLOLsol = integrate(DP_lode, NLOLCGVNI)
 

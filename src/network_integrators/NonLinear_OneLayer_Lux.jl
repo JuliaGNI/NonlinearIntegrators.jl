@@ -141,12 +141,10 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
 
         dqdWr₁ = zeros(ST, S, D)
         dqdWr₀ = zeros(ST, S, D)
-
         dqdbr₁ = zeros(ST, S, D)
         dqdbr₀ = zeros(ST, S, D)
 
         current_step = zeros(ST, 1)
-
         stage_values = zeros(ST, 41, D)
         network_labels = zeros(ST, N + 1, D)
 
