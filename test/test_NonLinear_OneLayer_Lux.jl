@@ -13,8 +13,8 @@ using GeometricProblems
 using Test
 
 # Set up the Harmonic Oscillator problem
-int_step = 0.5
-int_timespan = 5.0
+int_step = 0.03125
+int_timespan = 0.3125
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
 HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0,HO_lode.ics.q,HO_lode.ics.p,HO_lode.parameters)
@@ -24,16 +24,16 @@ Q = 2*R
 QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
 BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
 
-S =6
+S = 4 
 square(x) = x^2
 relu2 = x->max(0,x) .^3
 
 OLnetwork = NonlinearIntegrators.OneLayerNetwork_Lux{Float64}(S,relu2,1)
 NLOLCGVNI_Lux = NonlinearIntegrators.NonLinear_OneLayer_Lux(OLnetwork,QGau4,
-problem_initial_hamitltonian = initial_hamiltonian, use_hamiltonian_loss=false,show_status=true,bias_interval = [-pi,pi],dict_amount = 100000)
+problem_initial_hamitltonian = initial_hamiltonian, use_hamiltonian_loss=false,show_status=false,bias_interval = [-pi,pi],dict_amount = 100000)
 
 #HarmonicOscillator
-HO_NLOLsol_lux = integrate(HO_lode, NLOLCGVNI_Lux)
+@benchmark HO_NLOLsol_lux = integrate(HO_lode, NLOLCGVNI_Lux)
 HO_NLOLsol_lux.q
 relative_maximum_error(HO_NLOLsol_lux.q,HO_pref.q)
 
