@@ -105,6 +105,14 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
+    x_abstol_final::Vector{ST}
+    x_reltol_final::Vector{ST}
+    x_suctol_final::Vector{ST}
+    f_abstol_final::Vector{ST}
+    f_reltol_final::Vector{ST}
+    f_suctol_final::Vector{ST}
+    converge_status::Vector{Bool}
+
     function NonLinear_OneLayer_GMLCache{ST,D,S,R,N}() where {ST,D,S,R,N}
         x = zeros(ST, D * (S + 1 + 2 * S)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
 
@@ -147,9 +155,19 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
         stage_values = zeros(ST, 41, D)
         network_labels = zeros(ST, N + 1, D)
 
+        x_abstol_final = zeros(ST, 1)
+        x_reltol_final = zeros(ST, 1)
+        x_suctol_final = zeros(ST, 1)
+        f_abstol_final = zeros(ST, 1)
+        f_reltol_final = zeros(ST, 1)
+        f_suctol_final = zeros(ST, 1)
+        converge_status = [false]
+
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a,
             dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
-            current_step, stage_values, network_labels)
+            current_step, stage_values, network_labels,
+            x_abstol_final,x_reltol_final, x_suctol_final,
+            f_abstol_final, f_reltol_final, f_suctol_final, converge_status)
     end
 end
 
@@ -642,6 +660,15 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
 
     # check if solution contains NaNs or error bounds are violated
     # check_solver_status(int.solver.status, int.solver.params)
+
+    # copy solution status
+    cache(int).x_abstol_final[1] = solver(int).status.rxₐ
+    cache(int).x_reltol_final[1] = solver(int).status.rxᵣ
+    cache(int).x_suctol_final[1] = solver(int).status.rxₛ
+    cache(int).f_abstol_final[1] = solver(int).status.rfₐ
+    cache(int).f_reltol_final[1] = solver(int).status.rfᵣ
+    cache(int).f_suctol_final[1] = solver(int).status.rfₛ
+    cache(int).converge_status[1] = solver(int).status.x_converged || solver(int).status.f_converged
 
     # compute final update
     GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)

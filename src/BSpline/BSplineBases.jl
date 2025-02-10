@@ -1,43 +1,45 @@
-using CompactBasisFunctions
-struct BSplineDirichlet{T}
-    t::AbstractVector{T} # vector to generate knots
-    interval::AbstractVector{T} # domain 
+struct BSplineDirichlet{T} <:Basis{T}
     k::Int # order
+    t::AbstractVector{T} # vector to generate knots
 
-    knots::AbstractVector{T} # knots
-    B::Vector{Function} #  basis functions 
-
-    Der_knots::AbstractVector{T} # knots for the derivative
-    Der_B::Vector{Function}  # Derivative of basis functions
-    function BSplineDirichlet(k::Int,t::AbstractVector{T}; interval = [0,1]) where T
-        knots = ArbitraryKnotSet(k,t)
-        B = BSpline(knots)
+    knot_seq
+    B #  basis functions 
+    Der_B  # Derivative of basis functions
+    function BSplineDirichlet(k::Int,t::AbstractVector{T}) where T
+        B = BSplineBasis(BSplineOrder(k), t)
+        knot_seq = B.t
         basis_fct = []
-
-        for i in 1:size(B)[2]
-            push!(basis_fct, x -> B[x, i])
+        for i in eachindex(B)
+            push!(basis_fct, B[i])
         end
 
-        Der_k = k - 1
-        Der_knots = ArbitraryKnotSet(Der_k,t)
-        D_B = BSpline(Der_knots)
-        Der_basis_fct = []
-        for i in 1:size(D_B)[2]
-            push!(Der_basis_fct, x -> k/(Der_knots[i+k] - Der_knots[i]) * D_B[x, i])
+        tem_coes = zeros(length(B))
+        Der_B = []
+        # create a temporary coefficient vector with only one non-zero entry, which is 1
+        # for each basis function, create a spline and then take the derivative
+        # to achieve the derivative of the basis function
+        for i in eachindex(B)
+            tem_coes[i] = 1
+            S = BSplineKit.Spline(B, tem_coes)
+            DB = BSplineKit.Derivative(1) * S
+            push!(Der_B, DB)
         end
 
-        return new{T}(t, interval, k, knots, basis_fct, Der_knots, Der_basis_fct)
+        return new{T}(k, t, knot_seq, basis_fct, Der_B)
     end
 end
 
+Base.length(Basis::BSplineDirichlet) = Base.length(Basis.B)
 
-
+getindex(B::BSplineDirichlet, j::Integer) =  B.B[j]
 getindex(B::BSplineDirichlet, x::Real, j::Integer) = B.B[j](x)
 getindex(B::BSplineDirichlet, x::Real, j::Colon) = [B.B[i](x) for i in 1:length(B.B)]
 getindex(B::BSplineDirichlet, x::AbstractVector, j::Integer) = B.B[j].(x)
 getindex(B::BSplineDirichlet, x::AbstractVector, j::Colon) = [B.B[i](x[j]) for j in 1:length(x), i in 1:length(B.B)]
 
-function Base.show(io::IO, B::BSplineDirichlet{T}) where {T}
-    println(io, T, " Dirichlet BSpline basis of order ", B.k, " on interval ", B.interval, " with knots", B.t)
+function Base.show(io::IO, Basis::BSplineDirichlet{T}) where {T}
+    println(io, T, " Dirichlet BSpline basis of order ", Basis.k, "\n")
+    println(io, T, " Knots Sequence: ", Basis.knot_seq)
     nothing
 end
+

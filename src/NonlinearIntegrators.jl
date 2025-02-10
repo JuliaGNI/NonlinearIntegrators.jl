@@ -22,6 +22,7 @@ module NonlinearIntegrators
     using SymbolicNeuralNetworks
     using AbstractNeuralNetworks
     using LinearAlgebra
+    using BSplineKit
 
     include("methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
@@ -59,5 +60,10 @@ module NonlinearIntegrators
     include("network_integrators/NonLinear_OneLayer_VectorValue_Lux.jl")
     include("network_integrators/NonLinear_OneLayer_VectorValue_GML.jl")
     export NonLinear_OneLayer_VectorValue_Lux,NonLinear_OneLayer_VectorValue_GML
+
+    # BSpline
+    include("BSpline/BSplineBases.jl")
+    include("BSpline/CGVI_SplineBases.jl")
+    export BSplineDirichlet, CGVI_BSpline
 
 end

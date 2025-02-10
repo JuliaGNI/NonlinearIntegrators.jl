@@ -17,10 +17,8 @@ struct CGVI_BSpline{T, NBASIS, NNODES, NDOF, basisType <: Basis{T}} <: LODEMetho
     b::SVector{NNODES,T}
     c::SVector{NNODES,T}
 
-    x::SVector{NBASIS,T}
-
-    m::SMatrix{NNODES, NBASIS, T, NDOF}
-    a::SMatrix{NNODES, NBASIS, T, NDOF}
+    m::SMatrix{NNODES, NBASIS, T}
+    a::SMatrix{NNODES, NBASIS, T}
 
     r₀::SVector{NBASIS,T}
     r₁::SVector{NBASIS,T}
@@ -28,7 +26,7 @@ struct CGVI_BSpline{T, NBASIS, NNODES, NDOF, basisType <: Basis{T}} <: LODEMetho
     function CGVI_BSpline(basis::Basis{T}, quadrature::QuadratureRule{T}) where {T}
         # get number of quadrature nodes and number of basis functions
         NNODES = QuadratureRules.nnodes(quadrature)
-        NBASIS = CompactBasisFunctions.nbasis(basis)
+        NBASIS = length(basis)
 
         # get quadrature nodes and weights
         quad_weights = QuadratureRules.weights(quadrature)
@@ -40,16 +38,16 @@ struct CGVI_BSpline{T, NBASIS, NNODES, NDOF, basisType <: Basis{T}} <: LODEMetho
         m  = zeros(T, NNODES, NBASIS)
         a  = zeros(T, NNODES, NBASIS)
 
-        for i in eachindex(basis)
-            r₀[i] = basis[zero(T), i]
-            r₁[i] = basis[one(T), i]
+        for i in eachindex(basis.B)
+            r₀[i] = basis.B[i](zero(T))
+            r₁[i] = basis.B[i](one(T))
             for j in eachindex(quad_nodes)
-                m[j,i] = basis[quad_nodes[j], i]
-                a[j,i] = basis'[quad_nodes[j], i]
+                m[j,i] = basis.B[i](quad_nodes[j])
+                a[j,i] = basis.Der_B[i](quad_nodes[j])
             end
         end
 
-        new{T, NBASIS, NNODES, NBASIS * NNODES, typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, CompactBasisFunctions.grid(basis), m, a, r₀, r₁)
+        new{T, NBASIS, NNODES, NBASIS * NNODES, typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, m, a, r₀, r₁)
     end
 end
 
@@ -76,7 +74,6 @@ function Base.show(io::IO, method::CGVI_BSpline)
     print(io, "\n")
     print(io, "    c  = ", method.c, "\n")
     print(io, "    b  = ", method.b, "\n")
-    print(io, "    x  = ", method.x, "\n")
     print(io, "    m  = ", method.m, "\n")
     print(io, "    a  = ", method.a, "\n")
     print(io, "    r₀ = ", method.r₀, "\n")
@@ -122,55 +119,56 @@ struct CGVI_BSplineCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
     end
 end
 
-nlsolution(cache::CGVI_BSplineCache) = cache.x
+GeometricIntegrators.Integrators.nlsolution(cache::CGVI_BSplineCache) = cache.x
 
-function Cache{ST}(problem::AbstractProblemIODE, method::CGVI_BSpline; kwargs...) where {ST}
+function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::CGVI_BSpline; kwargs...) where {ST}
     CGVI_BSplineCache{ST, ndims(problem), nbasis(method), nnodes(method)}(; kwargs...)
 end
 
-@inline CacheType(ST, problem::AbstractProblemIODE, method::CGVI_BSpline) = CGVI_BSplineCache{ST, ndims(problem), nbasis(method), nnodes(method)}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::CGVI_BSpline) = CGVI_BSplineCache{ST, ndims(problem), nbasis(method), nnodes(method)}
+
+@inline function Base.getindex(c::CGVI_BSplineCache, ST::DataType)
+    key = hash(Threads.threadid(), hash(ST))
+    if haskey(c.caches, key)
+        c.caches[key]
+    else
+        c.caches[key] = Cache{ST}(c.problem, c.method)
+    end::CacheType(ST, c.problem, c.method)
+end
+
+function GeometricIntegrators.Integrators.reset!(cache::CGVI_BSplineCache, t, q, p)
+    copyto!(cache.q̄, q)
+    copyto!(cache.p̄, p)
+end
 
 
-function initial_guess!(sol, history, params, int::GeometricIntegrator{<:CGVI_BSpline})
+function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, int::GeometricIntegrator{<:CGVI_BSpline})
     # set some local variables for convenience
     local D = ndims(int)
     local S = nbasis(method(int))
     local x = nlsolution(int)
+    local h = int.problem.tstep
+    local problem = int.problem
+    local k = method(int).basis.k
 
-    # TODO: here we should not initialise with the solution q but with the degree of freedom x,
-    # obtained e.g. from an L2 projection of q onto the basis
+    tem_ode = similar(problem, [0.0, h], h / (S-1), (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_sol = integrate(tem_ode, ImplicitMidpoint())
 
-    for i in eachindex(basis(method(int)))
-        soltmp = (
-            t = sol.t + timestep(int) * (method(int).x[i] - 1),
-            q = cache(int).q̃,
-            p = cache(int).p̃,
-            v = cache(int).ṽ,
-            f = cache(int).f̃,
-        )
-        solutionstep!(soltmp, history, problem(int), iguess(int))
-
-        for k in 1:D
-            x[D*(i-1)+k] = cache(int).q̃[k]
+    for d in 1:D
+        xx = 0:1/(S-1):1
+        yy = collect(tem_sol[1].s.q[:, d])
+        interpolation_function = interpolate(xx, yy, BSplineOrder(k))
+        for i in 1:S
+            x[D*(i-1)+d] = interpolation_function.spline.coefs[i]
         end
-    end
 
-    soltmp = (
-        t = sol.t,
-        q = cache(int).q̃,
-        p = cache(int).p̃,
-        v = cache(int).ṽ,
-        f = cache(int).f̃,
-    )
-    solutionstep!(soltmp, history, problem(int), iguess(int))
-
-    for k in 1:D
-        x[D*S+k] = cache(int).p̃[k]
+        cache(int).p̃[d] = tem_sol[1].s.p[:, d][end]
+        x[D*S+d] = cache(int).p̃[d]   
     end
 end
 
 
-function components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_BSpline}) where {ST}
+function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_BSpline}) where {ST}
     # set some local variables for convenience and clarity
     local C = cache(int, ST)
     local D = ndims(int)
@@ -228,7 +226,7 @@ function components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrato
 end
 
 
-function residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_BSpline}) where {ST}
+function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_BSpline}) where {ST}
     # set some local variables for convenience and clarity
     local C = cache(int, ST)
     local D = ndims(int)
@@ -258,35 +256,35 @@ end
 
 
 # Compute stages of Variational Partitioned Runge-Kutta methods.
-function residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_BSpline}) where {ST}
+function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_BSpline}) where {ST}
     # check that x and b are compatible
     @assert axes(x) == axes(b)
 
     # compute stages from nonlinear solver solution x
-    components!(x, sol, params, int)
+    GeometricIntegrators.Integrators.components!(x, sol, params, int)
 
     # compute residual vector
-    residual!(b, sol, params, int)
+    GeometricIntegrators.Integrators.residual!(b, sol, params, int)
 end
 
 
-function update!(sol, params, int::GeometricIntegrator{<:CGVI_BSpline}, DT)
+function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:CGVI_BSpline}, DT)
     sol.q .= cache(int, DT).q̃
     sol.p .= cache(int, DT).p̃
 end
 
-function update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:CGVI_BSpline}) where {DT}
+function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:CGVI_BSpline}) where {DT}
     # compute vector field at internal stages
-    components!(x, sol, params, int)
+    GeometricIntegrators.Integrators.components!(x, sol, params, int)
 
     # compute final update
-    update!(sol, params, int, DT)
+    GeometricIntegrators.Integrators.update!(sol, params, int, DT)
 end
 
 
-function integrate_step!(sol, history, params, int::GeometricIntegrator{<:CGVI_BSpline, <:AbstractProblemIODE})
+function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:CGVI_BSpline, <:AbstractProblemIODE})
     # call nonlinear solver
-    solve!(nlsolution(int), (b,x) -> residual!(b, x, sol, params, int), solver(int))
+    solve!(nlsolution(int), (b,x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
 
     # print solver status
     # print_solver_status(int.solver.status, int.solver.params)
@@ -295,5 +293,5 @@ function integrate_step!(sol, history, params, int::GeometricIntegrator{<:CGVI_B
     # check_solver_status(int.solver.status, int.solver.params)
 
     # compute final update
-    update!(sol, params, nlsolution(int), int)
+    GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
 end
