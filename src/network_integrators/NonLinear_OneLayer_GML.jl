@@ -494,7 +494,6 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     end
 
     # compute the derivatives of the coefficients on the quadrature nodes and at the boundaries
-    ϵ = 0.00001
     for d in 1:D
         for j in eachindex(quad_nodes)
             g = DQDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))

@@ -1,6 +1,8 @@
 module NonlinearIntegrators
 
     using GeometricIntegrators
+    using GeometricIntegrators: LODEMethod
+
     import GeometricIntegrators.Integrators: IODEIntegratorCache
     import GeometricIntegrators.Integrators: CacheDict, Cache, default_solver, default_iguess,CacheType
     import GeometricIntegrators.Integrators: create_internal_stage_vector,parameters
@@ -23,6 +25,8 @@ module NonlinearIntegrators
     using AbstractNeuralNetworks
     using LinearAlgebra
     using BSplineKit
+    using ForwardDiff
+    
 
     include("methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
@@ -62,8 +66,18 @@ module NonlinearIntegrators
     export NonLinear_OneLayer_VectorValue_Lux,NonLinear_OneLayer_VectorValue_GML
 
     # BSpline
-    include("BSpline/BSplineBases.jl")
-    include("BSpline/CGVI_SplineBases.jl")
+    include("BSpline/BSplineBasis.jl")
+    include("BSpline/CGVI_SplineBasis.jl")
     export BSplineDirichlet, CGVI_BSpline
 
+    # Nonlinear BSpline
+    include("BSpline/NL_BSplineBasis.jl")
+    include("BSpline/NL_Spline_CGVI.jl")
+    export Nonlinear_BSpline_Basis, Nonlinear_BSpline_Integrator
+
+    # Sindy models
+    using Symbolics
+    include("SINDy_methods/PR_Int.jl")
+    include("SINDy_methods/PR_basis.jl")
+    export PR_Integrator, PR_Basis
 end

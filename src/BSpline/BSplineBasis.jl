@@ -13,12 +13,12 @@ struct BSplineDirichlet{T} <:Basis{T}
             push!(basis_fct, B[i])
         end
 
-        tem_coes = zeros(length(B))
         Der_B = []
         # create a temporary coefficient vector with only one non-zero entry, which is 1
         # for each basis function, create a spline and then take the derivative
         # to achieve the derivative of the basis function
         for i in eachindex(B)
+            tem_coes = zeros(length(B))
             tem_coes[i] = 1
             S = BSplineKit.Spline(B, tem_coes)
             DB = BSplineKit.Derivative(1) * S
