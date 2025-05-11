@@ -4,7 +4,8 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaGNI.github.io/NonlinearIntegrators.jl/dev/)
 [![Build Status](https://github.com/JuliaGNI/NonlinearIntegrators.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/JuliaGNI/NonlinearIntegrators.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/JuliaGNI/NonlinearIntegrators.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/JuliaGNI/NonlinearIntegrators.jl)
-[![PkgEval](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/N/NonlinearIntegrators.svg)](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/N/NonlinearIntegrators.html)
+<!-- 
+[![PkgEval](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/N/NonlinearIntegrators.svg)](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/N/NonlinearIntegrators.html) -->
 
 
 [NonlinearIntegrators.jl](https://github.com/JuliaGNI/NonlinearIntegrators.jl) is a affliated package in the [GeometricIntegrators.jl](https://github.com/JuliaGNI/GeometricIntegrators.jl) community. This package aims to generalize continuous Galerkin variational integrators with linear basis to nonlinear basis to achieve large time-step integration.

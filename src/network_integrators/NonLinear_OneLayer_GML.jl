@@ -42,7 +42,7 @@ struct NonLinear_OneLayer_GML{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Integrator
             training_epochs, problem_initial_hamitltonian, use_hamiltonian_loss, bias_interval, dict_amount)
     end
 end
-
+nbasis(method::NonLinear_OneLayer_GML) = method.basis.S
 CompactBasisFunctions.basis(method::NonLinear_OneLayer_GML) = method.basis
 quadrature(method::NonLinear_OneLayer_GML) = method.quadrature
 CompactBasisFunctions.nbasis(method::NonLinear_OneLayer_GML) = method.basis.S
