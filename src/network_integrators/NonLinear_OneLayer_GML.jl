@@ -268,9 +268,9 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
-        network_labels[:, k] = tem_sol[1].s.q[:, k]
-        cache(int).q̃[k] = tem_sol[1].s.q[:, k][end]
-        cache(int).p̃[k] = tem_sol[1].s.p[:, k][end]
+        network_labels[:, k] = tem_sol.q[:, k]#[1].s
+        cache(int).q̃[k] = tem_sol.q[:, k][end]
+        cache(int).p̃[k] = tem_sol.p[:, k][end]
         x[D*S+k] = cache(int).p̃[k]
     end
 end

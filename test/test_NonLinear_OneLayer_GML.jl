@@ -1,7 +1,7 @@
 using Pkg
 
 # cd("IntegratorNN/GeometricIntegrators.jl")
-# cd("..")
+cd("..")
 cd("IntegratorNN")
 
 Pkg.activate(".")
@@ -40,7 +40,7 @@ OLnetwork = OneLayerNetwork_GML{Float64}(relu3,S)
 NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork,QGau4,show_status = false,bias_interval = [-pi,pi],dict_amount = 400000)
 
 #HarmonicOscillator
-HO_NLOLsol,stages_values,state = integrate(HO_lode, NLOLCGVNI_Gml)
+HO_NLOLsol = integrate(HO_lode, NLOLCGVNI_Gml)
 relative_maximum_error(HO_NLOLsol.q,HO_truth.q)
 HO_NLOLsol.q
 
