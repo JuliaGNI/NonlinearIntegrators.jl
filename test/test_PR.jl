@@ -1,4 +1,5 @@
-cd("IntegratorNN")
+# cd("IntegratorNN")
+cd("..")
 using Pkg
 Pkg.activate(".")
 using Symbolics
@@ -28,7 +29,7 @@ PR_sol = integrate(HO_lode, PR_Int)
 using Plots
 gr()
 plot(collect(0:h_step/50:TT),collect(HO_pref.q[:,1]))
-scatter!(collect(0:h_step:TT),collect(PR_sol[1].q[:,1]))
+scatter!(collect(0:h_step:TT),collect(PR_sol.q[:,1]))
 
 
 #### Pendulum

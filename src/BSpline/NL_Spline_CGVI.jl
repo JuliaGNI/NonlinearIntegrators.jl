@@ -159,13 +159,13 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
 
     for d in 1:D
         xx = 0:1/(S-1):1 
-        yy = collect(tem_sol[1].s.q[:, d])
+        yy = collect(tem_sol.q[:, d])
         interpolation_function = interpolate(xx, yy, BSplineOrder(K))
         for i in 1:S
             x[D*(i-1)+d] = interpolation_function.spline.coefs[i]
         end
 
-        cache(int).p̃[d] = tem_sol[1].s.p[:, d][end]
+        cache(int).p̃[d] = tem_sol.p[:, d][end]
         x[D*S+d] = cache(int).p̃[d]
         for i in 1:N
             x[D*(S+1)+D*(i-1)+d] = method(int).basis.internal_knots[i]

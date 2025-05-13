@@ -2,7 +2,7 @@ using Pkg
 
 # cd("IntegratorNN/GeometricIntegrators.jl")
 cd("..")
-cd("IntegratorNN")
+# cd("IntegratorNN")
 
 Pkg.activate(".")
 
@@ -17,6 +17,7 @@ using GeometricProblems
 int_step =0.5
 int_timespan = 10.0
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
+
 # HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step/40))
 # HO_truth = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 
@@ -25,7 +26,8 @@ QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
 # #set up the Coupled Harmonic Oscillator problem
 # CHO = GeometricProblems.CoupledHarmonicOscillator.lodeproblem(tstep=0.5,tspan=(0,20))
-# CHO_pref = integrate(CHO, CGVI(BGau4, QGau4))
+sol = integrate(HO_lode, IRK(Gauss(3); implicit_update = true))
+
 
 # #set up the OuterSolarSystem
 # OSS = GeometricProblems.OuterSolarSystem.lodeproblem(tstep=0.25,tspan=(0,2.5),n=3)

@@ -141,7 +141,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
-        cache(int).p̃[k] = tem_sol[1].s.p[:, k][end]
+        cache(int).p̃[k] = tem_sol.p[:, k][end]
         x[S+k] = cache(int).p̃[k]
     end
 

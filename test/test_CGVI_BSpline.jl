@@ -1,42 +1,42 @@
 using Pkg
 
 # cd("IntegratorNN/GeometricIntegrators.jl")
-# cd("..")
-cd("IntegratorNN")
+cd("..")
+# cd("IntegratorNN")
 
 Pkg.activate(".")
 
-# using NonlinearIntegrators
+using NonlinearIntegrators
 
-# using GeometricIntegrators
-# using NonlinearIntegrators
-# using QuadratureRules
-# using CompactBasisFunctions
-# using GeometricProblems: HarmonicOscillator
-# using GeometricProblems
-# using StaticArrays
-# using BSplineKit
+using GeometricIntegrators
+using NonlinearIntegrators
+using QuadratureRules
+using CompactBasisFunctions
+using GeometricProblems: HarmonicOscillator
+using GeometricProblems
+using StaticArrays
+using BSplineKit
 
-# int_step = 4.
-# int_timespan = 40.
+int_step = 4.
+int_timespan = 40.
 
-# HO_iode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
-# HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
+HO_iode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
+HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
 
-# QGau = QuadratureRules.GaussLegendreQuadrature(8)
-# # knots_seq = 0:0.2:1
-# # SplineB = BSplineDirichlet(4, knots_seq)
+QGau = QuadratureRules.GaussLegendreQuadrature(8)
+knots_seq = 0:0.2:1
+SplineB = BSplineDirichlet(4, knots_seq)
 
-# # Spline_results= integrate(HO_iode, CGVI_BSpline(SplineB, QGau))
-# # Spline_results[1].q
+Spline_results= integrate(HO_iode, CGVI_BSpline(SplineB, QGau))
+Spline_results.q
 
-# # relative_maximum_error(Spline_results[1].q, HO_pref.q)
+relative_maximum_error(Spline_results[1].q, HO_pref.q)
 
 
 
-# ### Nonlinear Case
-# NL_SplineB = Nonlinear_BSpline_Basis(4, QGau.nodes)
-# Spline_results= integrate(HO_iode, Nonlinear_BSpline_Integrator(NL_SplineB, QGau))
+# ### Nonlinear Case : Got a issue with the ForwardDiff Dual number and the BSpline. 
+NL_SplineB = Nonlinear_BSpline_Basis(4, QGau.nodes)
+Spline_results= integrate(HO_iode, Nonlinear_BSpline_Integrator(NL_SplineB, QGau))
 
 # Nonlinear_BSpline_Integrator(NL_SplineB, QGau)
 
