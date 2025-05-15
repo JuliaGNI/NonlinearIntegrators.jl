@@ -265,7 +265,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
     local x = nlsolution(int)
 
     tem_ode = similar(problem, [0.0, h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
-    tem_sol = integrate(tem_ode, integrator)
+    tem_sol,_ = integrate(tem_ode, integrator)
 
     for k in 1:D
         network_labels[:, k] = tem_sol.q[:, k]#[1].s
