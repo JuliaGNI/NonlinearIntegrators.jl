@@ -265,7 +265,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
     local x = nlsolution(int)
 
     tem_ode = similar(problem, [0.0, h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
-    tem_sol,_ = integrate(tem_ode, integrator)
+    tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
         network_labels[:, k] = tem_sol.q[:, k]#[1].s
@@ -712,4 +712,50 @@ function stages_compute!(sol, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}
 
     end
 
+end
+
+
+import GeometricIntegrators.Integrators: integrate!, solutionstep
+
+function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, n₁::Int, n₂::Int)
+    # check time steps range for consistency
+    @assert n₁ ≥ 1
+    @assert n₂ ≥ n₁
+    @assert n₂ ≤ ntime(sol)
+
+    # copy initial condition from solution to solutionstep and initialize
+    solstep = solutionstep(int, sol[n₁-1])
+    internal_values = Vector{Matrix}(undef,n₂ - n₁ + 1)
+    # loop over time steps
+    for n in n₁:n₂
+        # integrate one step and copy solution from cache to solution
+        sol[n] = integrate!(solstep, int)
+
+        if hasproperty(cache(int),:stage_values)
+            internal_values[n] = deepcopy(cache(int).stage_values)
+        end
+        # try
+        #     sol[n] = integrate!(int)
+        # catch ex
+        #     tstr = " in time step " * string(n)
+        #
+        #     if m₁ ≠ m₂
+        #         tstr *= " for initial condition " * string(m)
+        #     end
+        #
+        #     tstr *= "."
+        #
+        #     if isa(ex, DomainError)
+        #         @warn("Domain error" * tstr)
+        #     elseif isa(ex, ErrorException)
+        #         @warn("Simulation exited early" * tstr)
+        #         @warn(ex.msg)
+        #     else
+        #         @warn(string(typeof(ex)) * tstr)
+        #         throw(ex)
+        #     end
+        # end
+    end
+
+    return sol, internal_values
 end
