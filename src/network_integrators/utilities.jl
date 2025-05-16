@@ -3,6 +3,7 @@
 #######
 using NonlinearIntegrators
 using CompactBasisFunctions
+using Plots
 
 function first_order_central_difference(f,x;ϵ=0.00001)
     return (f(x+ϵ)-f(x-ϵ))/(2*ϵ)
