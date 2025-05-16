@@ -66,7 +66,7 @@ DP_NLOLsol,DP_internal = integrate(DP_lode, NLOLCGVNI_Gml)
 DP_hams = [GeometricProblems.DoublePendulum.hamiltonian(0, q, p, DP_lode.parameters) for (q, p) in zip(collect(DP_NLOLsol.q[:]), collect(DP_NLOLsol.p[:]))]
 
 pref_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step/40,tspan=(0,int_timespan))
-DP_pref,_ = integrate(pref_lode, Gauss(8))
+DP_pref= integrate(pref_lode, Gauss(8))
 
 DP_relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
 
