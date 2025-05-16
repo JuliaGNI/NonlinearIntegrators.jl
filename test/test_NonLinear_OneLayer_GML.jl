@@ -19,7 +19,7 @@ int_timespan = 10.0
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
 
-HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step/40))
+HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tstep=int_step,tspan=(0,int_timespan)))
 
 R = 4
 Q = 2 * R
@@ -35,8 +35,7 @@ NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork,QGau4,show_status = false,bias_
 
 #HarmonicOscillator
 HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
-relative_maximum_error(HO_NLOLsol.q,HO_truth.q)
-HO_NLOLsol.q
+@show relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
 
 using Plots
 # figure for q
