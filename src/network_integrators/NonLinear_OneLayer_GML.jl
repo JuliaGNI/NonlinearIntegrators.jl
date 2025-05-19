@@ -1,3 +1,5 @@
+import GeometricIntegrators.Integrators: default_options
+
 struct NonLinear_OneLayer_GML{T,NBASIS,NNODES,basisType<:Basis{T},ET<:IntegratorExtrapolation,IPMT<:InitialParametersMethod} <: OneLayerMethod
     basis::basisType
     quadrature::QuadratureRule{T,NNODES}
@@ -56,6 +58,15 @@ isexplicit(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = fal
 isimplicit(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = true
 issymmetric(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
 issymplectic(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
+
+GeometricIntegrators.Integrators.default_options(::NonLinear_OneLayer_GML) = Options(
+    x_reltol = 8eps(),
+    x_suctol = 2eps(),
+    f_abstol = 8eps(),
+    f_reltol = 8eps(),
+    f_suctol = 2eps(),
+    max_iterations = 10_000,
+)
 
 default_solver(::NonLinear_OneLayer_GML) = Newton()
 default_iguess(::NonLinear_OneLayer_GML) = IntegratorExtrapolation()#CoupledHarmonicOscillator
