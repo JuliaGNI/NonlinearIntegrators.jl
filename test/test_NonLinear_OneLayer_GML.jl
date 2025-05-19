@@ -12,7 +12,8 @@ int_timespan = 10.0
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
 
-HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tstep=int_step,tspan=(0,int_timespan)))
+HO_ref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tstep=int_step,tspan=(0,int_timespan)))
+HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tstep=int_step/40,tspan=(0,int_timespan)))
 
 R = 4
 Q = 2 * R
@@ -27,7 +28,7 @@ NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork,QGau4,show_status = false,bias_
 
 #HarmonicOscillator
 HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
-@show relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
+@show relative_maximum_error(HO_NLOLsol.q,HO_ref.q)
 
 # figure for q
 plot(int_step/40:int_step/40:int_timespan,vcat(hcat(internal_values...)[2:end,:]...))
@@ -47,6 +48,7 @@ plot!(p[2], 0:int_step:int_timespan,collect(HO_NLOLsol.p[:, 1]), label="S$(S)R$(
 plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
 
 plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="Relative Hamiltonian error")
+savefig(p, "nn_harmonic_oscillator.png")
 
 
 #DoublePendulum
@@ -58,7 +60,6 @@ NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau4, show_status = false, bi
 
 int_step = 1.0
 int_timespan = 10.0
-
 DP_params = (
     l₁ = 1.0,
     l₂ = 1.0,
@@ -67,9 +68,9 @@ DP_params = (
     g = 1.0,
     )
 
-# DP_ics = (t = 0.0, q = [0.7853981633974483, 1.5707963267948966], p = [0.2776801836348979, 0.39269908169872414], v = [0.0, 0.39269908169872414])
+DP_ics = (t = 0.0, q = [0.7853981633974483, 1.5707963267948966], p = [0.2776801836348979, 0.39269908169872414], v = [0.0, 0.39269908169872414])
 
-DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep = int_step, tspan = (0,int_timespan), parameters = DP_params)
+DP_lode = GeometricProblems.DoublePendulum.lodeproblem(DP_ics.q, DP_ics.p; tstep = int_step, tspan = (0,int_timespan), parameters = DP_params)
 initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0, DP_lode.ics.q, DP_lode.ics.p, DP_lode.parameters)
 
 DP_NLOLsol,DP_internal = integrate(DP_lode, NLOLCGVNI_Gml)
@@ -110,3 +111,4 @@ plot!(p[4], 0:int_step:int_timespan, collect(DP_NLOLsol.p[:, 2]), label="S$(S)R$
 plot!(p[4], 0:int_step/40:int_timespan, collect(DP_pref.p[:, 2]), label="Reference Solution", ylims=(-3, 3))
 
 plot!(p[5], 0:int_step:int_timespan, DP_relative_hams_err, label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="Relative Hamiltonian error")
+savefig(p, "nn_Double_Pendulum.png")
