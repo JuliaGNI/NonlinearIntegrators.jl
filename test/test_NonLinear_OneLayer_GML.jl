@@ -48,6 +48,8 @@ plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analyti
 
 plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="Relative Hamiltonian error")
 
+savefig(p, "nn_harmonic_oscillator.png")
+
 
 #DoublePendulum
 S = 8
@@ -110,3 +112,5 @@ plot!(p[4], 0:int_step:int_timespan, collect(DP_NLOLsol.p[:, 2]), label="S$(S)R$
 plot!(p[4], 0:int_step/40:int_timespan, collect(DP_pref.p[:, 2]), label="Reference Solution", ylims=(-3, 3))
 
 plot!(p[5], 0:int_step:int_timespan, DP_relative_hams_err, label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="Relative Hamiltonian error")
+
+savefig(p, "nn_double_pendulum.png")
