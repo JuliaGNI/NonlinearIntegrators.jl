@@ -19,7 +19,6 @@ Q = 2 * R
 QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
 BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
 
-
 S = 4
 relu3 = x->max(0,x) .^3
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
@@ -55,9 +54,9 @@ S = 8
 R = 8
 QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
 OLnetwork = OneLayerNetwork_GML{Float64}(tanh,S)
-NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork,QGau4,show_status = false,bias_interval = [-pi,pi],dict_amount = 400000)
+NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau4, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
 
-int_step =1.0
+int_step = 1.0
 int_timespan = 10.0
 
 DP_params = (
