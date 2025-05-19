@@ -360,7 +360,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
         Bias = zeros(S, 1)      # all parameters b
         C = zeros(S, nstages + 1)
         for k = 1:S
-            #     The subproblem is key to the greedy algorithm, where the 
+            #     The subproblem is key to the greedy algorithm, where the
             #     inner products |(u,g) - (f,g)| should be maximized.
             #     Part of the inner products can be computed in advance.
             uk_quad = NN(quad_nodes, ps[d])'
@@ -400,7 +400,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
             # show_status ? print("\n OGA error $errs before training \n ") : nothing
             # @show ps[d]
             # @show W
-            # @show Bias 
+            # @show Bias
             # @show xk
 
             # gs = Zygote.gradient(p -> sum(network_labels[d, :] - NN(quad_nodes, p)') .^ 2, ps[d])[1]
@@ -413,12 +413,12 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
             # show_status ? print("\n OGA error $errs after training ") : nothing
 
             # W .= ps[d][1].W[:]
-            # Bias .= ps[d][1].b[:] 
+            # Bias .= ps[d][1].b[:]
             # xk .= ps[d][2].W[1:k]
 
             # @show ps[d]
             # @show W
-            # @show Bias 
+            # @show Bias
             # @show xk
 
 
@@ -685,7 +685,7 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
 
     #compute the trajectory after solving by newton method
     stages_compute!(sol, int)
-    
+
 end
 
 function stages_compute!(sol, int::GeometricIntegrator{<:NonLinear_OneLayer_GML})

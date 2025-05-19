@@ -7,7 +7,7 @@ using GeometricProblems
 using Plots
 
 # Set up the Harmonic Oscillator problem
-int_step =0.5
+int_step = 0.5
 int_timespan = 10.0
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
