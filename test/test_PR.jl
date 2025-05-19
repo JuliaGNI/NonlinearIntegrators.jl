@@ -1,5 +1,5 @@
-# cd("IntegratorNN")
-cd("..")
+cd("IntegratorNN")
+# cd("..")
 using Pkg
 Pkg.activate(".")
 using Symbolics
@@ -15,7 +15,7 @@ q_expr = W[1] *sin(W[2]* ttt + W[3])
 
 PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
  #TODO: what if the expression is different for different dimensions?
-TT = 50.0
+TT = 300.0
 h_step = 5.0
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,TT),tstep = h_step)
 HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = h_step/50))

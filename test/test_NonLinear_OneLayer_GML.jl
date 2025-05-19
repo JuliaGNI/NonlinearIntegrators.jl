@@ -59,12 +59,34 @@ plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)re
 
 
 #DoublePendulum
-DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
+S = 8
+R = 8
+QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
+OLnetwork = OneLayerNetwork_GML{Float64}(tanh,S)
+NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork,QGau4,show_status = false,bias_interval = [-pi,pi],dict_amount = 400000)
+
+int_step =1.0
+int_timespan = 10.0
+
+DP_params = (
+    l₁ = 1.0,
+    l₂ = 1.0,
+    m₁ = 1.0,
+    m₂ = 1.0,
+    g = 1.0,
+    )
+
+DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep = int_step, tspan = (0,int_timespan), parameters = DP_params)
 initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0, DP_lode.ics.q, DP_lode.ics.p, DP_lode.parameters)
 
 DP_NLOLsol,DP_internal = integrate(DP_lode, NLOLCGVNI_Gml)
 DP_hams = [GeometricProblems.DoublePendulum.hamiltonian(0, q, p, DP_lode.parameters) for (q, p) in zip(collect(DP_NLOLsol.q[:]), collect(DP_NLOLsol.p[:]))]
 
+DP_ref1 = integrate(DP_lode, Gauss(8))
+@show relative_maximum_error(DP_NLOLsol.q,DP_ref1.q)
+
+
+DP_hams = [GeometricProblems.DoublePendulum.hamiltonian(0, q, p, DP_lode.parameters) for (q, p) in zip(collect(DP_NLOLsol.q[:]), collect(DP_NLOLsol.p[:]))]
 pref_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step/40,tspan=(0,int_timespan))
 DP_pref= integrate(pref_lode, Gauss(8))
 
