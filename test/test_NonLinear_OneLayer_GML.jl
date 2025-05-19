@@ -84,7 +84,7 @@ DP_hams = [GeometricProblems.DoublePendulum.hamiltonian(0, q, p, DP_lode.paramet
 pref_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step/40,tspan=(0,int_timespan))
 DP_pref= integrate(pref_lode, Gauss(8))
 
-DP_relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
+DP_relative_hams_err = abs.((DP_hams .- initial_hamiltonian) / initial_hamiltonian)
 
 
 DP_internal_q1 = Array{Vector}(undef,Int(int_timespan/int_step))
