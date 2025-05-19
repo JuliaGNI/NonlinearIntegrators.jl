@@ -24,34 +24,35 @@ S = 4
 relu3 = x->max(0,x) .^3
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 OLnetwork = OneLayerNetwork_GML{Float64}(relu3,S)
-NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork,QGau4,show_status = false,bias_interval = [-pi,pi],dict_amount = 400000)
+NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau4, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
 
 #HarmonicOscillator
 HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
 @show relative_maximum_error(HO_NLOLsol.q,HO_ref.q)
 
 # figure for q
-plot(int_step/40:int_step/40:int_timespan,vcat(hcat(internal_values...)[2:end,:]...))
+plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
 plot!(int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Truth", linestyle=:dash, linecolor=:black)
 scatter!(collect(0:int_step:int_timespan), collect(HO_NLOLsol.q[:, 1]), label="Discrete solution")
+savefig("nn_harmonic_oscillator_solution.png")
 
-#### Figures in the paper
+### Figures in the paper
 hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.q[:]), collect(HO_NLOLsol.p[:]))]
 relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
 
 p = plot(layout=@layout([a; b; c]), label="", size=(700, 700), plot_title="HarmonicOscillator,h = $(int_step)")
 
-plot!(p[1], int_step/40:int_step/40:int_timespan,vcat(hcat(internal_values...)[2:end,:]...), label="S$(S)R$(R)Q$(Q)relu3", ylims=(-0.6, 0.6))
+plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...), label="S$(S)R$(R)Q$(Q)relu3", ylims=(-0.6, 0.6))
 plot!(p[1], int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Analytic Solution", xaxis="time", yaxis="q₁")
 
-plot!(p[2], 0:int_step:int_timespan,collect(HO_NLOLsol.p[:, 1]), label="S$(S)R$(R)Q$(Q)relu3", ylims=(-0.6, 0.6))
+plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.p[:, 1]), label="S$(S)R$(R)Q$(Q)relu3", ylims=(-0.6, 0.6))
 plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
 
 plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="Relative Hamiltonian error")
 savefig(p, "nn_harmonic_oscillator.png")
 
 
-#DoublePendulum
+# DoublePendulum
 S = 8
 R = 8
 QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
@@ -69,7 +70,9 @@ DP_params = (
     )
 
 DP_ics = (t = 0.0, q = [0.7853981633974483, 1.5707963267948966], p = [0.2776801836348979, 0.39269908169872414], v = [0.0, 0.39269908169872414])
+DP_ics = (t = 0.0, q = [0.7853981633974483, 1.5707963267948966], p = [0.2776801836348979, 0.39269908169872414], v = [0.0, 0.39269908169872414])
 
+DP_lode = GeometricProblems.DoublePendulum.lodeproblem(DP_ics.q, DP_ics.p; tstep = int_step, tspan = (0,int_timespan), parameters = DP_params)
 DP_lode = GeometricProblems.DoublePendulum.lodeproblem(DP_ics.q, DP_ics.p; tstep = int_step, tspan = (0,int_timespan), parameters = DP_params)
 initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0, DP_lode.ics.q, DP_lode.ics.p, DP_lode.parameters)
 

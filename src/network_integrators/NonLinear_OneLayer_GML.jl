@@ -391,7 +391,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
 
             ps[d][1].W[:] .= W
             ps[d][1].b[:] .= Bias
-            ps[d][2].W[1:k] = xk
+            ps[d][2].W[1:k] .= xk
 
             # opt = Optimisers.Descent(0.00001)
             # st_opt = Optimisers.setup(opt, ps[d])
