@@ -4,7 +4,8 @@ using QuadratureRules
 using CompactBasisFunctions
 using GeometricProblems
 # using BenchmarkTools
-# using Plots
+using Plots
+
 # Set up the Harmonic Oscillator problem
 int_step =0.5
 int_timespan = 10.0
@@ -29,7 +30,6 @@ NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork,QGau4,show_status = false,bias_
 HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
 @show relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
 
-using Plots
 # figure for q
 plot(int_step/40:int_step/40:int_timespan,vcat(hcat(internal_values...)[2:end,:]...))
 plot!(int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Truth", linestyle=:dash, linecolor=:black)
