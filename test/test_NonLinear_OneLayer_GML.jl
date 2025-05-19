@@ -68,6 +68,8 @@ DP_params = (
     g = 1.0,
     )
 
+# DP_ics = (t = 0.0, q = [0.7853981633974483, 1.5707963267948966], p = [0.2776801836348979, 0.39269908169872414], v = [0.0, 0.39269908169872414])
+
 DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep = int_step, tspan = (0,int_timespan), parameters = DP_params)
 initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0, DP_lode.ics.q, DP_lode.ics.p, DP_lode.parameters)
 
