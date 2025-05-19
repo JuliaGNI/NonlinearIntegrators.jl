@@ -55,6 +55,7 @@ savefig(p, "nn_harmonic_oscillator.png")
 # DoublePendulum
 S = 8
 R = 8
+Q = 2 * R
 QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
 OLnetwork = OneLayerNetwork_GML{Float64}(tanh,S)
 NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau4, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
@@ -70,25 +71,19 @@ DP_params = (
     )
 
 DP_ics = (t = 0.0, q = [0.7853981633974483, 1.5707963267948966], p = [0.2776801836348979, 0.39269908169872414], v = [0.0, 0.39269908169872414])
-DP_ics = (t = 0.0, q = [0.7853981633974483, 1.5707963267948966], p = [0.2776801836348979, 0.39269908169872414], v = [0.0, 0.39269908169872414])
 
 DP_lode = GeometricProblems.DoublePendulum.lodeproblem(DP_ics.q, DP_ics.p; tstep = int_step, tspan = (0,int_timespan), parameters = DP_params)
-DP_lode = GeometricProblems.DoublePendulum.lodeproblem(DP_ics.q, DP_ics.p; tstep = int_step, tspan = (0,int_timespan), parameters = DP_params)
-initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0, DP_lode.ics.q, DP_lode.ics.p, DP_lode.parameters)
+DP_initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0, DP_lode.ics.q, DP_lode.ics.p, DP_lode.parameters)
 
 DP_NLOLsol,DP_internal = integrate(DP_lode, NLOLCGVNI_Gml)
 DP_hams = [GeometricProblems.DoublePendulum.hamiltonian(0, q, p, DP_lode.parameters) for (q, p) in zip(collect(DP_NLOLsol.q[:]), collect(DP_NLOLsol.p[:]))]
+DP_relative_hams_err = abs.((DP_hams .- DP_initial_hamiltonian) / DP_initial_hamiltonian)
 
 DP_ref1 = integrate(DP_lode, Gauss(8))
 @show relative_maximum_error(DP_NLOLsol.q,DP_ref1.q)
 
-
-DP_hams = [GeometricProblems.DoublePendulum.hamiltonian(0, q, p, DP_lode.parameters) for (q, p) in zip(collect(DP_NLOLsol.q[:]), collect(DP_NLOLsol.p[:]))]
-pref_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step/40,tspan=(0,int_timespan))
+pref_lode = GeometricProblems.DoublePendulum.lodeproblem(DP_ics.q, DP_ics.p; tstep = int_step/40, tspan = (0,int_timespan), parameters = DP_params)
 DP_pref= integrate(pref_lode, Gauss(8))
-
-DP_relative_hams_err = abs.((DP_hams .- initial_hamiltonian) / initial_hamiltonian)
-
 
 DP_internal_q1 = Array{Vector}(undef,Int(int_timespan/int_step))
 DP_internal_q2 = Array{Vector}(undef,Int(int_timespan/int_step))
