@@ -34,7 +34,7 @@ HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
 plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
 plot!(int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Truth", linestyle=:dash, linecolor=:black)
 scatter!(collect(0:int_step:int_timespan), collect(HO_NLOLsol.q[:, 1]), label="Discrete solution")
-savefig("nn_harmonic_oscillator_solution.png")
+savefig("result_figures/nn_harmonic_oscillator_solution.png")
 
 ### Figures in the paper
 hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.q[:]), collect(HO_NLOLsol.p[:]))]
@@ -49,7 +49,7 @@ plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.p[:, 1]), label="S$(S)R$
 plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
 
 plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="Relative Hamiltonian error")
-savefig(p, "nn_harmonic_oscillator.png")
+savefig(p, "result_figures/nn_harmonic_oscillator.png")
 
 
 # DoublePendulum
@@ -109,4 +109,4 @@ plot!(p[4], 0:int_step:int_timespan, collect(DP_NLOLsol.p[:, 2]), label="S$(S)R$
 plot!(p[4], 0:int_step/40:int_timespan, collect(DP_pref.p[:, 2]), label="Reference Solution", ylims=(-3, 3))
 
 plot!(p[5], 0:int_step:int_timespan, DP_relative_hams_err, label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="Relative Hamiltonian error")
-savefig(p, "nn_Double_Pendulum.png")
+savefig(p, "result_figures/nn_Double_Pendulum.png")

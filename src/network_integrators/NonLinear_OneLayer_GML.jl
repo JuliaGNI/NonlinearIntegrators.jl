@@ -59,15 +59,6 @@ isimplicit(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = tru
 issymmetric(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
 issymplectic(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
 
-GeometricIntegrators.Integrators.default_options(::NonLinear_OneLayer_GML) = Options(
-    x_reltol = 8eps(),
-    x_suctol = 2eps(),
-    f_abstol = 8eps(),
-    f_reltol = 8eps(),
-    f_suctol = 2eps(),
-    max_iterations = 10_000,
-)
-
 default_solver(::NonLinear_OneLayer_GML) = Newton()
 default_iguess(::NonLinear_OneLayer_GML) = IntegratorExtrapolation()#CoupledHarmonicOscillator
 default_iparams(::NonLinear_OneLayer_GML) = OGA1d()
@@ -726,8 +717,6 @@ function stages_compute!(sol, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}
 end
 
 
-import GeometricIntegrators.Integrators: integrate!, solutionstep
-
 function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, n₁::Int, n₂::Int)
     # check time steps range for consistency
     @assert n₁ ≥ 1
@@ -745,28 +734,17 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
         if hasproperty(cache(int),:stage_values)
             internal_values[n] = deepcopy(cache(int).stage_values)
         end
-        # try
-        #     sol[n] = integrate!(int)
-        # catch ex
-        #     tstr = " in time step " * string(n)
-        #
-        #     if m₁ ≠ m₂
-        #         tstr *= " for initial condition " * string(m)
-        #     end
-        #
-        #     tstr *= "."
-        #
-        #     if isa(ex, DomainError)
-        #         @warn("Domain error" * tstr)
-        #     elseif isa(ex, ErrorException)
-        #         @warn("Simulation exited early" * tstr)
-        #         @warn(ex.msg)
-        #     else
-        #         @warn(string(typeof(ex)) * tstr)
-        #         throw(ex)
-        #     end
-        # end
     end
 
     return sol, internal_values
 end
+
+
+GeometricIntegrators.Integrators.default_options(::NonLinear_OneLayer_GML) = Options(
+    x_reltol = 8eps(),
+    x_suctol = 2eps(),
+    f_abstol = 8eps(),
+    f_reltol = 8eps(),
+    f_suctol = 2eps(),
+    max_iterations = 10_000,
+)

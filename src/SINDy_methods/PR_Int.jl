@@ -309,8 +309,6 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
     # compute final update
     GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
     
-    print("\n x: ",nlsolution(int))
-
     stages_compute!(sol, int)
 
 end
@@ -337,7 +335,6 @@ function stages_compute!(sol, int::GeometricIntegrator{<:PR_Integrator})
     #         tem_W[k,i] = x[D*(i-1)+k]
     #     end
     # end
-    print("\n x: ",x)
     for d in 1:D
         for i in eachindex(network_inputs)
             stage_values[i,d] = q_expr[d](tem_W[d][:], sol.t - timestep(int) + network_inputs[i] * timestep(int))
@@ -362,3 +359,36 @@ function create_boundary_derivative_vector(ST::Type, D::Int,W_sizes::Vector{Int}
     end
     return mat
 end
+
+
+function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:PR_Integrator}, n₁::Int, n₂::Int)
+    # check time steps range for consistency
+    @assert n₁ ≥ 1
+    @assert n₂ ≥ n₁
+    @assert n₂ ≤ ntime(sol)
+
+    # copy initial condition from solution to solutionstep and initialize
+    solstep = solutionstep(int, sol[n₁-1])
+    internal_values = Vector{Matrix}(undef,n₂ - n₁ + 1)
+    each_step_solution = Vector{Vector}(undef,n₂ - n₁ + 1)
+    # loop over time steps
+    for n in n₁:n₂
+        # integrate one step and copy solution from cache to solution
+        sol[n] = integrate!(solstep, int)
+
+        internal_values[n] = deepcopy(cache(int).stage_values)
+        each_step_solution[n] = deepcopy(nlsolution(int))
+    end
+
+    return sol, internal_values, each_step_solution
+end
+
+
+GeometricIntegrators.Integrators.default_options(::PR_Integrator) = Options(
+    x_reltol = 8eps(),
+    x_suctol = 2eps(),
+    f_abstol = 8eps(),
+    f_reltol = 8eps(),
+    f_suctol = 2eps(),
+    max_iterations = 10_000,
+)

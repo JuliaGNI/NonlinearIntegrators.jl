@@ -7,6 +7,7 @@ module NonlinearIntegrators
     import GeometricIntegrators.Integrators: CacheDict, Cache, default_solver, default_iguess,CacheType
     import GeometricIntegrators.Integrators: create_internal_stage_vector,parameters
     import GeometricIntegrators.Integrators: cache,nlsolution,solver,method,iguess,problem,current,update!
+    import GeometricIntegrators.Integrators: integrate!, solutionstep
 
     using NonlinearIntegrators
     using QuadratureRules
