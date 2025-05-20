@@ -20,7 +20,7 @@ function PR_plot_1d(PR_sol, internal_sol, pref,relative_ham_err, h_step, TT, tit
     scatter!(p[2],collect(0:h_step:TT),collect(PR_sol.p[:,1]), label="SINDy Discrete Solution")
 
     plot!(p[3], 0:h_step:TT, relative_ham_err, label = "SINDy Solution", xaxis="time", yaxis="Relative Hamiltonian error")
-    savefig("result_figures/$(title_name).png")
+    savefig("result_figures/$(title_name).pdf")
 end
 
 function PR_plot_2d(PR_sol, internal_sol, pref,relative_ham_err, h_step, TT, title_name)
@@ -50,7 +50,7 @@ function PR_plot_2d(PR_sol, internal_sol, pref,relative_ham_err, h_step, TT, tit
     plot!(p[4], 0:h_step/40:TT, collect(pref.p[:, 2]), label="Reference Solution")
 
     plot!(p[5], 0:h_step:TT, relative_ham_err, label="SINDy Solution", xaxis="time", yaxis="Relative Hamiltonian error")
-    savefig(p, "result_figures/$(title_name).png")
+    savefig(p, "result_figures/$(title_name).pdf")
 end
 
 

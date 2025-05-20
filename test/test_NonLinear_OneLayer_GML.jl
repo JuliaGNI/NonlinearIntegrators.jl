@@ -56,9 +56,9 @@ savefig(p, "result_figures/nn_harmonic_oscillator.png")
 S = 8
 R = 8
 Q = 2 * R
-QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
+QGau = QuadratureRules.GaussLegendreQuadrature(R)
 OLnetwork = OneLayerNetwork_GML{Float64}(tanh,S)
-NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau4, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
+NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
 
 int_step = 1.0
 int_timespan = 10.0
@@ -109,4 +109,4 @@ plot!(p[4], 0:int_step:int_timespan, collect(DP_NLOLsol.p[:, 2]), label="S$(S)R$
 plot!(p[4], 0:int_step/40:int_timespan, collect(DP_pref.p[:, 2]), label="Reference Solution", ylims=(-3, 3))
 
 plot!(p[5], 0:int_step:int_timespan, DP_relative_hams_err, label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="Relative Hamiltonian error")
-savefig(p, "result_figures/nn_Double_Pendulum.png")
+savefig(p, "result_figures/nn_Double_Pendulum.pdf")
