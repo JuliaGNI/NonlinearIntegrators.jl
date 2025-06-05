@@ -383,6 +383,12 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
             ps[d][1].b[:] .= Bias
             ps[d][2].W[1:k] .= xk
 
+            if show_status
+                @show ps[d][2].W[:]
+                @show ps[d][1].W[:]
+                @show ps[d][1].b[:]
+            end
+
             # opt = Optimisers.Descent(0.00001)
             # st_opt = Optimisers.setup(opt, ps[d])
 
@@ -702,6 +708,11 @@ function stages_compute!(sol, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}
             ps[k][1].b[i] = x[D*(S+1+S)+D*(i-1)+k]
         end
         stage_values[:, k] = NN(network_inputs, ps[k])[:]
+        if show_status
+            @show ps[k][2].W[:]
+            @show ps[k][1].W[:]
+            @show ps[k][1].b[:]
+        end
     end
 
     if show_status
