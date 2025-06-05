@@ -1,6 +1,6 @@
 struct PR_Integrator{T,NNODES,basisType <: Basis{T}} <: LODEMethod
     basis::basisType
-    quadrature::QuadratureRule{T,NNODES}
+    quadrature
 
     b::SVector{NNODES,T}
     c::SVector{NNODES,T}
@@ -8,10 +8,10 @@ struct PR_Integrator{T,NNODES,basisType <: Basis{T}} <: LODEMethod
     init_w::Vector{Vector{T}}
     nstages::Int
 
-    function PR_Integrator(basis::Basis{T}, quadrature::QuadratureRule{T}, init_w::Vector{Vector{T}};
+    function PR_Integrator(basis::Basis{T}, quadrature, init_w::Vector{Vector{T}};
         nstages::Int=10) where T
-        quad_weights = QuadratureRules.weights(quadrature)
-        quad_nodes = QuadratureRules.nodes(quadrature)
+        quad_weights = quadrature.weights
+        quad_nodes = quadrature.nodes
         NNODES = QuadratureRules.nnodes(quadrature)
         new{T,NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, init_w, nstages)
     end
@@ -153,7 +153,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     local W_sizes = method(int).basis.W_sizes
     local C = cache(int, ST)
 
-    local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
+    local quad_nodes = int.method.quadrature.nodes
 
     local q = cache(int, ST).q̃
     local p = cache(int, ST).p̃

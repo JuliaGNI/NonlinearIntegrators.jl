@@ -1,11 +1,4 @@
-using Pkg
-# cd("IntegratorNN/GeometricIntegrators.jl")
-# cd("..")
-cd("IntegratorNN")
-
-Pkg.activate(".")
-
-using GeometricIntegrators
+using GeometricIntegrators 
 using NonlinearIntegrators
 using QuadratureRules
 using CompactBasisFunctions
