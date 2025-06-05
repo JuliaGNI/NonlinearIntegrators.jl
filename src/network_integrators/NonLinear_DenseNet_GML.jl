@@ -355,7 +355,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     # compute coefficients
     ϵ=0.00001
     for d in 1:D
-        intermidiate_ps = (L1 = ps[k].L1, L2 = ps[k].L2)
+        intermidiate_ps = (L1 = ps[d].L1, L2 = ps[d].L2)
         r₀[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([0.0],intermidiate_ps)
         r₁[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([1.0],intermidiate_ps)
         # for i in 1:S
