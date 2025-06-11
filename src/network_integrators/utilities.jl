@@ -116,3 +116,46 @@ function GaussQuadrature128()
     weights = 0.5 .* [weight...,reverse(weight)...]
     return (nodes = nodes, weights = weights)
 end
+
+function flatten_params(params::NeuralNetworkParameters)
+    flat_list = []
+    for layer in values(params)
+        for field in fieldnames(typeof(layer))
+            val = getfield(layer, field)
+            push!(flat_list, vec(val))
+        end
+    end
+    return vcat(flat_list...)
+end
+
+
+function box_init_plain(input_dim::Int, output_dim::Int;Random_rng = Random.seed!(1))
+    W = zeros(Float32, output_dim, input_dim)
+    b = zeros(Float32, output_dim)
+
+    for i in 1:output_dim
+        p = rand(Random_rng,Float32, input_dim) 
+        n = randn(Random_rng,Float32, input_dim)
+        n ./= norm(n)
+        p_max = map((n_i) -> n_i ≥ 0 ? 1.0f0 : 0.0f0, n)
+        k = 1 / dot((p_max .- p), n)
+        W[i, :] = k * n
+        b[i] = k * dot(p, n)
+    end
+    return W, b
+end
+
+function lsgd_loss(network_inputs,labels,NN,ps)
+    NN_output = NN(network_inputs, ps)
+    return sqrt(mean((labels .- NN_output).^2))
+end
+
+
+GeometricIntegrators.Integrators.default_options(::NetworkIntegratorMethod) = Options(
+    x_reltol = 8eps(),
+    x_suctol = 2eps(),
+    f_abstol = 8eps(),
+    f_reltol = 8eps(),
+    f_suctol = 2eps(),
+    max_iterations = 10_000,
+)

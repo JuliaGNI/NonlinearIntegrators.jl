@@ -1,4 +1,4 @@
-struct Linear_DenseNet_GML{T, NBASIS,NHIDDEN, NNODES, basisType <: Basis{T}} <: DenseNetMethod
+struct Linear_DenseNet_GML{T, NNODES, basisType <: Basis{T},ET<:IntegratorExtrapolation,IPMT<:InitialParametersMethod} <: DenseNetMethod
     basis::basisType
     quadrature::QuadratureRule{T,NNODES}
 
@@ -10,18 +10,21 @@ struct Linear_DenseNet_GML{T, NBASIS,NHIDDEN, NNODES, basisType <: Basis{T}} <: 
     network_inputs::Matrix{T}
     training_epochs::Int
 
-    function Linear_DenseNet_GML(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000) where {T}
+    initial_trajectory::ET
+    initial_guess_method::IPMT
+
+    function Linear_DenseNet_GML(basis::Basis{T}, quadrature::QuadratureRule{T};nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000,
+        initial_trajectory::ET=IntegratorExtrapolation(),
+        initial_guess_method::IPMT=LSGD()) where {T, ET, IPMT}
         # get number of quadrature nodes and number of basis functions
         NNODES = QuadratureRules.nnodes(quadrature)
-        NBASIS = basis.S
-        NHIDDEN = basis.S₁    
 
         # get quadrature nodes and weights
         quad_weights = QuadratureRules.weights(quadrature)
         quad_nodes = QuadratureRules.nodes(quadrature)
         network_inputs = reshape(collect(0:1/nstages:1),1,nstages+1)
 
-        new{T, NBASIS, NHIDDEN, NNODES, typeof(basis)}(basis, quadrature, quad_weights, quad_nodes,nstages, show_status, network_inputs, training_epochs)
+        new{T, NNODES, typeof(basis),ET,IPMT}(basis, quadrature, quad_weights, quad_nodes,nstages, show_status, network_inputs, training_epochs,initial_trajectory, initial_guess_method)
     end
 end
 
@@ -61,19 +64,19 @@ struct Linear_DenseNet_GMLCache{ST,D,S₁,S,R,N} <: IODEIntegratorCache{ST,D}
     V::Vector{Vector{ST}}
     F::Vector{Vector{ST}}
 
-    ps::Vector{Tuple{NamedTuple{},NamedTuple{},NamedTuple{},NamedTuple{}}}
+    ps::Vector{@NamedTuple{L1::@NamedTuple{W::Matrix{ST}, b::Vector{ST}},L2::@NamedTuple{W::Matrix{ST}, b::Vector{ST}},
+        L3::@NamedTuple{W::Matrix{ST}}}}
 
     r₀::VecOrMat{ST}
     r₁::VecOrMat{ST}
     m::Array{ST} 
     a::Array{ST}
 
-    current_step::Vector{ST}
     stage_values::VecOrMat{ST}
     network_labels::VecOrMat{ST}
 
     function Linear_DenseNet_GMLCache{ST,D,S₁,S,R,N}() where {ST,D,S₁,S,R,N}
-        x = zeros(ST,D*(S+1)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
+        x = zeros(ST,D*(S+1))
 
         q̄ = zeros(ST,D)
         p̄ = zeros(ST,D)
@@ -93,22 +96,20 @@ struct Linear_DenseNet_GMLCache{ST,D,S₁,S,R,N} <: IODEIntegratorCache{ST,D}
         F = create_internal_stage_vector(ST,D,R)
 
         # create hidden layer parameter vectors
-        ps = [((W = zeros(ST,S₁,1),b = zeros(ST,S₁)),
-                (W = zeros(ST,S₁,S₁),b = zeros(ST,S₁)),
-                (W = zeros(ST,S,S₁),b = zeros(ST,S)),
-                (W = zeros(ST,1,S),))  for k in 1:D]
+        ps = [(L1 = (W = zeros(ST,S₁,1),b = zeros(ST,S₁)),
+                L2 = (W = zeros(ST,S,S₁),b = zeros(ST,S)),
+                L3 = (W = zeros(ST,1,S),))  for k in 1:D]
 
         r₀ = zeros(ST, S, D)
         r₁ = zeros(ST, S, D)
         m  = zeros(ST, R, S, D)
         a  = zeros(ST, R, S, D)
 
-        current_step = zeros(ST, 1)
         stage_values = zeros(ST, N, D)
         network_labels = zeros(ST, N+1, D)
 
-        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a, 
-        current_step,stage_values,network_labels)
+        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a
+                ,stage_values,network_labels)
     end
 end
 
@@ -120,10 +121,10 @@ end
 GeometricIntegrators.Integrators.nlsolution(cache::Linear_DenseNet_GMLCache) = cache.x
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Linear_DenseNet_GML; kwargs...) where {ST}
-    Linear_DenseNet_GMLCache{ST, ndims(problem), method.basis.S₁,nbasis(method), nnodes(method),nstages(method)}(; kwargs...)
+    Linear_DenseNet_GMLCache{ST, ndims(problem), method.basis.S₁,method.basis.S, nnodes(method),nstages(method)}(; kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Linear_DenseNet_GML) = Linear_DenseNet_GMLCache{ST, ndims(problem), method.basis.S₁,nbasis(method), nnodes(method),nstages(method)}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Linear_DenseNet_GML) = Linear_DenseNet_GMLCache{ST, ndims(problem), method.basis.S₁,method.basis.S, nnodes(method),nstages(method)}
 
 @inline function Base.getindex(c::Linear_DenseNet_GMLCache, ST::DataType)
     key = hash(Threads.threadid(), hash(ST))
@@ -134,23 +135,15 @@ end
     end::CacheType(ST, c.problem, c.method)
 end
 
-function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrator{<:Linear_DenseNet_GML}) 
-    local h = int.problem.tstep
+function GeometricIntegrators.Integrators.initial_guess!(sol, history, params,int::GeometricIntegrator{<:Linear_DenseNet_GML}) 
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local show_status = method(int).show_status 
-    local current_step = cache(int).current_step
+    local initial_trajectory = method(int).initial_trajectory
+    local initial_guess_method = method(int).initial_guess_method
 
-    show_status ? print("\n current time step: $current_step") : nothing
-    current_step[1]+=1
+    initial_trajectory!(sol, history, params, int, initial_trajectory)
 
-    # choose initial guess method based on the value of h
-    if h < 0.5
-        initial_guess_Extrapolation!(int)
-    else
-        initial_guess_integrator!(int)
-    end 
-    
     if show_status
         print("\n network inputs")
         print(network_inputs)
@@ -159,11 +152,11 @@ function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrato
         print(network_labels)
     end
 
-    initial_guess_networktraining!(int)
+    initial_params!(int, initial_guess_method)
 
 end
 
-function initial_guess_Extrapolation!(int::GeometricIntegrator{<:Linear_DenseNet_GML})
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Linear_DenseNet_GML}, initial_trajectory::HermiteExtrapolation)
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local D = ndims(int)
@@ -178,30 +171,31 @@ function initial_guess_Extrapolation!(int::GeometricIntegrator{<:Linear_DenseNet
     network_labels[1,:] = solstep(int).q #safe check for MidpointExtrapolation
 end
 
-function initial_guess_integrator!(int::GeometricIntegrator{<:Linear_DenseNet_GML})
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Linear_DenseNet_GML}, initial_trajectory::IntegratorExtrapolation)
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
     local h = int.problem.tstep
     local N = method(int).nstages
     local D = ndims(int)
     local problem = int.problem
-    local S = nbasis(method(int))   
+    local S = method(int).basis.S
     local x = nlsolution(int)
+    local nstages = method(int).nstages
 
-    tem_ode=similar(problem,[0.,h],h/N,(q = StateVariable(int.solstep.q[:]), p = StateVariable(int.solstep.p[:]), λ = AlgebraicVariable(problem.ics.λ)))
-    sol = integrate(tem_ode, integrator)
+    tem_ode = similar(problem, [0.0, h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
-        network_labels[:,k]=sol.s.q[:,k]
-        cache(int).q̃[k] = sol.s.q[:,k][end]
-        cache(int).p̃[k] = sol.s.p[:,k][end]
+        network_labels[:, k] = tem_sol.q[:, k]#[1].s
+        cache(int).q̃[k] = tem_sol.q[:, k][end]
+        cache(int).p̃[k] = tem_sol.p[:, k][end]
         x[D*S+k] = cache(int).p̃[k]
     end
 end 
 
-function initial_guess_networktraining!(int)
+function initial_params!(int::GeometricIntegrator{<:Linear_DenseNet_GML}, InitialParams::TrainingMethod)
     local D = ndims(int)
-    local S = nbasis(method(int))
+    local S = method(int).basis.S
 
     local show_status = method(int).show_status 
     local x = nlsolution(int)
@@ -221,13 +215,15 @@ function initial_guess_networktraining!(int)
 
         labels = reshape(network_labels[:,k],1,nstages+1)
 
-        ps[k] = AbstractNeuralNetworks.initialparameters(NN,backend,Float64)
-        opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
+        PNN = GeometricMachineLearning.NeuralNetwork(NN)
+        # opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
+        opt = GeometricMachineLearning.Optimizer(GeometricMachineLearning.AdamOptimizerWithDecay(nepochs,1e-3, 5e-5), PNN)
         err = 0
+        λ = GeometricMachineLearning.GlobalSection(PNN.params)
         for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs,labels,NN,p)[1],ps[k])[1]
-            optimization_step!(opt, NN, ps[k], gs)
-            err = mse_loss(network_inputs,labels,NN,ps[k])[1]
+            gs = Zygote.gradient(p -> mse_loss(network_inputs,labels,PNN,p)[1],PNN.params)[1]
+            GeometricMachineLearning.optimization_step!(opt,λ, PNN.params, gs)
+            err = mse_loss(network_inputs,labels,PNN,PNN.params)[1]
 
             if err < 5e-5
                 show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
@@ -237,10 +233,8 @@ function initial_guess_networktraining!(int)
             end
         end
 
-        for i in 1:S
-            x[D*(i-1)+k] = ps[k][end].W[i]
-        end
-
+        ps[k] = PNN.params[:]
+        x[(k-1)*S+1:(k-1)*S+S] = ps[k].L3.W[:]
     end
 
 
@@ -254,14 +248,78 @@ function initial_guess_networktraining!(int)
 
 end
 
+function initial_params!(int::GeometricIntegrator{<:Linear_DenseNet_GML}, InitialParams::LSGD)
+    local D = ndims(int)
+    local S = int.method.basis.S
+    local S₁ = int.method.basis.S₁
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {ST}
+    local show_status = method(int).show_status 
+    local x = nlsolution(int)
+    local NN = method(int).basis.NN
+    local ps = cache(int).ps
+    local nstages = method(int).nstages
+    local network_inputs = method(int).network_inputs
+    local network_labels = cache(int).network_labels
+    local nepochs = method(int).training_epochs
+
+    for k in 1:D
+        if show_status
+            print("\n network lables for dimension $k \n")
+            print(network_labels[:,k])
+        end
+
+        labels = reshape(network_labels[:,k],1,nstages+1)
+
+        PNN = NeuralNetwork(NN)
+        PNN.params.L1.W[:], PNN.params.L1.b[:] = box_init_plain(1, S₁)
+        PNN.params.L2.W[:], PNN.params.L2.b[:] = box_init_plain(S₁, S)
+        PNN.params.L3.W[:], _ = box_init_plain(S, 1)
+        tem_ps = (L1 = PNN.params.L1, L2 = PNN.params.L2)
+        opt = GeometricMachineLearning.Optimizer(GeometricMachineLearning.GradientOptimizer(.001), tem_ps)
+        err = 0
+        λ = GeometricMachineLearning.GlobalSection(tem_ps)
+
+        for ep in 1:nepochs
+            Φ = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)(network_inputs,tem_ps)
+            # Φ = NN(network_inputs, PNN.params)
+            # PNN.params.L3.W[:] = labels/Φ
+            PNN.params.L3.W[:] = (Φ' \ labels')'
+            gs = Zygote.gradient(p -> lsgd_loss(network_inputs,labels,NN,p),PNN.params)[1]
+            tem_ps = (L1 = PNN.params.L1, L2 = PNN.params.L2)
+            tem_gs = (L1 = gs.L1, L2 = gs.L2)
+            GeometricMachineLearning.optimization_step!(opt,λ, tem_ps, tem_gs)
+            err = lsgd_loss(network_inputs,labels,NN,PNN.params)
+            if err < 5e-8
+                show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
+                break
+            elseif ep == nepochs
+                show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
+            end
+        end
+
+        ps[k] = PNN.params[:]
+        x[(k-1)*S+1:(k-1)*S+S] = ps[k].L3.W[:]
+    end
+
+    if show_status
+        print("\n network parameters \n")
+        print(ps)
+
+        print("\n initial guess x from network training \n")
+        print(x)
+    end
+
+end
+
+
+
+function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST},sol, params, int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {ST}
     # set some local variables for convenience and clarity
     local D = ndims(int)
-    local S₁ = int.method.basis.S₁
-    local S = nbasis(method(int))
+    local S = method(int).basis.S
     local σ = int.method.basis.activation
     local R = length(method(int).c)
+    local C = cache(int, ST)
 
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
 
@@ -269,8 +327,6 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
     local p = cache(int, ST).p̃
     local Q = cache(int, ST).Q
     local V = cache(int, ST).V
-    local P = cache(int, ST).P
-    local F = cache(int, ST).F
     local X = cache(int, ST).X
 
     local NN = method(int).basis.NN
@@ -280,14 +336,13 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
     local r₁ = cache(int, ST).r₁
     local m  = cache(int, ST).m
     local a  = cache(int, ST).a
-
-    local float_ps = cache(int,Float64).ps
-
+    local DVDθ = method(int).basis.dvdθ
+    local V_func = method(int).basis.V_func
 
     # copy x to X and bias 
     for i in 1:S
         for d in 1:D
-            X[i][d] = x[D*(i-1)+d]
+            X[i][d] = x[(d-1)*S+i]
         end
     end
 
@@ -296,76 +351,48 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, int
         p[k] = x[D*S+k]
     end
 
-    if ST != Float64 
-        for k in 1:D
-            for layers in 1:length(float_ps[k])-1
-                ps[k][layers].W[:] = float_ps[k][layers].W[:]
-                ps[k][layers].b[:] = float_ps[k][layers].b[:]
-            end
-        end
-    end
-
-    # copy x to hidden layer weights W : [D,S*S₁]
-    for d in 1:D
-        for i in 1:S
-            ps[d][end].W[i]= x[D*(i-1)+d]
-        end
-    end 
-    
     # compute coefficients
-    ϵ=0.00001
     for d in 1:D
-        r₀[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([0.0],ps[d][1:end-1])
-        r₁[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([1.0],ps[d][1:end-1])
+        intermidiate_ps = (L1 = ps[d].L1, L2 = ps[d].L2)
+        r₀[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([0.0],intermidiate_ps)
+        r₁[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([1.0],intermidiate_ps)
         for j in eachindex(quad_nodes)
-            m[j,:,d] =  AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([quad_nodes[j]],ps[d][1:end-1])
-            a[j,:,d] = basis_first_order_central_difference(NN,ps[d],quad_nodes[j])
+            m[j,:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([quad_nodes[j]],intermidiate_ps)
+            a[j,:,d] = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))[1,1].L3.W[:]
         end
     end
 
     # compute Q q at quaadurature points
     for i in eachindex(Q)
         for d in eachindex(Q[i])
-            y = zero(ST)
-            for j in eachindex(X)
-                y += m[i,j,d] * X[j][d]
-            end
-            Q[i][d] = y
+            Q[i][d] = NN([quad_nodes[i]], NeuralNetworkParameters(ps[d]))[1]
         end
     end
 
     # compute q[t_{n+1}]
     for d in eachindex(q)
-        y = zero(ST)
-        for i in eachindex(X)
-            y += r₁[i,d] * X[i][d]
-        end
-        q[d] = y
+        q[d] = NN([1.0], NeuralNetworkParameters(ps[d]))[1]
     end
 
     # compute V volicity at quadrature points
     for i in eachindex(V)
-        for k in eachindex(V[i])
-            y = zero(ST)
-            for j in eachindex(X)
-                y += a[i,j,k] * X[j][k]
-            end
-            V[i][k] = y / timestep(int)
+        for d in eachindex(V[i])            
+            V[i][d] = V_func([quad_nodes[i]],NeuralNetworkParameters(ps[d]))[1] / timestep(int)
         end
     end
 
     # compute P=ϑ(Q,V) pl/pv and F=f(Q,V) pl/px
-    for i in eachindex(Q,V,P,F)
-        tᵢ = solstep(int).t + timestep(int) * method(int).c[i]
-        equations(int).ϑ(P[i], tᵢ, Q[i], V[i], parameters(solstep(int))) # P[i] : momentum at t_n+h* c_i
-        equations(int).f(F[i], tᵢ, Q[i], V[i], parameters(solstep(int))) # F[i] : Force at t_n + h* cᵢ
+    for i in eachindex(C.Q, C.V, C.P, C.F)
+        tᵢ = sol.t + timestep(int) * (method(int).c[i] - 1)
+        equations(int).ϑ(C.P[i], tᵢ, C.Q[i], C.V[i], params)
+        equations(int).f(C.F[i], tᵢ, C.Q[i], C.V[i], params)
     end
 
 end
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {ST}
+function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params,int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {ST}
     local D = ndims(int)
-    local S = nbasis(method(int))
+    local S = method(int).basis.S
     local S₁ = int.method.basis.S₁
     local R = length(method(int).c)
 
@@ -389,7 +416,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, int::Geometri
                 z += method(int).b[j] * F[j][k] * m[j,i,k] * timestep(int)
                 z += method(int).b[j] * P[j][k] * a[j,i,k] 
             end
-            b[D*(i-1)+k] = (r₁[i,k] * p̃[k] - r₀[i,k] * p̄[k]) - z
+            b[(k-1)*S+i] = (r₁[i,k] * p̃[k] - r₀[i,k] * p̄[k]) - z
         end
     end # the residual in actual action, vatiation with respect to Q_{n,i}
 
@@ -402,38 +429,32 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, int::Geometri
     end
 end
 
-function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {ST}
+function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST},sol, params, int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {ST}
     @assert axes(x) == axes(b)
 
-    # copy previous solution from solstep to cache
-    reset!(cache(int, ST), current(solstep(int))...)
-
     # compute stages from nonlinear solver solution x
-    GeometricIntegrators.Integrators.components!(x, int)
+    GeometricIntegrators.Integrators.components!(x, sol, params, int)
 
     # compute residual vector
-    GeometricIntegrators.Integrators.residual!(b, int)
+    GeometricIntegrators.Integrators.residual!(b, sol, params, int)
 end
 
-function GeometricIntegrators.Integrators.update!(x::AbstractVector{DT}, int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {DT}
-    # copy previous solution from solstep to cache
-    GeometricIntegrators.Integrators.reset!(cache(int, DT), current(solstep(int))...)
+function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:Linear_DenseNet_GML}, DT)
+    sol.q .= cache(int, DT).q̃
+    sol.p .= cache(int, DT).p̃
+end
 
+function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {DT}
     # compute vector field at internal stages
-    GeometricIntegrators.Integrators.components!(x, int)
+    GeometricIntegrators.Integrators.components!(x, sol, params, int)
 
     # compute final update
-    solstep(int).q .= cache(int, DT).q̃
-    solstep(int).p .= cache(int, DT).p̃
+    GeometricIntegrators.Integrators.update!(sol, params, int, DT)
 end
 
-
-function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrator{<:Linear_DenseNet_GML, <:AbstractProblemIODE})
-    # copy previous solution from solstep to cache
-    reset!(cache(int), current(solstep(int))...)
-
+function GeometricIntegrators.Integrators.integrate_step!(sol, history, params,int::GeometricIntegrator{<:Linear_DenseNet_GML, <:AbstractProblemIODE})
     # call nonlinear solver
-    solve!(nlsolution(int), (b,x) -> GeometricIntegrators.Integrators.residual!(b, x, int), solver(int)) # nlsoution : initialguess from HermiteExtrapolation
+    solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
 
     # print solver status
     # print_solver_status(int.solver.status, int.solver.params)
@@ -442,22 +463,26 @@ function GeometricIntegrators.Integrators.integrate_step!(int::GeometricIntegrat
     # check_solver_status(int.solver.status, int.solver.params)
 
     # compute final update
-    update!(nlsolution(int), int)
+    GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
 
     #compute the trajectory after solving by newton method
-    stages_compute!(int)
+    stages_compute!(sol, int)
+
+    #check for NaNs
+    # if sum(isnan.(cache(int).q̃[:])) > 0 
+    #     error("NaN value encountered, terminating program.")
+    # end
 end
 
-function stages_compute!(int::GeometricIntegrator{<:Linear_DenseNet_GML})
+function stages_compute!(sol,int::GeometricIntegrator{<:Linear_DenseNet_GML})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     local network_inputs = method(int).network_inputs
     local D = ndims(int)
-    local S = nbasis(method(int))
+    local S = method(int).basis.S
     local NN = method(int).basis.NN
     local ps = cache(int).ps
     local show_status = method(int).show_status
-    local S₁ = method(int).basis.S₁
 
     if show_status
         print("\n solution x after solving by Newton \n")
@@ -477,3 +502,13 @@ function stages_compute!(int::GeometricIntegrator{<:Linear_DenseNet_GML})
     end
 
 end
+
+
+GeometricIntegrators.Integrators.default_options(::Linear_DenseNet_GML) = Options(
+    x_reltol = 8eps(),
+    x_suctol = 2eps(),
+    f_abstol = 8eps(),
+    f_reltol = 8eps(),
+    f_suctol = 2eps(),
+    max_iterations = 10_000,
+)

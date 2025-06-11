@@ -15,7 +15,7 @@ struct OneLayerNetwork_GML{T,NT,BT,SNNT,QWFT,VWFT}<:OneLayerNetBasis{T}
             AbstractNeuralNetworks.Dense(S,1,identity,use_bias= false))
         SNN = SymbolicNeuralNetwork(NN)
 
-        dqdθ = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Gradient(SNN))
+        dqdθ = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Gradient(SNN)) #[1]
         dqdθ_built_function = build_nn_function(dqdθ, SNN.params, SNN.input)
 
         jac = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Jacobian(SNN))

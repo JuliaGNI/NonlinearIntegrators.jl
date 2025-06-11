@@ -17,3 +17,4 @@ struct IntegratorExtrapolation <: Extrapolation end
 abstract type InitialParametersMethod end
 struct TrainingMethod <: InitialParametersMethod end
 struct OGA1d <: InitialParametersMethod end
+struct LSGD <: InitialParametersMethod end

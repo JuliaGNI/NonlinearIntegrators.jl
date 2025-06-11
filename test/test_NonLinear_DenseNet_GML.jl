@@ -8,7 +8,7 @@ using GeometricProblems
 
 # Set up the Harmonic Oscillator problem
 int_step = 0.6
-int_timespan = 60.
+int_timespan = 6.0
 
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
 HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
@@ -30,14 +30,14 @@ DP_pref_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=0.1,tspan=(0,i
 DP_pref = integrate(DP_pref_lode, CGVI(BGau4, QGau4))
 
 
-S₁ = 6
-S = 4
+S₁ = 5
+S = 3
 square(x) = x^2
 sigmoid(x) = 1 / (1 + exp(-x))
 
 Densenetwork = DenseNet_GML{Float64}(tanh,S₁,S)
 QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
-NL_DenseGML = NonLinear_DenseNet_GML(Densenetwork,QGau4,training_epochs =1 )
+NL_DenseGML = NonLinear_DenseNet_GML(Densenetwork,QGau4,training_epochs =40000 )
 
 
 #HarmonicOscillator
