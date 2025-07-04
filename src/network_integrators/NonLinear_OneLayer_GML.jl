@@ -24,7 +24,7 @@ struct NonLinear_OneLayer_GML{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Integrator
         nstages::Int=10, show_status::Bool=true, training_epochs::Int=50000, problem_initial_hamitltonian::Float64=0.0, use_hamiltonian_loss::Bool=true,
         initial_trajectory::ET=IntegratorExtrapolation(),
         initial_guess_method::IPMT=OGA1d(),
-        bias_interval=[-pi, pi], dict_amount=50000) where {T,ET<:Extrapolation,IPMT<:OGA1d}
+        bias_interval=[-pi, pi], dict_amount=50000) where {T,ET,IPMT}
         # get number of quadrature nodes and number of basis functions
         # initial_trajectory_list = subtypes(Extrapolation)
         # @assert initial_trajectory in initial_trajectory_list "initial_trajectory should be one of $(initial_trajectory_list)"
