@@ -27,7 +27,7 @@ HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(tspan
 
 
 
-S₁ = 5
+S₁ = 3
 S = 5
 square(x) = x^2
 OLnetwork = DenseNet_GML{Float64}(tanh,S₁,S)
@@ -37,14 +37,14 @@ L_DenseGML = Linear_DenseNet_GML(OLnetwork,QGau4,training_epochs = 1000)
 
 #HarmonicOscillator
 HO_NLOLsol = integrate(HO_lode, L_DenseGML)
-relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
+@show relative_maximum_error(HO_NLOLsol.q,HO_pref.q)
 
 
-#CoupledHarmonicOscillator
-CHO_NLOLsol = integrate(CHO, L_DenseGML)
-relative_maximum_error(CHO_NLOLsol.q,CHO_pref.q)
+# #CoupledHarmonicOscillator
+# CHO_NLOLsol = integrate(CHO, L_DenseGML)
+# relative_maximum_error(CHO_NLOLsol.q,CHO_pref.q)
 
-#OuterSolarSystem
-OSS_NLOLsol = integrate(OSS, L_DenseGML)
-relative_maximum_error(OSS_NLOLsol.q,OSS_pref.q)
+# #OuterSolarSystem
+# OSS_NLOLsol = integrate(OSS, L_DenseGML)
+# relative_maximum_error(OSS_NLOLsol.q,OSS_pref.q)
 

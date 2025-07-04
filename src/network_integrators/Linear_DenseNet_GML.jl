@@ -67,13 +67,13 @@ struct Linear_DenseNet_GMLCache{ST,D,S₁,S,R,N} <: IODEIntegratorCache{ST,D}
     ps::Vector{@NamedTuple{L1::@NamedTuple{W::Matrix{ST}, b::Vector{ST}},L2::@NamedTuple{W::Matrix{ST}, b::Vector{ST}},
         L3::@NamedTuple{W::Matrix{ST}}}}
 
-    r₀::VecOrMat{ST}
-    r₁::VecOrMat{ST}
-    m::Array{ST} 
-    a::Array{ST}
+    r₀::Matrix{ST}
+    r₁::Matrix{ST}
+    m::Array{ST,3} 
+    a::Array{ST,3} 
 
-    stage_values::VecOrMat{ST}
-    network_labels::VecOrMat{ST}
+    stage_values::Matrix{ST}
+    network_labels::Matrix{ST}
 
     function Linear_DenseNet_GMLCache{ST,D,S₁,S,R,N}() where {ST,D,S₁,S,R,N}
         x = zeros(ST,D*(S+1))
@@ -205,7 +205,13 @@ function initial_params!(int::GeometricIntegrator{<:Linear_DenseNet_GML}, Initia
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
-    local backend = method(int).basis.backend
+    local r₀ = cache(int).r₀
+    local r₁ = cache(int).r₁
+    local m  = cache(int).m
+    local a  = cache(int).a
+    local DVDθ = method(int).basis.dvdθ
+    local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
+
 
     for k in 1:D
         if show_status
@@ -246,6 +252,17 @@ function initial_params!(int::GeometricIntegrator{<:Linear_DenseNet_GML}, Initia
         print(x)
     end
 
+    
+    for d in 1:D
+        intermidiate_ps = (L1 = ps[d].L1, L2 = ps[d].L2)
+        r₀[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([0.0],intermidiate_ps)
+        r₁[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([1.0],intermidiate_ps)
+        for j in eachindex(quad_nodes)
+            m[j,:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([quad_nodes[j]],intermidiate_ps)
+            a[j,:,d] = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))[1,1].L3.W[:]
+        end
+    end
+
 end
 
 function initial_params!(int::GeometricIntegrator{<:Linear_DenseNet_GML}, InitialParams::LSGD)
@@ -261,6 +278,13 @@ function initial_params!(int::GeometricIntegrator{<:Linear_DenseNet_GML}, Initia
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
+    local r₀ = cache(int).r₀
+    local r₁ = cache(int).r₁
+    local m  = cache(int).m
+    local a  = cache(int).a
+    local DVDθ = method(int).basis.dvdθ
+    local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
+
 
     for k in 1:D
         if show_status
@@ -309,49 +333,6 @@ function initial_params!(int::GeometricIntegrator{<:Linear_DenseNet_GML}, Initia
         print(x)
     end
 
-end
-
-
-
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST},sol, params, int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {ST}
-    # set some local variables for convenience and clarity
-    local D = ndims(int)
-    local S = method(int).basis.S
-    local σ = int.method.basis.activation
-    local R = length(method(int).c)
-    local C = cache(int, ST)
-
-    local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
-
-    local q = cache(int, ST).q̃
-    local p = cache(int, ST).p̃
-    local Q = cache(int, ST).Q
-    local V = cache(int, ST).V
-    local X = cache(int, ST).X
-
-    local NN = method(int).basis.NN
-    local ps = cache(int, ST).ps
-
-    local r₀ = cache(int, ST).r₀
-    local r₁ = cache(int, ST).r₁
-    local m  = cache(int, ST).m
-    local a  = cache(int, ST).a
-    local DVDθ = method(int).basis.dvdθ
-    local V_func = method(int).basis.V_func
-
-    # copy x to X and bias 
-    for i in 1:S
-        for d in 1:D
-            X[i][d] = x[(d-1)*S+i]
-        end
-    end
-
-    # copy x to p # momenta
-    for k in eachindex(p)
-        p[k] = x[D*S+k]
-    end
-
-    # compute coefficients
     for d in 1:D
         intermidiate_ps = (L1 = ps[d].L1, L2 = ps[d].L2)
         r₀[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([0.0],intermidiate_ps)
@@ -362,26 +343,64 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST},sol,
         end
     end
 
-    # compute Q q at quaadurature points
-    for i in eachindex(Q)
-        for d in eachindex(Q[i])
-            Q[i][d] = NN([quad_nodes[i]], NeuralNetworkParameters(ps[d]))[1]
+
+end
+
+
+
+function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST},sol, params, int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {ST}
+    # set some local variables for convenience and clarity
+    local D = ndims(int)
+    local S = method(int).basis.S
+    local C = cache(int, ST)
+    local r₀ = cache(int).r₀
+    local r₁ = cache(int).r₁
+    local m  = cache(int).m
+    local a  = cache(int).a
+
+    # copy x to X and bias 
+    for i in 1:S
+        for d in 1:D
+            C.X[i][d] = x[(d-1)*S+i]
+        end
+    end
+    # copy x to p
+    for k in eachindex(C.p̃)
+        C.p̃[k] = x[D*S+k]
+    end
+
+    # compute Q
+    for i in eachindex(C.Q)
+        for k in eachindex(C.Q[i])
+            y = zero(ST)
+            for j in eachindex(C.X)
+                y += m[i,j] * C.X[j][k]
+            end
+            C.Q[i][k] = y
         end
     end
 
-    # compute q[t_{n+1}]
-    for d in eachindex(q)
-        q[d] = NN([1.0], NeuralNetworkParameters(ps[d]))[1]
+    # compute q
+    for k in eachindex(C.q̃)
+        y = zero(ST)
+        for i in eachindex(C.X)
+            y += r₁[i] * C.X[i][k]
+        end
+        C.q̃[k] = y
     end
 
-    # compute V volicity at quadrature points
-    for i in eachindex(V)
-        for d in eachindex(V[i])            
-            V[i][d] = V_func([quad_nodes[i]],NeuralNetworkParameters(ps[d]))[1] / timestep(int)
+    # compute V
+    for i in eachindex(C.V)
+        for k in eachindex(C.V[i])
+            y = zero(ST)
+            for j in eachindex(C.X)
+                y += a[i,j] * C.X[j][k]
+            end
+            C.V[i][k] = y / timestep(int)
         end
     end
 
-    # compute P=ϑ(Q,V) pl/pv and F=f(Q,V) pl/px
+    # compute P=ϑ(Q,V) and F=f(Q,V)
     for i in eachindex(C.Q, C.V, C.P, C.F)
         tᵢ = sol.t + timestep(int) * (method(int).c[i] - 1)
         equations(int).ϑ(C.P[i], tᵢ, C.Q[i], C.V[i], params)
@@ -393,20 +412,17 @@ end
 function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params,int::GeometricIntegrator{<:Linear_DenseNet_GML}) where {ST}
     local D = ndims(int)
     local S = method(int).basis.S
-    local S₁ = int.method.basis.S₁
     local R = length(method(int).c)
 
-    local q̄ = cache(int, ST).q̄ #q[t_n]
-    local p̄ = cache(int, ST).p̄ #p[t_n]
     local p̃ = cache(int, ST).p̃ #initial guess for p[t_{n+1}]
     local P = cache(int, ST).P # p at internal stages/quad_nodes
     local F = cache(int, ST).F
     local X = cache(int, ST).X
 
-    local r₀ = cache(int, ST).r₀
-    local r₁ = cache(int, ST).r₁
-    local m  = cache(int, ST).m
-    local a  = cache(int, ST).a
+    local r₀ = cache(int).r₀
+    local r₁ = cache(int).r₁
+    local m  = cache(int).m
+    local a  = cache(int).a
 
     # compute b = - [(P-AF)]
     for i in 1:S
@@ -416,7 +432,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params,i
                 z += method(int).b[j] * F[j][k] * m[j,i,k] * timestep(int)
                 z += method(int).b[j] * P[j][k] * a[j,i,k] 
             end
-            b[(k-1)*S+i] = (r₁[i,k] * p̃[k] - r₀[i,k] * p̄[k]) - z
+            b[(k-1)*S+i] = (r₁[i,k] * p̃[k] - r₀[i,k] * sol.p[k]) - z
         end
     end # the residual in actual action, vatiation with respect to Q_{n,i}
 
@@ -425,7 +441,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params,i
         for j in eachindex(X)
             y += r₀[j,k] * X[j][k]
         end
-        b[D*S+k] = q̄[k] - y # the continue constraint from hamilton pontryagin principle
+        b[D*S+k] = sol.q[k] - y # the continue constraint from hamilton pontryagin principle
     end
 end
 
