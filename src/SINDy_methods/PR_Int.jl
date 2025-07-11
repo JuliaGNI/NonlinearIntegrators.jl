@@ -132,7 +132,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
     local D = ndims(int)
     local x = nlsolution(int)
     local integrator = default_iguess_integrator(method(int))
-    local h = int.problem.tstep
+    local h = timestep(int)
     local problem = int.problem
 
     x[1:S] = vcat(method(int).init_w...)
@@ -298,7 +298,8 @@ end
 
 function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:PR_Integrator, <:AbstractProblemIODE})
     # call nonlinear solver
-    solve!(nlsolution(int), (b,x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
+    # solve!(nlsolution(int), (b,x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))+
+    solve!(solver(int), nlsolution(int), (sol, params, int))
 
     # print solver status
     # print_solver_status(int.solver.status, int.solver.params)
@@ -383,12 +384,15 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     return sol, internal_values, each_step_solution
 end
 
+# GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Backtracking()
+GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic2()
 
-GeometricIntegrators.Integrators.default_options(::PR_Integrator) = Options(
+GeometricIntegrators.Integrators.default_options(method::PR_Integrator) = (
     x_reltol = 8eps(),
     x_suctol = 2eps(),
     f_abstol = 8eps(),
     f_reltol = 8eps(),
     f_suctol = 2eps(),
-    max_iterations = 10_000,
+    max_iterations = 10000,
+    linesearch=GeometricIntegrators.Integrators.default_linesearch(method),
 )
