@@ -506,7 +506,8 @@ end
 
 function GeometricIntegrators.Integrators.integrate_step!(sol, history, params,int::GeometricIntegrator{<:NonLinear_DenseNet_GML, <:AbstractProblemIODE})
     # call nonlinear solver
-    solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
+    # solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
+    solve!(solver(int), nlsolution(int), (sol, params, int))
 
     # print solver status
     # print_solver_status(int.solver.status, int.solver.params)

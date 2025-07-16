@@ -6,11 +6,6 @@ abstract type NetworkIntegratorMethod <: LODEMethod end
 abstract type OneLayerMethod <: NetworkIntegratorMethod end
 abstract type DenseNetMethod <: NetworkIntegratorMethod end
 
-
-using GeometricIntegrators: GeometricMethod
-abstract type TimeDependentPDEMethod <: GeometricMethod end
-abstract type NinePointStencil <: TimeDependentPDEMethod end
-
 using GeometricIntegrators: Extrapolation
 struct IntegratorExtrapolation <: Extrapolation end
 

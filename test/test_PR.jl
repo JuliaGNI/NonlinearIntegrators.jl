@@ -143,25 +143,25 @@ using CairoMakie
 
 # #### Pendulum
 # begin
-    TT = 100.0
-    h_step = 0.1
-    pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
-    pd_ref_sol = integrate(pendulum_lode, Gauss(8))
-#     initial_hamiltonian = GeometricProblems.Pendulum.hamiltonian(0.0, pendulum_lode.ics.q, pendulum_lode.ics.p, pendulum_lode.parameters)
-#     @show initial_hamiltonian
+    # TT = 150.0
+    # h_step = 1.0
+    # pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
+    # pd_ref_sol = integrate(pendulum_lode, Gauss(8))
+    # initial_hamiltonian = GeometricProblems.Pendulum.hamiltonian(0.0, pendulum_lode.ics.q, pendulum_lode.ics.p, pendulum_lode.parameters)
+    # @show initial_hamiltonian
 
-#     # f_try(x₁) = cos((x₁ * 0.45644) - 1.1466) * 1.1931
-#     @variables W[1:3] ttt
-#     q_expr = W[1] *cos(W[2]* ttt + W[3])
-#     PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
-#     R = 4
-#     println("Start to run Pendulum Problem with PR_Integrator! h = $(h_step), R= $(R)")
+    # # f_try(x₁) = cos((x₁ * 0.45644) - 1.1466) * 1.1931
+    # @variables W[1:3] ttt
+    # q_expr = W[1] *cos(W[2]* ttt + W[3])
+    # PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
+    # R = 4
+    # println("Start to run Pendulum Problem with PR_Integrator! h = $(h_step), R= $(R)")
 
-#     QGau = QuadratureRules.GaussLegendreQuadrature(R)
-#     PR_Int = PR_Integrator(PRB, QGau,[[1.1931,0.45644,-1.1466]])
+    # QGau = QuadratureRules.GaussLegendreQuadrature(R)
+    # PR_Int = PR_Integrator(PRB, QGau,[[1.1931,0.45644,-1.1466]])
 
-#     pendulum_PR_sol,pendulum_internal_sol,x_list = integrate(pendulum_lode, PR_Int)
-#     @show relative_maximum_error(pendulum_PR_sol.q,pd_ref_sol.q)
+    # pendulum_PR_sol,pendulum_internal_sol,x_list = integrate(pendulum_lode, PR_Int)
+    # @show relative_maximum_error(pendulum_PR_sol.q,pd_ref_sol.q)
 
 #     pendulum_hams = [GeometricProblems.Pendulum.hamiltonian(0.0, q, p, pendulum_lode.parameters) for (q, p) in zip(collect(pendulum_PR_sol.q[:]), collect(pendulum_PR_sol.p[:]))]
 #     pendulum_relative_hams_err = abs.((pendulum_hams .- initial_hamiltonian) / initial_hamiltonian)
@@ -516,34 +516,225 @@ using CairoMakie
 
 # end
 
+# begin 
+#     TT = 100.0
+#     h_step = 0.3
+#     pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
+#     pd_ref_sol = integrate(pendulum_lode, Gauss(8))
 
-TT = 100.0
-h_step = 0.3
-pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
-pd_ref_sol = integrate(pendulum_lode, Gauss(8))
+#     TT = 100.0
+#     h_step = 0.1
+#     pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
+#     continuous_sol = integrate(pendulum_lode, Gauss(8))
 
-TT = 100.0
-h_step = 0.1
-pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
-continuous_sol = integrate(pendulum_lode, Gauss(8))
+#     pd_ref_fig = Figure(size = (800,1200), linewidth = 2, markersize = 8)
+#     q_axis = Axis(pd_ref_fig[1,1],xlabel = "t", ylabel = "q",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+#     lin1= lines!(q_axis, collect(0:0.1:TT), collect(continuous_sol.q[:,1]), label = "Reference Solution", linewidth = 2,color = :red)
+#     sca1 = scatter!(q_axis,collect(0:0.3:100),collect(pd_ref_sol.q[:,1]),label = "Observation Points")
+#     Label(pd_ref_fig[1,0],"Pendulum", rotation = pi/2,fontsize = 30,tellheight = false)
 
-pd_ref_fig = Figure(size = (800,1200), linewidth = 2, markersize = 8)
-q_axis = Axis(pd_ref_fig[1,1],xlabel = "t", ylabel = "q",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-lin1= lines!(q_axis, collect(0:0.1:TT), collect(continuous_sol.q[:,1]), label = "Reference Solution", linewidth = 2,color = :red)
-sca1 = scatter!(q_axis,collect(0:0.3:100),collect(pd_ref_sol.q[:,1]),label = "Observation Points")
-Label(pd_ref_fig[1,0],"Pendulum", rotation = pi/2,fontsize = 30,tellheight = false)
+#     lp_axis = Axis(pd_ref_fig[2,1],xlabel = "x", ylabel = "u",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+#     input = randn(100) .-2
+#     labels = exact_u.(0,input)
+#     scatter!(lp_axis,input,labels,label = "Observation Points")
+#     lin2 = lines!(lp_axis,collect(-5:0.01:1),exact_u.(0,collect(-5:0.01:1)),label = "Initial Condition",linewidth = 2,color = :green)
+#     Label(pd_ref_fig[2,0],"Linear Transport Equation", rotation = pi/2,fontsize = 30,tellheight = false)
 
-lp_axis = Axis(pd_ref_fig[2,1],xlabel = "x", ylabel = "u",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-input = randn(100) .-2
-labels = exact_u.(0,input)
-scatter!(lp_axis,input,labels,label = "Observation Points")
-lin2 = lines!(lp_axis,collect(-5:0.01:1),exact_u.(0,collect(-5:0.01:1)),label = "Initial Condition",linewidth = 2,color = :green)
-Label(pd_ref_fig[2,0],"Linear Transport Equation", rotation = pi/2,fontsize = 30,tellheight = false)
+#     Legend(pd_ref_fig[3, 1], [lin1,lin2,sca1],["Pendulum Reference Solution",
+#             "Linear Transport Equation Initial Condition",
+#             "Observation Points"],
+#     orientation = :horizontal,labelsize = 30, 
+#             framevisible = false,nbanks = 3)  
+#     save("result_figures/pd_lp_illu.svg", pd_ref_fig)
+#     pd_ref_fig
 
-Legend(pd_ref_fig[3, 1], [lin1,lin2,sca1],["Pendulum Reference Solution",
-        "Linear Transport Equation Initial Condition",
-        "Observation Points"],
-orientation = :horizontal,labelsize = 30, 
-        framevisible = false,nbanks = 3)  
-save("result_figures/pd_lp_illu.svg", pd_ref_fig)
-pd_ref_fig
+# end
+
+# begin
+#     function pendulum_p_prediction(t,params)
+#         #q_expr = W[1] *cos(W[2]* ttt + W[3])
+#         - params[1] * params[2]* sin(params[2] * t + params[3]) 
+#     end
+
+#     function pendulum_q_prediction(t,params)
+#         params[1] * cos(params[2] * t + params[3])   
+#     end
+
+
+#     ill_fig2 = Figure(size = (800,1200), linewidth = 2, markersize = 8)
+#     pq_axis = Axis(ill_fig2[1,1],xlabel = "q(t)", ylabel = "p(t)",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+
+#     h = 0.05
+#     t1 = collect(0:h:1)
+#     q1 = [pendulum_q_prediction(ti, x_list[1]) for ti in t1]
+#     p1 = [pendulum_p_prediction(ti, x_list[1]) for ti in t1]
+#     lin1 = lines!(pq_axis, q1, p1, label="VISE Solution",)
+
+#     t2 = collect(1:h:2)
+#     q2 = [pendulum_q_prediction(ti, x_list[2]) for ti in t2]
+#     p2 = [pendulum_p_prediction(ti, x_list[2]) for ti in t2]
+#     lin2 = lines!(pq_axis, q2, p2, label="VISE Solution")
+
+#     t3 = collect(2:h:3)
+#     q3 = [pendulum_q_prediction(ti, x_list[3]) for ti in t3]
+#     p3 = [pendulum_p_prediction(ti, x_list[3]) for ti in t3]
+#     lin3 = lines!(pq_axis, q3, p3, label="VISE Solution")
+
+#     t4 = collect(3:h:4)
+#     q4 = [pendulum_q_prediction(ti, x_list[4]) for ti in t4]
+#     p4 = [pendulum_p_prediction(ti, x_list[4]) for ti in t4]
+#     lin4 = lines!(pq_axis, q4, p4, label="VISE Solution")
+
+#     t5 = collect(4:h:5)
+#     q5 = [pendulum_q_prediction(ti, x_list[5]) for ti in t5]
+#     p5 = [pendulum_p_prediction(ti, x_list[5]) for ti in t5]
+#     lin5 = lines!(pq_axis, q5, p5, label="VISE Solution")
+
+#     t6 = collect(5:h:6)
+#     q6 = [pendulum_q_prediction(ti, x_list[6]) for ti in t6]
+#     p6 = [pendulum_p_prediction(ti, x_list[6]) for ti in t6]
+#     lin6 = lines!(pq_axis, q6, p6, label="VISE Solution")
+
+#     t7 = collect(6:h:7)
+#     q7 = [pendulum_q_prediction(ti, x_list[7]) for ti in t7]
+#     p7 = [pendulum_p_prediction(ti, x_list[7]) for ti in t7]
+#     lin7 = lines!(pq_axis, q7, p7, label="VISE Solution")   
+
+#     t8 = collect(7:h:8)
+#     q8 = [pendulum_q_prediction(ti, x_list[8]) for ti in t8]
+#     p8 = [pendulum_p_prediction(ti, x_list[8]) for ti in t8]
+#     lin8 = lines!(pq_axis, q8, p8, label="VISE Solution")
+
+#     t9 = collect(8:h:9)
+#     q9 = [pendulum_q_prediction(ti, x_list[9]) for ti in t9]
+#     p9 = [pendulum_p_prediction(ti, x_list[9]) for ti in t9]
+#     lin9 = lines!(pq_axis, q9, p9, label="VISE Solution")
+
+#     t10 = collect(9:h:10)
+#     q10 = [pendulum_q_prediction(ti, x_list[10]) for ti in t10]
+#     p10 = [pendulum_p_prediction(ti, x_list[10]) for ti in t10]
+#     lin10 = lines!(pq_axis, q10, p10, label="VISE Solution")
+
+#     t11 = collect(10:h:11)
+#     q11 = [pendulum_q_prediction(ti, x_list[11]) for ti in t11]
+#     p11 = [pendulum_p_prediction(ti, x_list[11]) for ti in t11]
+#     lin11 = lines!(pq_axis, q11, p11, label="VISE Solution")
+
+#     t12 = collect(11:h:12)
+#     q12 = [pendulum_q_prediction(ti, x_list[12]) for ti in t12]
+#     p12 = [pendulum_p_prediction(ti, x_list[12]) for ti in t12]
+#     lin12 = lines!(pq_axis, q12, p12, label="VISE Solution")
+
+#     t13 = collect(12:0.05:13)
+#     q13 = [pendulum_q_prediction(ti, x_list[13]) for ti in t13]
+#     p13 = [pendulum_p_prediction(ti, x_list[13]) for ti in t13]
+#     lin13 = lines!(pq_axis, q13, p13, label="VISE Solution")
+
+#     t14 = collect(13:0.05:14)
+#     q14 = [pendulum_q_prediction(ti, x_list[14]) for ti in t14]
+#     p14 = [pendulum_p_prediction(ti, x_list[14]) for ti in t14]
+#     lin14 = lines!(pq_axis, q14, p14, label="VISE Solution")
+
+#     t15 = collect(14:0.05:15)
+#     q15 = [pendulum_q_prediction(ti, x_list[15]) for ti in t15]
+#     p15 = [pendulum_p_prediction(ti, x_list[15]) for ti in t15]
+#     lin15 = lines!(pq_axis, q15, p15, label="VISE Solution")
+
+#     line_ref = lines!(pq_axis,collect(pd_ref_sol.q[:,1]) ,collect(pd_ref_sol.p[:,1]), label="Pendulum Reference Solution", linewidth = 1, color = :blue,linestyle = :dash)
+#     Label(ill_fig2[1,0],"Pendulum", rotation = pi/2,fontsize = 30,tellheight = false)
+
+
+#     border_x = collect(-5:0.01:1)
+#     t1 = collect(0:0.01:0.1)
+#     t2 = collect(0.1:0.01:0.2)
+#     t3 = collect(0.2:0.01:0.3)
+#     t4 = collect(0.3:0.01:0.4)  
+#     t5 = collect(0.4:0.01:0.5)
+
+#     lt_params1= [1.9998958731356202,0.3130332665012085,3.8434752175319824,-0.5000260330714674,0.009429492502348818,]
+#     lt_params2= [  1.999895874334041,
+#     0.31303326677611865,
+#     3.8434752174883293,
+#     -0.5000260327718281,
+#     0.009429492503866939,]
+
+#     lt_params3= [  1.9998958742619493,
+#     0.3130332669098647,
+#     3.843475217415565,
+#     -0.5000260327898925,
+#     0.009429492506388108,]
+
+#     lt_params4= [   1.9998958745081066,
+#     0.3130332670424184,
+#     3.843475217368593,
+#     -0.5000260327283398,
+#     0.009429492508022639,]
+
+#     lt_params5= [  1.999895874539698,
+#     0.3130332670668317,
+#     3.8434752173588,
+#     -0.5000260327204497,
+#     0.00942949250836107]
+
+#     function lt_u_SindySol(x,t,p)
+#         exp((p[1] * (x - 0.2*t) + p[2])*(x - 0.2 * t + p[3])*p[4]) * p[5]
+#     end
+
+#     u_sol_ls1 =zeros(length(border_x), length(t1));
+#     for (i, xx) in enumerate(border_x)
+#         for (j, tt) in enumerate(t1)
+#             u_sol_ls1[i,j] = lt_u_SindySol(xx, tt, lt_params1)
+#         end
+#     end 
+
+#     u_sol_ls2 =zeros(length(border_x), length(t2));
+#     for (i, xx) in enumerate(border_x)
+#         for (j, tt) in enumerate(t2)
+#             u_sol_ls2[i,j] = lt_u_SindySol(xx, tt, lt_params2)
+#         end
+#     end
+
+#     u_sol_ls3 =zeros(length(border_x), length(t3));
+#     for (i, xx) in enumerate(border_x)
+#         for (j, tt) in enumerate(t3)
+#             u_sol_ls3[i,j] = lt_u_SindySol(xx, tt, lt_params3)
+#         end
+#     end
+
+#     u_sol_ls4 =zeros(length(border_x), length(t4));
+#     for (i, xx) in enumerate(border_x)
+#         for (j, tt) in enumerate(t4)
+#             u_sol_ls4[i,j] = lt_u_SindySol(xx, tt, lt_params4)
+#         end
+#     end
+
+#     u_sol_ls5 =zeros(length(border_x), length(t5));
+#     for (i, xx) in enumerate(border_x)
+#         for (j, tt) in enumerate(t5)
+#             u_sol_ls5[i,j] = lt_u_SindySol(xx, tt, lt_params5)
+#         end
+#     end
+
+#     ux_axis = Axis(ill_fig2[2,1],xlabel = "x", ylabel = "t",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+#     hm = heatmap!(ux_axis, border_x, t1, u_sol_ls1)
+#     heatmap!(ux_axis, border_x, t2 .+ 0.01, u_sol_ls2)
+#     heatmap!(ux_axis, border_x, t3, u_sol_ls3)
+#     heatmap!(ux_axis, border_x, t4, u_sol_ls4)
+#     heatmap!(ux_axis, border_x, t5, u_sol_ls5)
+#     hl1 = hlines!(ux_axis, [0.1], linestyle = :dash, label = "Discrete Time Step", linewidth = 2, color = :white)
+#     hlines!(ux_axis, [0.2], linestyle = :dash, label = "Discrete Time Step", linewidth = 2, color = :white)
+#     hlines!(ux_axis, [0.3], linestyle = :dash, label = "Discrete Time Step", linewidth = 2, color = :white)
+#     hlines!(ux_axis, [0.4], linestyle = :dash, label = "Discrete Time Step", linewidth = 2, color = :white)
+
+#     Label(ill_fig2[2,0],"Linear Transport Equation", rotation = pi/2,fontsize = 30,tellheight = false)
+#     Colorbar(ill_fig2[2, 2], hm)
+
+
+#     Legend(ill_fig2[3, 1], [line_ref,lin1,hl1],["Pendulum Reference Solution",
+#             "Pendulum VISE Solution",
+#             "Discrete Time Step"],
+#     orientation = :horizontal,labelsize = 30, 
+#             framevisible = false,nbanks = 3)  
+
+#     save("result_figures/ill_pendulum_lp_right.pdf", ill_fig2)
+# end

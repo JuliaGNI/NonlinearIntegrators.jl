@@ -26,7 +26,7 @@ module NonlinearIntegrators
     using AbstractNeuralNetworks
     using LinearAlgebra
     using BSplineKit
-    using ForwardDiff
+    # using ForwardDiff
     
 
     include("methods.jl")

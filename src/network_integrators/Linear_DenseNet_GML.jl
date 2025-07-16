@@ -470,7 +470,8 @@ end
 
 function GeometricIntegrators.Integrators.integrate_step!(sol, history, params,int::GeometricIntegrator{<:Linear_DenseNet_GML, <:AbstractProblemIODE})
     # call nonlinear solver
-    solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
+    # solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
+    solve!(solver(int), nlsolution(int), (sol, params, int))
 
     # print solver status
     # print_solver_status(int.solver.status, int.solver.params)
@@ -520,7 +521,7 @@ function stages_compute!(sol,int::GeometricIntegrator{<:Linear_DenseNet_GML})
 end
 
 
-GeometricIntegrators.Integrators.default_options(::Linear_DenseNet_GML) = Options(
+GeometricIntegrators.Integrators.default_options(::Linear_DenseNet_GML) = (
     x_reltol = 8eps(),
     x_suctol = 2eps(),
     f_abstol = 8eps(),
