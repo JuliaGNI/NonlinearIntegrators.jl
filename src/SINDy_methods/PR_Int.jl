@@ -384,15 +384,3 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     return sol, internal_values, each_step_solution
 end
 
-GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Backtracking()
-# GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic2()
-
-GeometricIntegrators.Integrators.default_options(method::PR_Integrator) = (
-    # x_reltol = 8eps(),
-    # x_suctol = 2eps(),
-    # f_abstol = 8eps(),
-    # f_reltol = 8eps(),
-    # f_suctol = 2eps(),
-    max_iterations = 1000,
-    linesearch=GeometricIntegrators.Integrators.default_linesearch(method),
-)

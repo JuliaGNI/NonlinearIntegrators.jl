@@ -6,7 +6,6 @@ using QuadratureRules
 using GeometricProblems
 using GeometricIntegrators
 using SimpleSolvers
-# using Plots
 using CairoMakie
 
 
@@ -55,113 +54,125 @@ using CairoMakie
 # end
 
 
+# GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Backtracking()
+GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic2()
+
+GeometricIntegrators.Integrators.default_options(method::PR_Integrator) = (
+    # f_abstol = 8eps(),
+    # f_suctol = 2eps(),
+    max_iterations = 5,
+    linesearch=GeometricIntegrators.Integrators.default_linesearch(method),
+)
+
 # Harmonic Oscillator
-# begin 
-#     @variables W[1:3] ttt
-#     q_expr = W[1] *sin(W[2]* ttt + W[3])
+begin 
+    t1 = time()
+    @variables W[1:3] ttt
+    q_expr = W[1] *sin(W[2]* ttt + W[3])
 
-#     PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
-#     TT = 150.0
-#     h_step = 5.0
-#     HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,TT),tstep = h_step)
+    PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
+    TT = 150.0
+    h_step = 5.0
+    HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,TT),tstep = h_step)
 
-#     initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
-#     HO_truth = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = h_step))
-#     HO_plot = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = h_step/40))
+    initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
+    HO_truth = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = h_step))
+    HO_plot = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = h_step/40))
 
-#     R = 32
-#     QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
-#     PR_Int = PR_Integrator(PRB, QGau4,[[-0.5000433352162222,0.705350078478666,-1.5678140333370576]]) # Pass the init W into the integrator instead of basis                                               
-#     # PR_Int = PR_Integrator(PRB, QGau4,[[-0.500,sqrt(0.5),-pi/2]])                           
+    R = 32
+    QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
+    PR_Int = PR_Integrator(PRB, QGau4,[[-0.5000433352162222,0.705350078478666,-1.5678140333370576]]) # Pass the init W into the integrator instead of basis                                               
+    # PR_Int = PR_Integrator(PRB, QGau4,[[-0.500,sqrt(0.5),-pi/2]])                           
 
-#     println("Start to run Harmonic Oscillator Problem with PR_Integrator! R = $(R), h = $(h_step)")
-#     PR_sol,internal_sol,x_list = integrate(HO_lode, PR_Int)
+    println("Start to run Harmonic Oscillator Problem with PR_Integrator! R = $(R), h = $(h_step)")
+    PR_sol,internal_sol,x_list = integrate(HO_lode, PR_Int)
+    t2 = time()
+    hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(PR_sol.q[:]), collect(PR_sol.p[:]))]
+    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
+    println("\n NISE:")
+    @show relative_maximum_error(PR_sol.q,HO_truth.q)
+    @show maximum(relative_hams_err)
 
-#     hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(PR_sol.q[:]), collect(PR_sol.p[:]))]
-#     relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
-#     println("\n NISE:")
-#     @show relative_maximum_error(PR_sol.q,HO_truth.q)
-#     @show maximum(relative_hams_err)
-
-#     pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = h_step/40))
-#     # PR_plot_1d(PR_sol, internal_sol, HO_plot, relative_hams_err, h_step, TT, "HarmonicOscillator,h$(h_step)_T$(TT)_R$(R)")
-#     # println("Finish integrating Harmonic Oscillator Problem with PR_Integrator!, Figure Saved!")
+    pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = h_step/40))
+    # PR_plot_1d(PR_sol, internal_sol, HO_plot, relative_hams_err, h_step, TT, "HarmonicOscillator,h$(h_step)_T$(TT)_R$(R)")
+    # println("Finish integrating Harmonic Oscillator Problem with PR_Integrator!, Figure Saved!")
     
-#     HO_imp_sol = integrate(HO_lode, ImplicitMidpoint())
-#     HO_imp_ham = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_imp_sol.q[:]), collect(HO_imp_sol.p[:]))]
-#     HO_relative_imp_ham_err = abs.((HO_imp_ham .- initial_hamiltonian) / initial_hamiltonian)
-#     println("\n ImplicitMidpoint:")
-#     @show relative_maximum_error(HO_imp_sol.q,HO_truth.q)
-#     @show maximum(HO_relative_imp_ham_err)
+    HO_imp_sol = integrate(HO_lode, ImplicitMidpoint())
+    HO_imp_ham = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_imp_sol.q[:]), collect(HO_imp_sol.p[:]))]
+    HO_relative_imp_ham_err = abs.((HO_imp_ham .- initial_hamiltonian) / initial_hamiltonian)
+    println("\n ImplicitMidpoint:")
+    @show relative_maximum_error(HO_imp_sol.q,HO_truth.q)
+    @show maximum(HO_relative_imp_ham_err)
 
 
-#     QGau = GaussLegendreQuadrature(R)
-#     BGau = Lagrange(QuadratureRules.nodes(QGau))
-#     HO_cgvi_sol = integrate(HO_lode, CGVI(BGau, QGau)) 
-#     HO_cgvi_ham = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_cgvi_sol.q[:]), collect(HO_cgvi_sol.p[:]))]
-#     HO_relative_cgvi_ham_err = abs.((HO_cgvi_ham .- initial_hamiltonian) / initial_hamiltonian)
+    QGau = GaussLegendreQuadrature(R)
+    BGau = Lagrange(QuadratureRules.nodes(QGau))
+    HO_cgvi_sol = integrate(HO_lode, CGVI(BGau, QGau)) 
+    HO_cgvi_ham = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_cgvi_sol.q[:]), collect(HO_cgvi_sol.p[:]))]
+    HO_relative_cgvi_ham_err = abs.((HO_cgvi_ham .- initial_hamiltonian) / initial_hamiltonian)
 
-#     println("\n CGVI R = $(R):")
-#     @show relative_maximum_error(HO_cgvi_sol.q,HO_truth.q)
-#     @show maximum(HO_relative_cgvi_ham_err)
+    println("\n CGVI R = $(R):")
+    @show relative_maximum_error(HO_cgvi_sol.q,HO_truth.q)
+    @show maximum(HO_relative_cgvi_ham_err)
 
-#     QGau3 = QuadratureRules.GaussLegendreQuadrature(3)
-#     BGau3 = Lagrange(QuadratureRules.nodes(QGau3))
-#     HO_cgvi_sol3 = integrate(HO_lode, CGVI(BGau3, QGau3))
-#     HO_cgvi_ham3 = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_cgvi_sol3.q[:]), collect(HO_cgvi_sol3.p[:]))]
-#     HO_relative_cgvi_ham_err3 = abs.((HO_cgvi_ham3 .- initial_hamiltonian) / initial_hamiltonian)
-#     println("\n CGVI with 3 nodes:")
-#     @show relative_maximum_error(HO_cgvi_sol3.q,HO_truth.q)
-#     @show maximum(HO_relative_cgvi_ham_err3)
+    QGau3 = QuadratureRules.GaussLegendreQuadrature(3)
+    BGau3 = Lagrange(QuadratureRules.nodes(QGau3))
+    HO_cgvi_sol3 = integrate(HO_lode, CGVI(BGau3, QGau3))
+    HO_cgvi_ham3 = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_cgvi_sol3.q[:]), collect(HO_cgvi_sol3.p[:]))]
+    HO_relative_cgvi_ham_err3 = abs.((HO_cgvi_ham3 .- initial_hamiltonian) / initial_hamiltonian)
+    println("\n CGVI with 3 nodes:")
+    @show relative_maximum_error(HO_cgvi_sol3.q,HO_truth.q)
+    @show maximum(HO_relative_cgvi_ham_err3)
+    t3 = time()
+    println("Time taken for VISE: $(t2 - t1) seconds")
+    println("Time taken for Reference: $(t3 - t2) seconds")
+    # # try to find a error on the same scale with NISE
+    # balance_h = 0.1
+    # HO_lode2 = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,TT),tstep = balance_h)
+    # imp_sol2 = integrate(HO_lode2, ImplicitMidpoint())
+    # HO_truth2 = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = balance_h))
+    # imp_ham2 = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode2.parameters) for (q, p) in zip(collect(imp_sol2.q[:]), collect(imp_sol2.p[:]))]
+    # relative_imp_ham_err2 = abs.((imp_ham2 .- initial_hamiltonian) / initial_hamiltonian)
+    # println("\n ImplicitMidpoint with balance_h:")
+    # @show relative_maximum_error(imp_sol2.q,HO_truth2.q)
+    # @show maximum(relative_imp_ham_err2)
 
-#     # # try to find a error on the same scale with NISE
-#     # balance_h = 0.1
-#     # HO_lode2 = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,TT),tstep = balance_h)
-#     # imp_sol2 = integrate(HO_lode2, ImplicitMidpoint())
-#     # HO_truth2 = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = balance_h))
-#     # imp_ham2 = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode2.parameters) for (q, p) in zip(collect(imp_sol2.q[:]), collect(imp_sol2.p[:]))]
-#     # relative_imp_ham_err2 = abs.((imp_ham2 .- initial_hamiltonian) / initial_hamiltonian)
-#     # println("\n ImplicitMidpoint with balance_h:")
-#     # @show relative_maximum_error(imp_sol2.q,HO_truth2.q)
-#     # @show maximum(relative_imp_ham_err2)
+    # balance_h = 15
+    # HO_lode2 = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,TT),tstep = balance_h)
+    # HO_truth2 = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = balance_h))
 
-#     # balance_h = 15
-#     # HO_lode2 = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,TT),tstep = balance_h)
-#     # HO_truth2 = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = balance_h))
+    # QGau = GaussLegendreQuadrature(8)
+    # BGau = Lagrange(QuadratureRules.nodes(QGau))
+    # cgvi_sol2 = integrate(HO_lode2, CGVI(BGau, QGau)) 
+    # cgvi_ham2 = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(cgvi_sol2.q[:]), collect(cgvi_sol2.p[:]))]
+    # relative_cgvi_ham_err2 = abs.((cgvi_ham2 .- initial_hamiltonian) / initial_hamiltonian)
+    # println("\n CGVI with balance_h:")
+    # @show relative_maximum_error(cgvi_sol2.q,HO_truth2.q)
+    # @show maximum(relative_cgvi_ham_err2)
 
-#     # QGau = GaussLegendreQuadrature(8)
-#     # BGau = Lagrange(QuadratureRules.nodes(QGau))
-#     # cgvi_sol2 = integrate(HO_lode2, CGVI(BGau, QGau)) 
-#     # cgvi_ham2 = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(cgvi_sol2.q[:]), collect(cgvi_sol2.p[:]))]
-#     # relative_cgvi_ham_err2 = abs.((cgvi_ham2 .- initial_hamiltonian) / initial_hamiltonian)
-#     # println("\n CGVI with balance_h:")
-#     # @show relative_maximum_error(cgvi_sol2.q,HO_truth2.q)
-#     # @show maximum(relative_cgvi_ham_err2)
-
-# end
-
+end
 
 # #### Pendulum
 # begin
-    # TT = 150.0
-    # h_step = 1.0
-    # pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
-    # pd_ref_sol = integrate(pendulum_lode, Gauss(8))
-    # initial_hamiltonian = GeometricProblems.Pendulum.hamiltonian(0.0, pendulum_lode.ics.q, pendulum_lode.ics.p, pendulum_lode.parameters)
-    # @show initial_hamiltonian
+#     TT = 150.0
+#     h_step = 1.0
+#     pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
+#     pd_ref_sol = integrate(pendulum_lode, Gauss(8))
+#     initial_hamiltonian = GeometricProblems.Pendulum.hamiltonian(0.0, pendulum_lode.ics.q, pendulum_lode.ics.p, pendulum_lode.parameters)
+#     @show initial_hamiltonian
 
-    # # f_try(x₁) = cos((x₁ * 0.45644) - 1.1466) * 1.1931
-    # @variables W[1:3] ttt
-    # q_expr = W[1] *cos(W[2]* ttt + W[3])
-    # PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
-    # R = 4
-    # println("Start to run Pendulum Problem with PR_Integrator! h = $(h_step), R= $(R)")
+#     # f_try(x₁) = cos((x₁ * 0.45644) - 1.1466) * 1.1931
+#     @variables W[1:3] ttt
+#     q_expr = W[1] *cos(W[2]* ttt + W[3])
+#     PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
+#     R = 4
+#     println("Start to run Pendulum Problem with PR_Integrator! h = $(h_step), R= $(R)")
 
-    # QGau = QuadratureRules.GaussLegendreQuadrature(R)
-    # PR_Int = PR_Integrator(PRB, QGau,[[1.1931,0.45644,-1.1466]])
+#     QGau = QuadratureRules.GaussLegendreQuadrature(R)
+#     PR_Int = PR_Integrator(PRB, QGau,[[1.1931,0.45644,-1.1466]])
 
-    # pendulum_PR_sol,pendulum_internal_sol,x_list = integrate(pendulum_lode, PR_Int)
-    # @show relative_maximum_error(pendulum_PR_sol.q,pd_ref_sol.q)
+#     pendulum_PR_sol,pendulum_internal_sol,x_list = integrate(pendulum_lode, PR_Int)
+#     @show relative_maximum_error(pendulum_PR_sol.q,pd_ref_sol.q)
 
 #     pendulum_hams = [GeometricProblems.Pendulum.hamiltonian(0.0, q, p, pendulum_lode.parameters) for (q, p) in zip(collect(pendulum_PR_sol.q[:]), collect(pendulum_PR_sol.p[:]))]
 #     pendulum_relative_hams_err = abs.((pendulum_hams .- initial_hamiltonian) / initial_hamiltonian)
