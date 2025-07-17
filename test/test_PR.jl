@@ -7,7 +7,8 @@ using GeometricProblems
 using GeometricIntegrators
 using SimpleSolvers
 using CairoMakie
-
+using Printf
+using JLD2
 
 # function PR_plot_1d(PR_sol, internal_sol, pref,relative_ham_err, h_step, TT, title_name)
 #     p = plot(layout=@layout([a; b; c]), label="", size=(700, 700)) 
@@ -53,38 +54,48 @@ using CairoMakie
 #     savefig(p, "result_figures/$(title_name).pdf")
 # end
 
+t0 = time()
 
-# GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Backtracking()
-GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic2()
+GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Backtracking()
+# GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic2()
 
 GeometricIntegrators.Integrators.default_options(method::PR_Integrator) = (
     # f_abstol = 8eps(),
     # f_suctol = 2eps(),
-    max_iterations = 5,
+    # f_abstol = parse(Float64,eval(ARGS[4])),
+    f_suctol = eval(Meta.parse(ARGS[5])),
+    f_abstol = eval(Meta.parse(ARGS[4])),
+    max_iterations = parse(Int,ARGS[3]),
     linesearch=GeometricIntegrators.Integrators.default_linesearch(method),
 )
 
+h_step = parse(Float64,ARGS[2])
+R = parse(Int,ARGS[1])
+
+
+record_results = Dict()
 # Harmonic Oscillator
 begin 
-    t1 = time()
     @variables W[1:3] ttt
     q_expr = W[1] *sin(W[2]* ttt + W[3])
 
     PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
-    TT = 150.0
-    h_step = 5.0
-    HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,TT),tstep = h_step)
+    TT = 200.0
+    # h_step = 5.0
+    # h_step = ARGS[2]
+    HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timespan = (0,TT),timestep = h_step)
 
     initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
-    HO_truth = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = h_step))
-    HO_plot = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = h_step/40))
+    HO_truth = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timespan = (0,TT),timestep = h_step))
+    HO_plot = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timespan = (0,TT),timestep = h_step/40))
 
-    R = 32
+    # R = 32
     QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
     PR_Int = PR_Integrator(PRB, QGau4,[[-0.5000433352162222,0.705350078478666,-1.5678140333370576]]) # Pass the init W into the integrator instead of basis                                               
     # PR_Int = PR_Integrator(PRB, QGau4,[[-0.500,sqrt(0.5),-pi/2]])                           
 
     println("Start to run Harmonic Oscillator Problem with PR_Integrator! R = $(R), h = $(h_step)")
+    t1 = time()
     PR_sol,internal_sol,x_list = integrate(HO_lode, PR_Int)
     t2 = time()
     hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(PR_sol.q[:]), collect(PR_sol.p[:]))]
@@ -93,7 +104,7 @@ begin
     @show relative_maximum_error(PR_sol.q,HO_truth.q)
     @show maximum(relative_hams_err)
 
-    pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = h_step/40))
+    # pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timespan = (0,TT),timestep = h_step/40))
     # PR_plot_1d(PR_sol, internal_sol, HO_plot, relative_hams_err, h_step, TT, "HarmonicOscillator,h$(h_step)_T$(TT)_R$(R)")
     # println("Finish integrating Harmonic Oscillator Problem with PR_Integrator!, Figure Saved!")
     
@@ -128,9 +139,9 @@ begin
     println("Time taken for Reference: $(t3 - t2) seconds")
     # # try to find a error on the same scale with NISE
     # balance_h = 0.1
-    # HO_lode2 = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,TT),tstep = balance_h)
+    # HO_lode2 = GeometricProblems.HarmonicOscillator.lodeproblem(timespan = (0,TT),timestep = balance_h)
     # imp_sol2 = integrate(HO_lode2, ImplicitMidpoint())
-    # HO_truth2 = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = balance_h))
+    # HO_truth2 = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timespan = (0,TT),timestep = balance_h))
     # imp_ham2 = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode2.parameters) for (q, p) in zip(collect(imp_sol2.q[:]), collect(imp_sol2.p[:]))]
     # relative_imp_ham_err2 = abs.((imp_ham2 .- initial_hamiltonian) / initial_hamiltonian)
     # println("\n ImplicitMidpoint with balance_h:")
@@ -138,8 +149,8 @@ begin
     # @show maximum(relative_imp_ham_err2)
 
     # balance_h = 15
-    # HO_lode2 = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,TT),tstep = balance_h)
-    # HO_truth2 = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,TT),tstep = balance_h))
+    # HO_lode2 = GeometricProblems.HarmonicOscillator.lodeproblem(timespan = (0,TT),timestep = balance_h)
+    # HO_truth2 = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timespan = (0,TT),timestep = balance_h))
 
     # QGau = GaussLegendreQuadrature(8)
     # BGau = Lagrange(QuadratureRules.nodes(QGau))
@@ -150,392 +161,480 @@ begin
     # @show relative_maximum_error(cgvi_sol2.q,HO_truth2.q)
     # @show maximum(relative_cgvi_ham_err2)
 
+    record_results[("HO_PR_sol_q")] = collect(PR_sol.q[:,1])
+    record_results[("HO_PR_sol_p")] = collect(PR_sol.p[:,1])
+    record_results[("HO_internal_sol")] = internal_sol
+    record_results[("HO_x_list")] = x_list
+    record_results[("HO_qerror")] = relative_maximum_error(PR_sol.q,HO_truth.q)
+    record_results[("HO_hams_err")] = maximum(relative_hams_err)
+
+    record_results[("HO_imp_hams_err")] = maximum(HO_relative_imp_ham_err)
+    record_results[("HO_imp_qerror")] = relative_maximum_error(HO_imp_sol.q,HO_truth.q)
+
+    record_results[("HO_cgvi_hams_err")] = maximum(HO_relative_cgvi_ham_err)
+    record_results[("HO_cgvi_qerror")] = relative_maximum_error(HO_cgvi_sol.q,HO_truth.q)
+
+    record_results[("HO_cgvi_hams_err3")] = maximum(HO_relative_cgvi_ham_err3)
+    record_results[("HO_cgvi_qerror3")] = relative_maximum_error(HO_cgvi_sol3.q,HO_truth.q)
+
 end
 
-# #### Pendulum
-# begin
+#### Pendulum
+begin
 #     TT = 150.0
 #     h_step = 1.0
-#     pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
-#     pd_ref_sol = integrate(pendulum_lode, Gauss(8))
-#     initial_hamiltonian = GeometricProblems.Pendulum.hamiltonian(0.0, pendulum_lode.ics.q, pendulum_lode.ics.p, pendulum_lode.parameters)
-#     @show initial_hamiltonian
+    pendulum_lode = GeometricProblems.Pendulum.lodeproblem(timespan = (0,TT),timestep = h_step)
+    pd_ref_sol = integrate(pendulum_lode, Gauss(8))
+    initial_hamiltonian = GeometricProblems.Pendulum.hamiltonian(0.0, pendulum_lode.ics.q, pendulum_lode.ics.p, pendulum_lode.parameters)
+    @show initial_hamiltonian
 
-#     # f_try(x₁) = cos((x₁ * 0.45644) - 1.1466) * 1.1931
-#     @variables W[1:3] ttt
-#     q_expr = W[1] *cos(W[2]* ttt + W[3])
-#     PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
-#     R = 4
-#     println("Start to run Pendulum Problem with PR_Integrator! h = $(h_step), R= $(R)")
+    # f_try(x₁) = cos((x₁ * 0.45644) - 1.1466) * 1.1931
+    @variables W[1:3] ttt
+    q_expr = W[1] *cos(W[2]* ttt + W[3])
+    PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
+    # R = 4
+    println("Start to run Pendulum Problem with PR_Integrator! h = $(h_step), R= $(R)")
 
-#     QGau = QuadratureRules.GaussLegendreQuadrature(R)
-#     PR_Int = PR_Integrator(PRB, QGau,[[1.1931,0.45644,-1.1466]])
+    QGau = QuadratureRules.GaussLegendreQuadrature(R)
+    PR_Int = PR_Integrator(PRB, QGau,[[1.1931,0.45644,-1.1466]])
 
-#     pendulum_PR_sol,pendulum_internal_sol,x_list = integrate(pendulum_lode, PR_Int)
-#     @show relative_maximum_error(pendulum_PR_sol.q,pd_ref_sol.q)
+    pendulum_PR_sol,pendulum_internal_sol,pendulum_x_list = integrate(pendulum_lode, PR_Int)
+    @show relative_maximum_error(pendulum_PR_sol.q,pd_ref_sol.q)
 
-#     pendulum_hams = [GeometricProblems.Pendulum.hamiltonian(0.0, q, p, pendulum_lode.parameters) for (q, p) in zip(collect(pendulum_PR_sol.q[:]), collect(pendulum_PR_sol.p[:]))]
-#     pendulum_relative_hams_err = abs.((pendulum_hams .- initial_hamiltonian) / initial_hamiltonian)
-#     @show maximum(pendulum_relative_hams_err)
+    pendulum_hams = [GeometricProblems.Pendulum.hamiltonian(0.0, q, p, pendulum_lode.parameters) for (q, p) in zip(collect(pendulum_PR_sol.q[:]), collect(pendulum_PR_sol.p[:]))]
+    pendulum_relative_hams_err = abs.((pendulum_hams .- initial_hamiltonian) / initial_hamiltonian)
+    @show maximum(pendulum_relative_hams_err)
 
-#     pendulum_plot = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step/40)
-#     pendulum_sol_plot = integrate(pendulum_plot, Gauss(8))
-#     # PR_plot_1d(PR_sol, internal_sol, sol_plot, relative_hams_err, h_step, TT, "Pendulum,h$(h_step)_T$(TT)_R$(R)")
-#     # println("Finish integrating Pendulum Problem with PR_Integrator!, Figure Saved!")
+    pendulum_plot = GeometricProblems.Pendulum.lodeproblem(timespan = (0,TT),timestep = h_step/40)
+    pendulum_sol_plot = integrate(pendulum_plot, Gauss(8))
+    # PR_plot_1d(PR_sol, internal_sol, sol_plot, relative_hams_err, h_step, TT, "Pendulum,h$(h_step)_T$(TT)_R$(R)")
+    # println("Finish integrating Pendulum Problem with PR_Integrator!, Figure Saved!")
 
-#     pd_imp_sol = integrate(pendulum_lode, ImplicitMidpoint())
-#     pd_imp_ham = [GeometricProblems.Pendulum.hamiltonian(0, q, p, pendulum_lode.parameters) for (q, p) in zip(collect(pd_imp_sol.q[:]), collect(pd_imp_sol.p[:]))]
-#     pd_relative_imp_ham_err = abs.((pd_imp_ham .- initial_hamiltonian) / initial_hamiltonian)
-#     println("\n ImplicitMidpoint:")
-#     @show relative_maximum_error(pd_imp_sol.q,pd_ref_sol.q)
-#     @show maximum(pd_relative_imp_ham_err)
+    pd_imp_sol = integrate(pendulum_lode, ImplicitMidpoint())
+    pd_imp_ham = [GeometricProblems.Pendulum.hamiltonian(0, q, p, pendulum_lode.parameters) for (q, p) in zip(collect(pd_imp_sol.q[:]), collect(pd_imp_sol.p[:]))]
+    pd_relative_imp_ham_err = abs.((pd_imp_ham .- initial_hamiltonian) / initial_hamiltonian)
+    println("\n ImplicitMidpoint:")
+    @show relative_maximum_error(pd_imp_sol.q,pd_ref_sol.q)
+    @show maximum(pd_relative_imp_ham_err)
 
-#     QGau = GaussLegendreQuadrature(R)
-#     BGau = Lagrange(QuadratureRules.nodes(QGau))
-#     pd_cgvi_sol = integrate(pendulum_lode, CGVI(BGau, QGau))
-#     pd_cgvi_ham = [GeometricProblems.Pendulum.hamiltonian(0, q, p, pendulum_lode.parameters) for (q, p) in zip(collect(pd_cgvi_sol.q[:]), collect(pd_cgvi_sol.p[:]))]
-#     pd_relative_cgvi_ham_err = abs.((pd_cgvi_ham .- initial_hamiltonian) / initial_hamiltonian)
-#     println("\n CGVI:")
-#     @show relative_maximum_error(pd_cgvi_sol.q,pd_ref_sol.q)
-#     @show maximum(pd_relative_cgvi_ham_err)
-#     #Plotting the results
+    QGau = GaussLegendreQuadrature(R)
+    BGau = Lagrange(QuadratureRules.nodes(QGau))
+    pd_cgvi_sol = integrate(pendulum_lode, CGVI(BGau, QGau))
+    pd_cgvi_ham = [GeometricProblems.Pendulum.hamiltonian(0, q, p, pendulum_lode.parameters) for (q, p) in zip(collect(pd_cgvi_sol.q[:]), collect(pd_cgvi_sol.p[:]))]
+    pd_relative_cgvi_ham_err = abs.((pd_cgvi_ham .- initial_hamiltonian) / initial_hamiltonian)
+    println("\n CGVI:")
+    @show relative_maximum_error(pd_cgvi_sol.q,pd_ref_sol.q)
+    @show maximum(pd_relative_cgvi_ham_err)
+    #Plotting the results
 
-#     QGau3 = QuadratureRules.GaussLegendreQuadrature(3)
-#     BGau3 = Lagrange(QuadratureRules.nodes(QGau3))
-#     pd_cgvi_sol3 = integrate(pendulum_lode, CGVI(BGau3, QGau3))
-#     pd_cgvi_ham3 = [GeometricProblems.Pendulum.hamiltonian(0, q, p, pendulum_lode.parameters) for (q, p) in zip(collect(pd_cgvi_sol3.q[:]), collect(pd_cgvi_sol3.p[:]))]
-#     pd_relative_cgvi_ham_err3 = abs.((pd_cgvi_ham3 .- initial_hamiltonian) / initial_hamiltonian)
-#     println("\n CGVI with 3 nodes:")
-#     @show relative_maximum_error(pd_cgvi_sol3.q,pd_ref_sol.q)
-#     @show maximum(pd_relative_cgvi_ham_err3)
-# end
+    QGau3 = QuadratureRules.GaussLegendreQuadrature(3)
+    BGau3 = Lagrange(QuadratureRules.nodes(QGau3))
+    pd_cgvi_sol3 = integrate(pendulum_lode, CGVI(BGau3, QGau3))
+    pd_cgvi_ham3 = [GeometricProblems.Pendulum.hamiltonian(0, q, p, pendulum_lode.parameters) for (q, p) in zip(collect(pd_cgvi_sol3.q[:]), collect(pd_cgvi_sol3.p[:]))]
+    pd_relative_cgvi_ham_err3 = abs.((pd_cgvi_ham3 .- initial_hamiltonian) / initial_hamiltonian)
+    println("\n CGVI with 3 nodes:")
+    @show relative_maximum_error(pd_cgvi_sol3.q,pd_ref_sol.q)
+    @show maximum(pd_relative_cgvi_ham_err3)
 
+    record_results[("Pendulum_PR_sol_q")] = collect(pendulum_PR_sol.q[:,1])
+    record_results[("Pendulum_PR_sol_p")] = collect(pendulum_PR_sol.p[:,1])
+    record_results[("Pendulum_internal_sol")] = pendulum_internal_sol
+    record_results[("Pendulum_x_list")] = pendulum_x_list
+    record_results[("Pendulum_qerror")] = relative_maximum_error(pendulum_PR_sol.q,pd_ref_sol.q)
+    record_results[("Pendulum_hams_err")] = maximum(pendulum_relative_hams_err) 
 
+    record_results[("Pendulum_imp_hams_err")] = maximum(pd_relative_imp_ham_err)
+    record_results[("Pendulum_imp_qerror")] = relative_maximum_error(pd_imp_sol.q,pd_ref_sol.q)
 
-#### Perturbed Pendulum
-# begin
-#     println("Start to run Perturbed Pendulum Problem with PR_Integrator!")
+    record_results[("Pendulum_cgvi_hams_err")] = maximum(pd_relative_cgvi_ham_err)
+    record_results[("Pendulum_cgvi_qerror")] = relative_maximum_error(pd_cgvi_sol.q,pd_ref_sol.q)
 
-#     TT = 150.0
-#     h_step = 5.0
-#     lode = GeometricProblems.PerturbedPendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
-#     pp_ref_sol = integrate(lode, Gauss(8))
-#     pp_initial_hamiltonian = GeometricProblems.PerturbedPendulum.hamiltonian(0.0, lode.ics.q, lode.ics.p, lode.parameters)
-#     @show pp_initial_hamiltonian
-
-#     R = 16
-#     QGau = QuadratureRules.GaussLegendreQuadrature(R)
-
-#     @variables W[1:3] ttt
-#     q_expr = W[1] *cos(W[2]* ttt + W[3])
-#     PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
-#     PR_Int = PR_Integrator(PRB, QGau,[[-0.51941,-0.47405,2.8713]])
-#     println("Start to run Perturbed Pendulum Problem with PR_Integrator! R = $(R), h = $(h_step)")
-#     pp_PR_sol,pp_internal_sol,x_list = integrate(lode, PR_Int)
-#     @show relative_maximum_error(PR_sol.q,pp_ref_sol.q)
-
-#     pp_hams = [GeometricProblems.PerturbedPendulum.hamiltonian(0.0, q, p, lode.parameters) for (q, p) in zip(collect(pp_PR_sol.q[:]), collect(pp_PR_sol.p[:]))]
-#     pp_relative_hams_err = abs.((pp_hams .- pp_initial_hamiltonian) / pp_initial_hamiltonian)
-#     @show maximum(pp_relative_hams_err)
-
-#     pp_imp_sol = integrate(lode, ImplicitMidpoint())
-#     pp_imp_ham = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, lode.parameters) for (q, p) in zip(collect(pp_imp_sol.q[:]), collect(pp_imp_sol.p[:]))]
-#     pp_relative_imp_ham_err = abs.((pp_imp_ham .- pp_initial_hamiltonian) / pp_initial_hamiltonian)
-#     println("\n ImplicitMidpoint:")
-#     @show relative_maximum_error(pp_imp_sol.q,pp_ref_sol.q)
-#     @show maximum(pp_relative_imp_ham_err)
-
-#     QGau = GaussLegendreQuadrature(R)
-#     BGau = Lagrange(QuadratureRules.nodes(QGau))
-#     pp_cgvi_sol = integrate(lode, CGVI(BGau, QGau))
-#     pp_cgvi_ham = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, lode.parameters) for (q, p) in zip(collect(pp_cgvi_sol.q[:]), collect(pp_cgvi_sol.p[:]))]
-#     pp_relative_cgvi_ham_err = abs.((pp_cgvi_ham .- pp_initial_hamiltonian) / pp_initial_hamiltonian)
-#     println("\n CGVI:")
-#     @show relative_maximum_error(pp_cgvi_sol.q,pp_ref_sol.q)
-#     @show maximum(pp_relative_cgvi_ham_err)
-
-#     pp_lode_plot = GeometricProblems.PerturbedPendulum.lodeproblem(tspan = (0,TT),tstep = h_step/40)
-#     pp_sol_plot = integrate(pp_lode_plot, Gauss(8))
-#     # PR_plot_1d(PR_sol, internal_sol, sol_plot, relative_hams_err, h_step, TT, "Perturbed_Pendulum,h$(h_step)_T$(TT)_R$(R)")
-#     # println("Finish integrating Perturbed Pendulum Problem with PR_Integrator!, Figure Saved!")
-
-#     QGau3 = QuadratureRules.GaussLegendreQuadrature(3)
-#     BGau3 = Lagrange(QuadratureRules.nodes(QGau3))
-#     pp_cgvi_sol3 = integrate(lode, CGVI(BGau3, QGau3))
-#     pp_cgvi_ham3 = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, lode.parameters) for (q, p) in zip(collect(pp_cgvi_sol3.q[:]), collect(pp_cgvi_sol3.p[:]))]
-#     pp_relative_cgvi_ham_err3 = abs.((pp_cgvi_ham3 .- pp_initial_hamiltonian) / pp_initial_hamiltonian)
-#     println("\n CGVI with 3 nodes:")
-#     @show relative_maximum_error(pp_cgvi_sol3.q,pp_ref_sol.q)
-#     @show maximum(pp_relative_cgvi_ham_err3)
-# end
+    record_results[("Pendulum_cgvi_hams_err3")] = maximum(pd_relative_cgvi_ham_err3)
+    record_results[("Pendulum_cgvi_qerror3")] = relative_maximum_error(pd_cgvi_sol3.q,pd_ref_sol.q)
 
 
-# #### Henon Heiles
-# begin     
-#     println("Start to run Henon Heiles Problem with PR_Integrator!")
+end
 
-#     TT = 100.0
-#     h_step = 1.0
-#     HHlode = GeometricProblems.HenonHeilesPotential.lodeproblem([0.1,0.1],[0.1,0.1],tspan = (0,TT),tstep = h_step)
-#     HH_ref_sol = integrate(HHlode, Gauss(8))
 
-#     HH_initial_hamiltonian = GeometricProblems.HenonHeilesPotential.hamiltonian(0.0, HHlode.ics.q, HHlode.ics.p, HHlode.parameters)
-#     @show HH_initial_hamiltonian
 
-#     R = 8
-#     QGau = QuadratureRules.GaussLegendreQuadrature(R)
+### Perturbed Pendulum
+begin
+    println("Start to run Perturbed Pendulum Problem with PR_Integrator!")
 
-#     @variables W1[1:4] ttt
-#     #(0.14831 * cos(-0.64812 + x₁)) - 0.018712
-#     q₁_expr = W1[1] *cos(W1[2]* ttt + W1[3]) + W1[4]
+    # TT = 150.0
+    # h_step = 5.0
+    lode = GeometricProblems.PerturbedPendulum.lodeproblem(timespan = (0,TT),timestep = h_step)
+    pp_ref_sol = integrate(lode, Gauss(8))
+    pp_initial_hamiltonian = GeometricProblems.PerturbedPendulum.hamiltonian(0.0, lode.ics.q, lode.ics.p, lode.parameters)
+    @show pp_initial_hamiltonian
 
-#     @variables W2[1:4]
-#     # 0.14298 * cos(- 0.97215 * x₁+ 0.7615)))-0.0013983
-#     q₂_expr = W2[1] *cos(W2[2]* ttt + W2[3]) + W2[4]
+    # R = 16
+    QGau = QuadratureRules.GaussLegendreQuadrature(R)
 
-#     PRB = PR_Basis{Float64}([q₁_expr,q₂_expr], [W1,W2], ttt,2)
+    @variables W[1:3] ttt
+    q_expr = W[1] *cos(W[2]* ttt + W[3])
+    PRB = PR_Basis{Float64}([q_expr], [W], ttt,1)
+    PR_Int = PR_Integrator(PRB, QGau,[[-0.51941,-0.47405,2.8713]])
+    println("Start to run Perturbed Pendulum Problem with PR_Integrator! R = $(R), h = $(h_step)")
+    pp_PR_sol,pp_internal_sol,pp_x_list = integrate(lode, PR_Int)
+    @show relative_maximum_error(PR_sol.q,pp_ref_sol.q)
 
-#     PR_Int = PR_Integrator(PRB, QGau,[[0.14831,1.0,-0.64812,- 0.018712],[0.14298,- 0.97215,0.7615,-0.0013983]]) # Pass the init W into the integrator instead of basis                                               
-#     HH_PR_sol,HH_internal_sol,x_list = integrate(HHlode, PR_Int)
-#     @show relative_maximum_error(HH_PR_sol.q,HH_ref_sol.q)
+    pp_hams = [GeometricProblems.PerturbedPendulum.hamiltonian(0.0, q, p, lode.parameters) for (q, p) in zip(collect(pp_PR_sol.q[:]), collect(pp_PR_sol.p[:]))]
+    pp_relative_hams_err = abs.((pp_hams .- pp_initial_hamiltonian) / pp_initial_hamiltonian)
+    @show maximum(pp_relative_hams_err)
 
-#     HH_hams = [GeometricProblems.HenonHeilesPotential.hamiltonian(0.0, q, p, HHlode.parameters) for (q, p) in zip(collect(HH_PR_sol.q[:]), collect(HH_PR_sol.p[:]))]
-#     HH_relative_hams_err = abs.((HH_hams .- HH_initial_hamiltonian) / HH_initial_hamiltonian)
-#     @show maximum(HH_relative_hams_err)
+    pp_imp_sol = integrate(lode, ImplicitMidpoint())
+    pp_imp_ham = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, lode.parameters) for (q, p) in zip(collect(pp_imp_sol.q[:]), collect(pp_imp_sol.p[:]))]
+    pp_relative_imp_ham_err = abs.((pp_imp_ham .- pp_initial_hamiltonian) / pp_initial_hamiltonian)
+    println("\n ImplicitMidpoint:")
+    @show relative_maximum_error(pp_imp_sol.q,pp_ref_sol.q)
+    @show maximum(pp_relative_imp_ham_err)
 
-#     HHlode_plot = GeometricProblems.HenonHeilesPotential.lodeproblem([0.1,0.1],[0.1,0.1],tspan = (0,TT),tstep = h_step/40)
-#     HH_sol_plot = integrate(HHlode_plot, Gauss(8))
+    QGau = GaussLegendreQuadrature(R)
+    BGau = Lagrange(QuadratureRules.nodes(QGau))
+    pp_cgvi_sol = integrate(lode, CGVI(BGau, QGau))
+    pp_cgvi_ham = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, lode.parameters) for (q, p) in zip(collect(pp_cgvi_sol.q[:]), collect(pp_cgvi_sol.p[:]))]
+    pp_relative_cgvi_ham_err = abs.((pp_cgvi_ham .- pp_initial_hamiltonian) / pp_initial_hamiltonian)
+    println("\n CGVI:")
+    @show relative_maximum_error(pp_cgvi_sol.q,pp_ref_sol.q)
+    @show maximum(pp_relative_cgvi_ham_err)
 
-#     # PR_plot_2d(PR_sol, internal_sol, sol_plot,relative_hams_err, h_step, TT, "HenonHeiles_Potential,h$(h_step)_T$(TT)_R$(R)")
-#     # println("Finish integrating HenonHeiles Potential Problem with PR_Integrator!, Figure Saved!")
+    pp_lode_plot = GeometricProblems.PerturbedPendulum.lodeproblem(timespan = (0,TT),timestep = h_step/40)
+    pp_sol_plot = integrate(pp_lode_plot, Gauss(8))
+    # PR_plot_1d(PR_sol, internal_sol, sol_plot, relative_hams_err, h_step, TT, "Perturbed_Pendulum,h$(h_step)_T$(TT)_R$(R)")
+    # println("Finish integrating Perturbed Pendulum Problem with PR_Integrator!, Figure Saved!")
 
-#     HH_imp_sol = integrate(HHlode, ImplicitMidpoint())
-#     HH_imp_ham = [GeometricProblems.HenonHeilesPotential.hamiltonian(0, q, p, HHlode.parameters) for (q, p) in zip(collect(HH_imp_sol.q[:]), collect(HH_imp_sol.p[:]))]
-#     HH_relative_imp_ham_err = abs.((HH_imp_ham .- HH_initial_hamiltonian) / HH_initial_hamiltonian)
-#     println("\n ImplicitMidpoint:")
-#     @show relative_maximum_error(HH_imp_sol.q,HH_ref_sol.q)
-#     @show maximum(HH_relative_imp_ham_err)
+    QGau3 = QuadratureRules.GaussLegendreQuadrature(3)
+    BGau3 = Lagrange(QuadratureRules.nodes(QGau3))
+    pp_cgvi_sol3 = integrate(lode, CGVI(BGau3, QGau3))
+    pp_cgvi_ham3 = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, lode.parameters) for (q, p) in zip(collect(pp_cgvi_sol3.q[:]), collect(pp_cgvi_sol3.p[:]))]
+    pp_relative_cgvi_ham_err3 = abs.((pp_cgvi_ham3 .- pp_initial_hamiltonian) / pp_initial_hamiltonian)
+    println("\n CGVI with 3 nodes:")
+    @show relative_maximum_error(pp_cgvi_sol3.q,pp_ref_sol.q)
+    @show maximum(pp_relative_cgvi_ham_err3)
 
-#     QGau = GaussLegendreQuadrature(R)
-#     BGau = Lagrange(QuadratureRules.nodes(QGau))
-#     HH_cgvi_sol = integrate(HHlode, CGVI(BGau, QGau))
-#     HH_cgvi_ham = [GeometricProblems.HenonHeilesPotential.hamiltonian(0, q, p, HHlode.parameters) for (q, p) in zip(collect(HH_cgvi_sol.q[:]), collect(HH_cgvi_sol.p[:]))]
-#     HH_relative_cgvi_ham_err = abs.((HH_cgvi_ham .- HH_initial_hamiltonian) / HH_initial_hamiltonian)
-#     println("\n CGVI:")
-#     @show relative_maximum_error(HH_cgvi_sol.q,HH_ref_sol.q)
-#     @show maximum(HH_relative_cgvi_ham_err)
+    record_results[("PerturbedPendulum_PR_sol_q")] = collect(pp_PR_sol.q[:,1])
+    record_results[("PerturbedPendulum_PR_sol_p")] = collect(pp_PR_sol.p[:,1])
 
-#     QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
-#     BGau4 = Lagrange(QuadratureRules.nodes(QGau4))
-#     HH_cgvi_sol4 = integrate(HHlode, CGVI(BGau4, QGau4))
-#     HH_cgvi_ham4 = [GeometricProblems.HenonHeilesPotential.hamiltonian(0, q, p, HHlode.parameters) for (q, p) in zip(collect(HH_cgvi_sol4.q[:]), collect(HH_cgvi_sol4.p[:]))]
-#     HH_relative_cgvi_ham_err4 = abs.((HH_cgvi_ham4 .- HH_initial_hamiltonian) / HH_initial_hamiltonian)
-#     println("\n CGVI with 4 nodes:")
-#     @show relative_maximum_error(HH_cgvi_sol4.q,HH_ref_sol.q)
-#     @show maximum(HH_relative_cgvi_ham_err4)
+    record_results[("PerturbedPendulum_internal_sol")] = pp_internal_sol
+    record_results[("PerturbedPendulum_x_list")] = pp_x_list
+    record_results[("PerturbedPendulum_qerror")] = relative_maximum_error(pp_PR_sol.q,pp_ref_sol.q)
+    record_results[("PerturbedPendulum_hams_err")] = maximum(pp_relative_hams_err)
 
-# end
+    record_results[("PerturbedPendulum_imp_hams_err")] = maximum(pp_relative_imp_ham_err)
+    record_results[("PerturbedPendulum_imp_qerror")] = relative_maximum_error(pp_imp_sol.q,pp_ref_sol.q)    
 
+    record_results[("PerturbedPendulum_cgvi_hams_err")] = maximum(pp_relative_cgvi_ham_err)
+    record_results[("PerturbedPendulum_cgvi_qerror")] = relative_maximum_error(pp_cgvi_sol.q,pp_ref_sol.q)
+
+    record_results[("PerturbedPendulum_cgvi_hams_err3")] = maximum(pp_relative_cgvi_ham_err3)
+    record_results[("PerturbedPendulum_cgvi_qerror3")] = relative_maximum_error(pp_cgvi_sol3.q,pp_ref_sol.q)
+
+end
+
+
+#### Henon Heiles
+begin     
+    println("Start to run Henon Heiles Problem with PR_Integrator!")
+
+    # TT = 100.0
+    # h_step = 1.0
+    HHlode = GeometricProblems.HenonHeilesPotential.lodeproblem([0.1,0.1],[0.1,0.1],timespan = (0,TT),timestep = h_step)
+    HH_ref_sol = integrate(HHlode, Gauss(8))
+
+    HH_initial_hamiltonian = GeometricProblems.HenonHeilesPotential.hamiltonian(0.0, HHlode.ics.q, HHlode.ics.p, HHlode.parameters)
+    @show HH_initial_hamiltonian
+
+    # R = 8
+    QGau = QuadratureRules.GaussLegendreQuadrature(R)
+
+    @variables W1[1:4] ttt
+    #(0.14831 * cos(-0.64812 + x₁)) - 0.018712
+    q₁_expr = W1[1] *cos(W1[2]* ttt + W1[3]) + W1[4]
+
+    @variables W2[1:4]
+    # 0.14298 * cos(- 0.97215 * x₁+ 0.7615)))-0.0013983
+    q₂_expr = W2[1] *cos(W2[2]* ttt + W2[3]) + W2[4]
+
+    PRB = PR_Basis{Float64}([q₁_expr,q₂_expr], [W1,W2], ttt,2)
+
+    PR_Int = PR_Integrator(PRB, QGau,[[0.14831,1.0,-0.64812,- 0.018712],[0.14298,- 0.97215,0.7615,-0.0013983]]) # Pass the init W into the integrator instead of basis                                               
+    HH_PR_sol,HH_internal_sol,HH_x_list = integrate(HHlode, PR_Int)
+    @show relative_maximum_error(HH_PR_sol.q,HH_ref_sol.q)
+
+    HH_hams = [GeometricProblems.HenonHeilesPotential.hamiltonian(0.0, q, p, HHlode.parameters) for (q, p) in zip(collect(HH_PR_sol.q[:]), collect(HH_PR_sol.p[:]))]
+    HH_relative_hams_err = abs.((HH_hams .- HH_initial_hamiltonian) / HH_initial_hamiltonian)
+    @show maximum(HH_relative_hams_err)
+
+    HHlode_plot = GeometricProblems.HenonHeilesPotential.lodeproblem([0.1,0.1],[0.1,0.1],timespan = (0,TT),timestep = h_step/40)
+    HH_sol_plot = integrate(HHlode_plot, Gauss(8))
+
+    # PR_plot_2d(PR_sol, internal_sol, sol_plot,relative_hams_err, h_step, TT, "HenonHeiles_Potential,h$(h_step)_T$(TT)_R$(R)")
+    # println("Finish integrating HenonHeiles Potential Problem with PR_Integrator!, Figure Saved!")
+
+    HH_imp_sol = integrate(HHlode, ImplicitMidpoint())
+    HH_imp_ham = [GeometricProblems.HenonHeilesPotential.hamiltonian(0, q, p, HHlode.parameters) for (q, p) in zip(collect(HH_imp_sol.q[:]), collect(HH_imp_sol.p[:]))]
+    HH_relative_imp_ham_err = abs.((HH_imp_ham .- HH_initial_hamiltonian) / HH_initial_hamiltonian)
+    println("\n ImplicitMidpoint:")
+    @show relative_maximum_error(HH_imp_sol.q,HH_ref_sol.q)
+    @show maximum(HH_relative_imp_ham_err)
+
+    QGau = GaussLegendreQuadrature(R)
+    BGau = Lagrange(QuadratureRules.nodes(QGau))
+    HH_cgvi_sol = integrate(HHlode, CGVI(BGau, QGau))
+    HH_cgvi_ham = [GeometricProblems.HenonHeilesPotential.hamiltonian(0, q, p, HHlode.parameters) for (q, p) in zip(collect(HH_cgvi_sol.q[:]), collect(HH_cgvi_sol.p[:]))]
+    HH_relative_cgvi_ham_err = abs.((HH_cgvi_ham .- HH_initial_hamiltonian) / HH_initial_hamiltonian)
+    println("\n CGVI:")
+    @show relative_maximum_error(HH_cgvi_sol.q,HH_ref_sol.q)
+    @show maximum(HH_relative_cgvi_ham_err)
+
+    QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
+    BGau4 = Lagrange(QuadratureRules.nodes(QGau4))
+    HH_cgvi_sol4 = integrate(HHlode, CGVI(BGau4, QGau4))
+    HH_cgvi_ham4 = [GeometricProblems.HenonHeilesPotential.hamiltonian(0, q, p, HHlode.parameters) for (q, p) in zip(collect(HH_cgvi_sol4.q[:]), collect(HH_cgvi_sol4.p[:]))]
+    HH_relative_cgvi_ham_err4 = abs.((HH_cgvi_ham4 .- HH_initial_hamiltonian) / HH_initial_hamiltonian)
+    println("\n CGVI with 4 nodes:")
+    @show relative_maximum_error(HH_cgvi_sol4.q,HH_ref_sol.q)
+    @show maximum(HH_relative_cgvi_ham_err4)
+
+    # record_results[("HenonHeiles_PR_sol")] = HH_PR_sol
+    record_results[("HenonHeiles_PR_sol_q1")] = collect(HH_PR_sol.q[:,1])
+    record_results[("HenonHeiles_PR_sol_q2")] = collect(HH_PR_sol.q[:,2])
+    record_results[("HenonHeiles_PR_sol_p1")] = collect(HH_PR_sol.p[:,1])
+    record_results[("HenonHeiles_PR_sol_p2")] = collect(HH_PR_sol.p[:,2])
+
+    record_results[("HenonHeiles_internal_sol")] = HH_internal_sol
+    record_results[("HenonHeiles_x_list")] = HH_x_list
+    record_results[("HenonHeiles_qerror")] = relative_maximum_error(HH_PR_sol.q,HH_ref_sol.q)
+    record_results[("HenonHeiles_hams_err")] = maximum(HH_relative_hams_err)
+
+    record_results[("HenonHeiles_imp_hams_err")] = maximum(HH_relative_imp_ham_err)
+    record_results[("HenonHeiles_imp_qerror")] = relative_maximum_error(HH_imp_sol.q,HH_ref_sol.q)  
+
+    record_results[("HenonHeiles_cgvi_hams_err")] = maximum(HH_relative_cgvi_ham_err)
+    record_results[("HenonHeiles_cgvi_qerror")] = relative_maximum_error(HH_cgvi_sol.q,HH_ref_sol.q)
+
+    record_results[("HenonHeiles_cgvi_hams_err4")] = maximum(HH_relative_cgvi_ham_err4)
+    record_results[("HenonHeiles_cgvi_qerror4")] = relative_maximum_error(HH_cgvi_sol4.q,HH_ref_sol.q)
+
+end
+
+f_suctol = eval(Meta.parse(ARGS[5]))
+f_abstol = eval(Meta.parse(ARGS[4]))
+max_iterations = parse(Int,ARGS[3])
+h_step = parse(Float64,ARGS[2])
+R = parse(Int,ARGS[1])
+
+filename2 = @sprintf(
+    "parallel_result_figures/R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.jld2",
+    R, h_step, max_iterations, f_abstol, f_suctol,TT)
+save(filename2,record_results)
 
 # # Plotting the results
-# begin
-#     fig = Figure(size = (2200,3800),linewidth = 2,markersize = 13)
-#     # legend_fig = Legend(fig[1,1:3],)
-#     q1_axis = Axis(fig[1, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     q2_axis = Axis(fig[1, 2],xlabel = "Time", ylabel = "p₁", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     ham_axis = Axis(fig[1, 3],xlabel = "Time", ylabel = "Relative Hamiltonian Error", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     linewidth = 3
-#     h_step = 5.0
-#     TT = 150.0
-#     t_dense = collect(0:h_step/40:TT)
-#     t_vise_dense = h_step/40:h_step/40:TT
-#     t_coarse = collect(0:h_step:TT)
+begin
+    fig = Figure(size = (2200,3800),linewidth = 3,markersize = 13)
+    # legend_fig = Legend(fig[1,1:3],)
+    q1_axis = Axis(fig[1, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    q2_axis = Axis(fig[1, 2],xlabel = "Time", ylabel = "p₁", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    ham_axis = Axis(fig[1, 3],xlabel = "Time", ylabel = "Relative Hamiltonian Error", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    linewidth = 3
+    # h_step = 5.0
+    # TT = 150.0
+    t_dense = collect(0:h_step/40:TT)
+    t_vise_dense = h_step/40:h_step/40:TT
+    t_coarse = collect(0:h_step:TT)
 
-#     # Plot 1: q₁ over time
-#     lines!(q1_axis, t_dense, collect(HO_plot.q[:,1]), label="Analytical Solution",color = :black,linestyle = :dash,linewidth = linewidth)
-#     lines!(q1_axis, t_vise_dense, vcat(hcat(internal_sol...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
-#     scatter!(q1_axis,t_coarse, collect(HO_imp_sol.q[:, 1]), label="Implicit Midpoint Solution",color = :red)
-#     scatter!(q1_axis, t_coarse, collect(HO_cgvi_sol.q[:,1]), label="Galerkin Integrator Solution",color = :green)
-#     scatter!(q1_axis,t_coarse, collect(PR_sol.q[:,1]), label="VISE Discrete Solution",color = :blue)
-#     vlines!(q1_axis,[30.0],linestyle=:dashdot,color = :purple,label = "Training Region")
+    # Plot 1: q₁ over time
+    lines!(q1_axis, t_dense, collect(HO_plot.q[:,1]), label="Analytical Solution",color = :black,linestyle = :dash,linewidth = linewidth)
+    lines!(q1_axis, t_vise_dense, vcat(hcat(internal_sol...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
+    scatter!(q1_axis,t_coarse, collect(HO_imp_sol.q[:, 1]), label="Implicit Midpoint Solution",color = :red)
+    scatter!(q1_axis, t_coarse, collect(HO_cgvi_sol.q[:,1]), label="Galerkin Integrator Solution",color = :green)
+    scatter!(q1_axis,t_coarse, collect(PR_sol.q[:,1]), label="VISE Discrete Solution",color = :blue)
+    vlines!(q1_axis,[30.0],linestyle=:dashdot,color = :purple,label = "Training Region")
 
 
-#     # Plot 2: p₁ over time
-#     lines!(q2_axis, t_dense, collect(HO_plot.p[:,1]), label="Analytical Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
-#     scatter!(q2_axis, t_coarse, collect(HO_cgvi_sol.p[:,1]), label="Galerkin Integrator Solution ",color = :green)
-#     scatter!(q2_axis, t_coarse, collect(HO_imp_sol.p[:,1]), label="Implicit Midpoint Solution ",color = :red)
-#     scatter!(q2_axis, t_coarse, collect(PR_sol.p[:,1]), label="VISE Discrete Solution ",color = :blue)
+    # Plot 2: p₁ over time
+    lines!(q2_axis, t_dense, collect(HO_plot.p[:,1]), label="Analytical Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
+    scatter!(q2_axis, t_coarse, collect(HO_cgvi_sol.p[:,1]), label="Galerkin Integrator Solution ",color = :green)
+    scatter!(q2_axis, t_coarse, collect(HO_imp_sol.p[:,1]), label="Implicit Midpoint Solution ",color = :red)
+    scatter!(q2_axis, t_coarse, collect(PR_sol.p[:,1]), label="VISE Discrete Solution ",color = :blue)
 
-#     # Plot 3: Relative Hamiltonian error
-#     lines!(ham_axis, t_coarse, relative_hams_err, label="VISE Discrete Solution ",color =:blue)
-#     lines!(ham_axis, t_coarse, HO_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
-#     lines!(ham_axis, t_coarse, HO_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
-#     scatter!(ham_axis, t_coarse, relative_hams_err, label="VISE Discrete Solution ",color =:blue)
-#     scatter!(ham_axis, t_coarse, HO_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
-#     scatter!(ham_axis, t_coarse, HO_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
+    # Plot 3: Relative Hamiltonian error
+    lines!(ham_axis, t_coarse, relative_hams_err, label="VISE Discrete Solution ",color =:blue)
+    lines!(ham_axis, t_coarse, HO_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
+    lines!(ham_axis, t_coarse, HO_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
+    scatter!(ham_axis, t_coarse, relative_hams_err, label="VISE Discrete Solution ",color =:blue)
+    scatter!(ham_axis, t_coarse, HO_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
+    scatter!(ham_axis, t_coarse, HO_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
 
-#     Label(fig[1:1, 0], "Harmonic Oscillator", rotation = pi/2,
-#         fontsize = 30,tellheight = false)
+    Label(fig[1:1, 0], "Harmonic Oscillator", rotation = pi/2,
+        fontsize = 30,tellheight = false)
 
-#     # Legend(fig[2, 1:3], q1_axis,orientation = :horizontal,labelsize = 30, framevisible = false,nbanks = 2)    
-#     # save("result_figures/HO.pdf", fig)
-#     # fig
+    # Legend(fig[2, 1:3], q1_axis,orientation = :horizontal,labelsize = 30, framevisible = false,nbanks = 2)    
+    # save("result_figures/HO.pdf", fig)
+    # fig
     
-#     # legend_fig = Legend(fig[1,1:3],)
-#     q1_axis = Axis(fig[2, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     q2_axis = Axis(fig[2, 2],xlabel = "Time", ylabel = "p₁", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     ham_axis = Axis(fig[2, 3],xlabel = "Time", ylabel = "Relative Hamiltonian Error", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    # legend_fig = Legend(fig[1,1:3],)
+    q1_axis = Axis(fig[2, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    q2_axis = Axis(fig[2, 2],xlabel = "Time", ylabel = "p₁", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    ham_axis = Axis(fig[2, 3],xlabel = "Time", ylabel = "Relative Hamiltonian Error", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
 
-#     h_step = 1.0
-#     t_dense = collect(0:h_step/40:TT)
-#     t_vise_dense = h_step/40:h_step/40:TT
-#     t_coarse = collect(0:h_step:TT)
+    # h_step = 1.0
+    t_dense = collect(0:h_step/40:TT)
+    t_vise_dense = h_step/40:h_step/40:TT
+    t_coarse = collect(0:h_step:TT)
 
-#     # Plot 1: q₁ over time
-#     lines!(q1_axis, t_coarse, collect(pd_ref_sol.q[:,1]), label="Reference Solution ",color = :black,linestyle = :dash,linewidth = linewidth)
-#     lines!(q1_axis, t_vise_dense, vcat(hcat(pendulum_internal_sol...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
-#     scatter!(q1_axis,t_coarse, collect(pd_imp_sol.q[:, 1]), label="Implicit Midpoint Solution",color = :red)
-#     scatter!(q1_axis, t_coarse, collect(pd_cgvi_sol.q[:,1]), label="Galerkin Integrator Solution",color = :green)
-#     scatter!(q1_axis,t_coarse, collect(pendulum_PR_sol.q[:,1]), label="VISE Discrete Solution",color = :blue)
-#     vlines!(q1_axis,[100.0],linestyle=:dashdot,color = :purple,label = "Training Region")
+    # Plot 1: q₁ over time
+    lines!(q1_axis, t_coarse, collect(pd_ref_sol.q[:,1]), label="Reference Solution ",color = :black,linestyle = :dash,linewidth = linewidth)
+    lines!(q1_axis, t_vise_dense, vcat(hcat(pendulum_internal_sol...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
+    scatter!(q1_axis,t_coarse, collect(pd_imp_sol.q[:, 1]), label="Implicit Midpoint Solution",color = :red)
+    scatter!(q1_axis, t_coarse, collect(pd_cgvi_sol.q[:,1]), label="Galerkin Integrator Solution",color = :green)
+    scatter!(q1_axis,t_coarse, collect(pendulum_PR_sol.q[:,1]), label="VISE Discrete Solution",color = :blue)
+    vlines!(q1_axis,[100.0],linestyle=:dashdot,color = :purple,label = "Training Region")
 
-#     # Plot 2: p₁ over time
-#     lines!(q2_axis, t_coarse, collect(pd_ref_sol.p[:,1]), label="Reference Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
-#     scatter!(q2_axis, t_coarse, collect(pd_cgvi_sol.p[:,1]), label="Galerkin Integrator Solution ",color = :green)
-#     scatter!(q2_axis, t_coarse, collect(pd_imp_sol.p[:,1]), label="Implicit Midpoint Solution ",color = :red)
-#     scatter!(q2_axis, t_coarse, collect(pendulum_PR_sol.p[:,1]), label="VISE Discrete Solution ",color = :blue)
+    # Plot 2: p₁ over time
+    lines!(q2_axis, t_coarse, collect(pd_ref_sol.p[:,1]), label="Reference Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
+    scatter!(q2_axis, t_coarse, collect(pd_cgvi_sol.p[:,1]), label="Galerkin Integrator Solution ",color = :green)
+    scatter!(q2_axis, t_coarse, collect(pd_imp_sol.p[:,1]), label="Implicit Midpoint Solution ",color = :red)
+    scatter!(q2_axis, t_coarse, collect(pendulum_PR_sol.p[:,1]), label="VISE Discrete Solution ",color = :blue)
 
-#     # Plot 3: Relative Hamiltonian error
-#     lines!(ham_axis, t_coarse, pendulum_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
-#     lines!(ham_axis, t_coarse, pd_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
-#     lines!(ham_axis, t_coarse, pd_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
-#     scatter!(ham_axis, t_coarse, pendulum_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
-#     scatter!(ham_axis, t_coarse, pd_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
-#     scatter!(ham_axis, t_coarse, pd_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
+    # Plot 3: Relative Hamiltonian error
+    lines!(ham_axis, t_coarse, pendulum_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
+    lines!(ham_axis, t_coarse, pd_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
+    lines!(ham_axis, t_coarse, pd_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
+    scatter!(ham_axis, t_coarse, pendulum_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
+    scatter!(ham_axis, t_coarse, pd_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
+    scatter!(ham_axis, t_coarse, pd_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
     
-#     Label(fig[2, 0], "Pendulum", rotation = pi/2,
-#         fontsize = 30,tellheight = false)
-#     # Legend(fig[3, 1:3], q1_axis,orientation = :horizontal,labelsize = 30, 
-#     #     framevisible = false,nbanks = 2)    
-#     # save("result_figures/hopd.pdf", fig)
-#     # fig
+    Label(fig[2, 0], "Pendulum", rotation = pi/2,
+        fontsize = 30,tellheight = false)
+    # Legend(fig[3, 1:3], q1_axis,orientation = :horizontal,labelsize = 30, 
+    #     framevisible = false,nbanks = 2)    
+    # save("result_figures/hopd.pdf", fig)
+    # fig
 
 
-#     # legend_fig = Legend(fig[1,1:3],)
-#     q1_axis = Axis(fig[3, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     q2_axis = Axis(fig[3, 2],xlabel = "Time", ylabel = "p₁", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     ham_axis = Axis(fig[3, 3],xlabel = "Time", ylabel = "Relative Hamiltonian Error", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    # legend_fig = Legend(fig[1,1:3],)
+    q1_axis = Axis(fig[3, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    q2_axis = Axis(fig[3, 2],xlabel = "Time", ylabel = "p₁", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    ham_axis = Axis(fig[3, 3],xlabel = "Time", ylabel = "Relative Hamiltonian Error", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
 
-#     TT = 150.0
-#     h_step = 5.0
-#     t_dense = collect(0:h_step/40:TT)
-#     t_vise_dense = h_step/40:h_step/40:TT
-#     t_coarse = collect(0:h_step:TT)
+    # TT = 150.0
+    # h_step = 5.0
+    t_dense = collect(0:h_step/40:TT)
+    t_vise_dense = h_step/40:h_step/40:TT
+    t_coarse = collect(0:h_step:TT)
 
-#     # Plot 1: q₁ over time
-#     lines!(q1_axis, t_dense, collect(pp_sol_plot.q[:,1]), label="Reference Solution ",color = :black,linestyle = :dash,linewidth = linewidth)
-#     lines!(q1_axis, t_vise_dense, vcat(hcat(pp_internal_sol...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
-#     scatter!(q1_axis,t_coarse, collect(pp_imp_sol.q[:, 1]), label="Implicit Midpoint Solution",color = :red)
-#     scatter!(q1_axis, t_coarse, collect(pp_cgvi_sol.q[:,1]), label="Galerkin Integrator Solution",color = :green)
-#     scatter!(q1_axis,t_coarse, collect(pp_PR_sol.q[:,1]), label="VISE Discrete Solution",color = :blue)
-#     vlines!(q1_axis,[100.0],linestyle=:dashdot,color = :purple,label = "Training Region")
+    # Plot 1: q₁ over time
+    lines!(q1_axis, t_dense, collect(pp_sol_plot.q[:,1]), label="Reference Solution ",color = :black,linestyle = :dash,linewidth = linewidth)
+    lines!(q1_axis, t_vise_dense, vcat(hcat(pp_internal_sol...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
+    scatter!(q1_axis,t_coarse, collect(pp_imp_sol.q[:, 1]), label="Implicit Midpoint Solution",color = :red)
+    scatter!(q1_axis, t_coarse, collect(pp_cgvi_sol.q[:,1]), label="Galerkin Integrator Solution",color = :green)
+    scatter!(q1_axis,t_coarse, collect(pp_PR_sol.q[:,1]), label="VISE Discrete Solution",color = :blue)
+    vlines!(q1_axis,[100.0],linestyle=:dashdot,color = :purple,label = "Training Region")
 
-#     # Plot 2: p₁ over time
-#     lines!(q2_axis, t_dense, collect(pp_sol_plot.p[:,1]), label="Reference Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
-#     scatter!(q2_axis, t_coarse, collect(pp_cgvi_sol.p[:,1]), label="Galerkin Integrator Solution ",color = :green)
-#     scatter!(q2_axis, t_coarse, collect(pp_imp_sol.p[:,1]), label="Implicit Midpoint Solution ",color = :red)
-#     scatter!(q2_axis, t_coarse, collect(pp_PR_sol.p[:,1]), label="VISE Discrete Solution ",color = :blue)
+    # Plot 2: p₁ over time
+    lines!(q2_axis, t_dense, collect(pp_sol_plot.p[:,1]), label="Reference Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
+    scatter!(q2_axis, t_coarse, collect(pp_cgvi_sol.p[:,1]), label="Galerkin Integrator Solution ",color = :green)
+    scatter!(q2_axis, t_coarse, collect(pp_imp_sol.p[:,1]), label="Implicit Midpoint Solution ",color = :red)
+    scatter!(q2_axis, t_coarse, collect(pp_PR_sol.p[:,1]), label="VISE Discrete Solution ",color = :blue)
 
-#     # Plot 3: Relative Hamiltonian error
-#     lines!(ham_axis, t_coarse, pp_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
-#     lines!(ham_axis, t_coarse, pp_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
-#     lines!(ham_axis, t_coarse, pp_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
-#     scatter!(ham_axis, t_coarse, pp_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
-#     scatter!(ham_axis, t_coarse, pp_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
-#     scatter!(ham_axis, t_coarse, pp_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
-#     Label(fig[3, 0], "Perturbed Pendulum", rotation = pi/2,
-#         fontsize = 30,tellheight = false)
+    # Plot 3: Relative Hamiltonian error
+    lines!(ham_axis, t_coarse, pp_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
+    lines!(ham_axis, t_coarse, pp_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
+    lines!(ham_axis, t_coarse, pp_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
+    scatter!(ham_axis, t_coarse, pp_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
+    scatter!(ham_axis, t_coarse, pp_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
+    scatter!(ham_axis, t_coarse, pp_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
+    Label(fig[3, 0], "Perturbed Pendulum", rotation = pi/2,
+        fontsize = 30,tellheight = false)
 
-#     # HenonHeiles_Potential 
-#     # legend_fig = Legend(fig[1,1:3],)
-#     q1_axis = Axis(fig[4, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     p1_axis = Axis(fig[4, 2],xlabel = "Time", ylabel = "p₁", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     q2_axis = Axis(fig[5, 1],xlabel = "Time", ylabel = "q₂",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     p2_axis = Axis(fig[5, 2],xlabel = "Time", ylabel = "p₂", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
-#     ham_axis = Axis(fig[5, 3],xlabel = "Time", ylabel = "Relative Hamiltonian Error", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    # HenonHeiles_Potential 
+    # legend_fig = Legend(fig[1,1:3],)
+    q1_axis = Axis(fig[4, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    p1_axis = Axis(fig[4, 2],xlabel = "Time", ylabel = "p₁", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    q2_axis = Axis(fig[5, 1],xlabel = "Time", ylabel = "q₂",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    p2_axis = Axis(fig[5, 2],xlabel = "Time", ylabel = "p₂", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
+    ham_axis = Axis(fig[5, 3],xlabel = "Time", ylabel = "Relative Hamiltonian Error", xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
 
-#     h_step = 1.0
-#     TT = 100.0
-#     t_dense = collect(0:h_step/40:TT)
-#     t_vise_dense = h_step/40:h_step/40:TT
-#     t_coarse = collect(0:h_step:TT)
+    # h_step = 1.0
+    # TT = 100.0
+    t_dense = collect(0:h_step/40:TT)
+    t_vise_dense = h_step/40:h_step/40:TT
+    t_coarse = collect(0:h_step:TT)
 
-#     internal_q1 = Array{Vector}(undef,Int(TT/h_step))
-#     internal_q2 = Array{Vector}(undef,Int(TT/h_step))
+    internal_q1 = Array{Vector}(undef,Int(TT/h_step))
+    internal_q2 = Array{Vector}(undef,Int(TT/h_step))
 
-#     for i in 1:Int(TT/h_step)
-#         internal_q1[i] = HH_internal_sol[i][:,1]
-#         internal_q2[i] = HH_internal_sol[i][:,2]
-#     end
+    for i in 1:Int(TT/h_step)
+        internal_q1[i] = HH_internal_sol[i][:,1]
+        internal_q2[i] = HH_internal_sol[i][:,2]
+    end
 
-#     # Plot 1: q₁ over time
-#     lines!(q1_axis, t_dense, collect(HH_sol_plot.q[:,1]), label="Reference Solution ",color = :black,linestyle = :dash,linewidth = linewidth)
-#     lines!(q1_axis, t_vise_dense, vcat(hcat(internal_q1...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
-#     scatter!(q1_axis,t_coarse, collect(HH_imp_sol.q[:, 1]), label="Implicit Midpoint Solution",color = :red)
-#     scatter!(q1_axis, t_coarse, collect(HH_cgvi_sol.q[:,1]), label="Galerkin Integrator Solution",color = :green)
-#     scatter!(q1_axis,t_coarse, collect(HH_PR_sol.q[:,1]), label="VISE Discrete Solution",color = :blue)
-#     vlines!(q1_axis,[10.0],linestyle=:dashdot,color = :purple,label = "Training Region")
+    # Plot 1: q₁ over time
+    lines!(q1_axis, t_dense, collect(HH_sol_plot.q[:,1]), label="Reference Solution ",color = :black,linestyle = :dash,linewidth = linewidth)
+    lines!(q1_axis, t_vise_dense, vcat(hcat(internal_q1...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
+    scatter!(q1_axis,t_coarse, collect(HH_imp_sol.q[:, 1]), label="Implicit Midpoint Solution",color = :red)
+    scatter!(q1_axis, t_coarse, collect(HH_cgvi_sol.q[:,1]), label="Galerkin Integrator Solution",color = :green)
+    scatter!(q1_axis,t_coarse, collect(HH_PR_sol.q[:,1]), label="VISE Discrete Solution",color = :blue)
+    vlines!(q1_axis,[10.0],linestyle=:dashdot,color = :purple,label = "Training Region")
 
-#     # Plot 2: p₁ over time
-#     lines!(p1_axis, t_dense, collect(HH_sol_plot.p[:,1]), label="Reference Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
-#     scatter!(p1_axis, t_coarse, collect(HH_cgvi_sol.p[:,1]), label="Galerkin Integrator Solution ",color = :green)
-#     scatter!(p1_axis, t_coarse, collect(HH_imp_sol.p[:,1]), label="Implicit Midpoint Solution ",color = :red)
-#     scatter!(p1_axis, t_coarse, collect(HH_PR_sol.p[:,1]), label="VISE Discrete Solution ",color = :blue)
-
-
-#     # Plot 1: q2 over time
-#     lines!(q2_axis, t_dense, collect(HH_sol_plot.q[:,2]), label="Reference Solution ",color = :black,linestyle = :dash,linewidth = linewidth)
-#     lines!(q2_axis, t_vise_dense, vcat(hcat(internal_q2...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
-#     scatter!(q2_axis,t_coarse, collect(HH_imp_sol.q[:, 2]), label="Implicit Midpoint Solution",color = :red)
-#     scatter!(q2_axis, t_coarse, collect(HH_cgvi_sol.q[:,2]), label="Galerkin Integrator Solution",color = :green)
-#     scatter!(q2_axis,t_coarse, collect(HH_PR_sol.q[:,2]), label="VISE Discrete Solution",color = :blue)
-#     vlines!(q2_axis,[10.0],linestyle=:dashdot,color = :purple,label = "Training Region")
-
-#     # Plot 2: p2 over time
-#     lines!(p2_axis, t_dense, collect(HH_sol_plot.p[:,2]), label="Reference Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
-#     scatter!(p2_axis, t_coarse, collect(HH_cgvi_sol.p[:,2]), label="Galerkin Integrator Solution ",color = :green)
-#     scatter!(p2_axis, t_coarse, collect(HH_imp_sol.p[:,2]), label="Implicit Midpoint Solution ",color = :red)
-#     scatter!(p2_axis, t_coarse, collect(HH_PR_sol.p[:,2]), label="VISE Discrete Solution ",color = :blue)
+    # Plot 2: p₁ over time
+    lines!(p1_axis, t_dense, collect(HH_sol_plot.p[:,1]), label="Reference Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
+    scatter!(p1_axis, t_coarse, collect(HH_cgvi_sol.p[:,1]), label="Galerkin Integrator Solution ",color = :green)
+    scatter!(p1_axis, t_coarse, collect(HH_imp_sol.p[:,1]), label="Implicit Midpoint Solution ",color = :red)
+    scatter!(p1_axis, t_coarse, collect(HH_PR_sol.p[:,1]), label="VISE Discrete Solution ",color = :blue)
 
 
-#     # Plot 3: Relative Hamiltonian error
-#     lines!(ham_axis, t_coarse, HH_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
-#     lines!(ham_axis, t_coarse, HH_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
-#     lines!(ham_axis, t_coarse, HH_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
-#     scatter!(ham_axis, t_coarse, HH_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
-#     scatter!(ham_axis, t_coarse, HH_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
-#     scatter!(ham_axis, t_coarse, HH_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
-#     Label(fig[4:5, 0], "Hénon-Heiles Potential", rotation = pi/2,
-#         fontsize = 30,tellheight = false)
+    # Plot 1: q2 over time
+    lines!(q2_axis, t_dense, collect(HH_sol_plot.q[:,2]), label="Reference Solution ",color = :black,linestyle = :dash,linewidth = linewidth)
+    lines!(q2_axis, t_vise_dense, vcat(hcat(internal_q2...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
+    scatter!(q2_axis,t_coarse, collect(HH_imp_sol.q[:, 2]), label="Implicit Midpoint Solution",color = :red)
+    scatter!(q2_axis, t_coarse, collect(HH_cgvi_sol.q[:,2]), label="Galerkin Integrator Solution",color = :green)
+    scatter!(q2_axis,t_coarse, collect(HH_PR_sol.q[:,2]), label="VISE Discrete Solution",color = :blue)
+    vlines!(q2_axis,[10.0],linestyle=:dashdot,color = :purple,label = "Training Region")
+
+    # Plot 2: p2 over time
+    lines!(p2_axis, t_dense, collect(HH_sol_plot.p[:,2]), label="Reference Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
+    scatter!(p2_axis, t_coarse, collect(HH_cgvi_sol.p[:,2]), label="Galerkin Integrator Solution ",color = :green)
+    scatter!(p2_axis, t_coarse, collect(HH_imp_sol.p[:,2]), label="Implicit Midpoint Solution ",color = :red)
+    scatter!(p2_axis, t_coarse, collect(HH_PR_sol.p[:,2]), label="VISE Discrete Solution ",color = :blue)
 
 
-#     Legend(fig[6, 1:3], q1_axis,orientation = :horizontal,labelsize = 30, 
-#         framevisible = false,nbanks = 2)    
-#     save("result_figures/full.pdf", fig)
-#     fig
+    # Plot 3: Relative Hamiltonian error
+    lines!(ham_axis, t_coarse, HH_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
+    lines!(ham_axis, t_coarse, HH_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
+    lines!(ham_axis, t_coarse, HH_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
+    scatter!(ham_axis, t_coarse, HH_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
+    scatter!(ham_axis, t_coarse, HH_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
+    scatter!(ham_axis, t_coarse, HH_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
+    Label(fig[4:5, 0], "Hénon-Heiles Potential", rotation = pi/2,
+        fontsize = 30,tellheight = false)
 
+    Legend(fig[6, 1:3], q1_axis,orientation = :horizontal,labelsize = 30, 
+        framevisible = false,nbanks = 2)    
+    # save("result_figures/full.pdf", fig)
+    # fig
 
-# end
+    filename = @sprintf(
+    "parallel_result_figures/R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.pdf",
+    R, h_step, max_iterations, f_abstol, f_suctol,TT)
+    save(filename, fig)
 
+end
+
+t5 = time()
+println("Total time taken: ", t5 - t0, " seconds")
+println("All results saved to ", filename)
 # begin 
 #     TT = 100.0
 #     h_step = 0.3
-#     pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
+#     pendulum_lode = GeometricProblems.Pendulum.lodeproblem(timespan = (0,TT),timestep = h_step)
 #     pd_ref_sol = integrate(pendulum_lode, Gauss(8))
 
 #     TT = 100.0
 #     h_step = 0.1
-#     pendulum_lode = GeometricProblems.Pendulum.lodeproblem(tspan = (0,TT),tstep = h_step)
+#     pendulum_lode = GeometricProblems.Pendulum.lodeproblem(timespan = (0,TT),timestep = h_step)
 #     continuous_sol = integrate(pendulum_lode, Gauss(8))
 
 #     pd_ref_fig = Figure(size = (800,1200), linewidth = 2, markersize = 8)
