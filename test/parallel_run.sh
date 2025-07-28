@@ -24,7 +24,7 @@ run_configuration() {
 
 # Loop through the activations
 for h in {1,2,5}; do # 
-    for max_iter in {100,}; do #  
+    for max_iter in {1000,10000}; do #  
         for f_abs in {"2eps()","8eps()"}; do # 
             for f_suc in {"2eps()","8eps()"}; do # 
                 run_configuration $h $max_iter $f_abs $f_suc

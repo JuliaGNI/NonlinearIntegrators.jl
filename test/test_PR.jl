@@ -56,8 +56,8 @@ using JLD2
 
 t0 = time()
 
-GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Backtracking()
-# GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic2()
+# GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Backtracking()
+GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic2()
 
 GeometricIntegrators.Integrators.default_options(method::PR_Integrator) = (
     # f_abstol = 8eps(),
@@ -426,7 +426,7 @@ for R in [8,16,32] # 4,
 
 
     filename2 = @sprintf(
-        "parallel_result_figures/R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.jld2",
+        "parallel_result_figures/Quadratic_R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.jld2",
         R, h_step, max_iterations, f_abstol, f_suctol,TT)
     save(filename2,record_results)
 
@@ -621,7 +621,7 @@ for R in [8,16,32] # 4,
         # fig
 
         filename = @sprintf(
-        "parallel_result_figures/R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.pdf",
+        "parallel_result_figures/Quadratic_R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.pdf",
         R, h_step, max_iterations, f_abstol, f_suctol,TT)
         save(filename, fig)
 
