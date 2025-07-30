@@ -32,6 +32,7 @@ default_iguess_integrator(::PR_Integrator) = ImplicitMidpoint()
 
 struct PR_IntegratorCache{ST,D,R} <: IODEIntegratorCache{ST,D}
     x::Vector{ST}
+    int_x::Vector{ST}
 
     q̄::Vector{ST}
     p̄::Vector{ST}
@@ -60,7 +61,9 @@ struct PR_IntegratorCache{ST,D,R} <: IODEIntegratorCache{ST,D}
     stage_values
 
     function PR_IntegratorCache{ST,D,R}(W_sizes) where {ST,D,R}
-        x = zeros(ST, sum(W_sizes) + D) 
+        S = sum(W_sizes)
+        x = zeros(ST, sum(S) + D) 
+        int_x = zeros(ST, S)
 
         q̄ = zeros(ST, D)
         p̄ = zeros(ST, D)
@@ -100,7 +103,7 @@ struct PR_IntegratorCache{ST,D,R} <: IODEIntegratorCache{ST,D}
 
         stage_values = zeros(ST, 41, D)
 
-        new{ST,D,R}(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, Q, P, V, F,dqdWc, dvdWc, dqdWr₁, dqdWr₀, dvdWr₁, dvdWr₀, tem_W,stage_values)
+        new{ST,D,R}(x,int_x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, Q, P, V, F,dqdWc, dvdWc, dqdWr₁, dqdWr₀, dvdWr₁, dvdWr₀, tem_W,stage_values)
     end
 end
 
@@ -122,6 +125,18 @@ end
     end::CacheType(ST, c.problem, c.method)
 end
 
+function GeometricIntegrators.Integrators.internal_variables(method::PR_Integrator, problem::AbstractProblemIODE)
+    # intermidiate_x = [zeros(Int, length(x)) for x in method(int).init_w]
+    S = sum(method.basis.W_sizes)
+
+    intermidiate_x = zeros(S)
+    (int_x = intermidiate_x,)
+end
+
+function copy_internal_variables(solstep::SolutionStep, cache::PR_IntegratorCache)
+    haskey(internal(solstep), :int_x) && copyto!(internal(solstep).int_x, cache.int_x)
+end
+
 function GeometricIntegrators.Integrators.reset!(cache::PR_IntegratorCache, t, q, p)
     copyto!(cache.q̄, q)
     copyto!(cache.p̄, p)
@@ -134,8 +149,12 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
     local integrator = default_iguess_integrator(method(int))
     local h = timestep(int)
     local problem = int.problem
-
-    x[1:S] = vcat(method(int).init_w...)
+    if sol.t == h || LinearAlgebra.norm(cache(int).int_x .- vcat(method(int).init_w...)) > 1.0
+        x[1:S] = vcat(method(int).init_w...)
+    else
+        x[1:S] = cache(int).int_x 
+    end
+    println("current time: $(sol.t), initial guess x: $(x[1:S])")
 
     tem_ode = similar(problem, [0.0, h], h / 100, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
@@ -285,6 +304,10 @@ end
 function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:PR_Integrator}, DT)
     sol.q .= cache(int, DT).q̃
     sol.p .= cache(int, DT).p̃
+
+    local S = sum(method(int).basis.W_sizes)
+    cache(int, DT).int_x .= nlsolution(int)[1:S]
+    # sol.internal.int_x .= nlsolution(int)[1:S]
 end
 
 function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:PR_Integrator}) where {DT}
@@ -309,9 +332,9 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
 
     # compute final update
     GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
-    
-    stages_compute!(sol, int)
+    println("solution after solving,",nlsolution(int))
 
+    stages_compute!(sol, int)
 end
 
 
