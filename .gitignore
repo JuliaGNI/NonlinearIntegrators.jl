@@ -7,3 +7,6 @@
 /parallel_result_figures/
 /parallel_result_figures/*.jld2
 /parallel_result_figures/*.pdf
+*.txt
+/result_figures/*.pdf
+/result_figures/*.png

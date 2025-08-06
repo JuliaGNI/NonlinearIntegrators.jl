@@ -19,11 +19,11 @@ run_configuration() {
     echo "Running Julia script with Step Size: $h and Max Iterations: $max_iter, f_abs: $f_abs, f_suc: $f_suc"
 
     # Run the Julia script in the background
-    julia --project=. test/test_PR.jl $h $max_iter $f_abs $f_suc &
+    julia --project=. test/test_NonLinear_DenseNet_GML.jl $h $max_iter $f_abs $f_suc &
 }
 
 # Loop through the activations
-for h in {1,2,5}; do # 
+for h in {1,2,5}; do # ,
     for max_iter in {1000,10000}; do #  
         for f_abs in {"2eps()","8eps()"}; do # 
             for f_suc in {"2eps()","8eps()"}; do # 
