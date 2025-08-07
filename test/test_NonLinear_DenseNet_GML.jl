@@ -12,6 +12,11 @@ GeometricIntegrators.Integrators.default_linesearch(method::NonLinear_DenseNet_G
 # GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic2()
 
 
+# f_suctol = 2eps()
+# f_abstol = 2eps()
+# max_iterations = 10000
+# h_step =1.0
+
 f_suctol = eval(Meta.parse(ARGS[4]))
 f_abstol = eval(Meta.parse(ARGS[3]))
 max_iterations = parse(Int,ARGS[2])
@@ -21,19 +26,20 @@ GeometricIntegrators.Integrators.default_options(method::NonLinear_DenseNet_GML)
     # f_abstol = 8eps(),
     # f_suctol = 2eps(),
     # f_abstol = parse(Float64,eval(ARGS[4])),
-    f_suctol = eval(Meta.parse(ARGS[4])),
-    f_abstol = eval(Meta.parse(ARGS[3])),
-    max_iterations = parse(Int,ARGS[2]),
+    f_suctol = f_suctol,
+    f_abstol = f_abstol,
+    max_iterations = max_iterations,
     linesearch=GeometricIntegrators.Integrators.default_linesearch(method),
 )
 
 
 # Set up the Harmonic Oscillator problem
-int_step = parse(Float64,ARGS[1])
+int_step = h_step
 int_timespan = 100.0
 
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timespan = (0,int_timespan),timestep = int_step)
 HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(timespan = (0,int_timespan),timestep = int_step))
+HO_pref2 = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(timespan = (0,int_timespan),timestep = int_step/40))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
 
 S₁ = 5
@@ -41,13 +47,15 @@ S = 5
 square(x) = x^2
 sigmoid(x) = 1 / (1 + exp(-x))
 Densenetwork = DenseNet_GML{Float64}(tanh,S₁,S)
+# R = 4
 for R in [4,6,8]#
+    Q = 2 * R
     record_results = Dict()
 
     QGau = QuadratureRules.GaussLegendreQuadrature(R)
     NL_DenseGML = NonLinear_DenseNet_GML(Densenetwork,QGau,training_epochs =50000 )
 
-    HO_Dense_sol = integrate(HO_lode, NL_DenseGML)
+    HO_Dense_sol,internal_values = integrate(HO_lode, NL_DenseGML)
     HO_qerror = relative_maximum_error(HO_Dense_sol.q,HO_pref.q)
 
     hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_Dense_sol.q[:]), collect(HO_Dense_sol.p[:]))]
@@ -60,12 +68,13 @@ for R in [4,6,8]#
 
     p = plot(layout=@layout([a; b; c]), label="", size=(700, 700), plot_title="HarmonicOscillator,h = $(int_step)")
 
-    plot!(p[1], 0:int_step:int_timespan, collect(HO_Dense_sol.q[:, 1]), label="NVI_Dense", ylims=(-0.6, 0.6))
-    plot!(p[1], 0:int_step:int_timespan, collect(HO_pref.q[:, 1]), label="Analytic Solution", xaxis="time", yaxis="q₁")
+    plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...), label="R$(R)Q$(Q)tanh", ylims=(-0.6, 0.6))
+    plot!(p[1], int_step/40:int_step/40:int_timespan, collect(HO_pref2.q[:, 1])[2:end], label="Analytic Solution", xaxis="time", yaxis="q₁")
 
-    plot!(p[2], 0:int_step:int_timespan, collect(HO_Dense_sol.p[:, 1]), label="NVI_Dense", ylims=(-0.6, 0.6))
+    plot!(p[2], 0:int_step:int_timespan, collect(HO_Dense_sol.p[:, 1]), label="R$(R)Q$(Q)tanh", ylims=(-0.6, 0.6))
     plot!(p[2], 0:int_step:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
-    plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="NVI_Dense", xaxis="time", yaxis="Relative Hamiltonian error")
+
+    plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="R$(R)Q$(Q)tanh", xaxis="time", yaxis="Relative Hamiltonian error")
 
     # filename2 = @sprintf(
     #     "parallel_result_figures/Backtracking2_R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.pdf",

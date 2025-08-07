@@ -23,7 +23,7 @@ run_configuration() {
 }
 
 # Loop through the activations
-for h in {1,2,5}; do # ,
+for h in {0.1,0.25,0.5}; do # ,
     for max_iter in {1000,10000}; do #  
         for f_abs in {"2eps()","8eps()"}; do # 
             for f_suc in {"2eps()","8eps()"}; do # 

@@ -112,7 +112,7 @@ struct NonLinear_DenseNet_GMLCache{ST,D,S₁,S,NP,R,N} <: IODEIntegratorCache{ST
         dqdθc = zeros(ST, R, NP, D)
         dvdθc = zeros(ST, R, NP, D)
 
-        stage_values = zeros(ST, N, D)
+        stage_values = zeros(ST, 41, D)
         network_labels = zeros(ST, N+1, D)
 
         return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, q0, X, Q, P, V, F, ps, 
@@ -530,7 +530,6 @@ end
 function stages_compute!(sol,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
-    local network_inputs = method(int).network_inputs
     local D = ndims(int)
     local S = int.method.basis.S
     local NN = method(int).basis.NN
@@ -538,6 +537,8 @@ function stages_compute!(sol,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
     local show_status = method(int).show_status
     local S₁ = method(int).basis.S₁
     local NP = method(int).basis.NP
+
+    network_inputs = reshape(collect(0:1/40:1),1,41)
 
     if show_status
         print("\n solution x after solving by Newton \n")
@@ -554,7 +555,7 @@ function stages_compute!(sol,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
             ps[d].L2.b[:] = x[(d-1)*NP+2*S₁+S*S₁+1:(d-1)*NP+2*S₁+S*S₁+S]
             ps[d].L3.W[1, :] = x[(d-1)*NP+2*S₁+S*S₁+S+1:(d-1)*NP+2*S₁+S*S₁+S+S]
         end
-        stage_values[:,d] = NN(network_inputs,ps[d])[2:end]
+        stage_values[:,d] = NN(network_inputs,ps[d])[:]
     end
 
     if show_status
@@ -562,4 +563,26 @@ function stages_compute!(sol,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
         print(stage_values)
     end
 
+end
+
+function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, n₁::Int, n₂::Int)
+    # check time steps range for consistency
+    @assert n₁ ≥ 1
+    @assert n₂ ≥ n₁
+    @assert n₂ ≤ ntime(sol)
+
+    # copy initial condition from solution to solutionstep and initialize
+    solstep = solutionstep(int, sol[n₁-1])
+    internal_values = Vector{Matrix}(undef,n₂ - n₁ + 1)
+    # loop over time steps
+    for n in n₁:n₂
+        # integrate one step and copy solution from cache to solution
+        sol[n] = integrate!(solstep, int)
+
+        if hasproperty(cache(int),:stage_values)
+            internal_values[n] = deepcopy(cache(int).stage_values)
+        end
+    end
+
+    return sol, internal_values
 end
