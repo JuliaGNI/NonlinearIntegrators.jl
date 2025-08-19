@@ -46,9 +46,10 @@ S₁ = 5
 S = 5
 square(x) = x^2
 sigmoid(x) = 1 / (1 + exp(-x))
+relu3 = x -> max(0, x)^3
 Densenetwork = DenseNet_GML{Float64}(tanh,S₁,S)
 # R = 4
-for R in [4,6,8]#
+for R in [12,16,24]#
     Q = 2 * R
     record_results = Dict()
 

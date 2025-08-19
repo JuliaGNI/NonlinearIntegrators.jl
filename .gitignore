@@ -4,7 +4,6 @@
 /Manifest.toml
 /docs/Manifest.toml
 /docs/build/
-/parallel_result_figures/
 /parallel_result_figures/*.jld2
 /parallel_result_figures/*.pdf
 *.txt
