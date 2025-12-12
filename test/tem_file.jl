@@ -6,6 +6,15 @@ using GeometricProblems
 using QuadratureRules
 using CompactBasisFunctions
 
+using SymbolicRegression
+using MLJ
+using GeometricIntegrators
+using GeometricProblems
+using Plots
+using SymbolicUtils
+
+
+
 HarmonicOscillator_h1 = load("/Users/zeyuanli/Desktop/untitled folder 2/HO/Backtracking2_R8_h1.00_iter1000_fabs4.44e-16_fsuc4.44e-16_TT200.jld2")
 HarmonicOscillator_h2 = load("/Users/zeyuanli/Desktop/untitled folder 2/HO/Backtracking2_R16_h2.00_iter1000_fabs1.78e-15_fsuc1.78e-15_TT200.jld2")
 HarmonicOscillator_h5 = load("/Users/zeyuanli/Desktop/untitled folder 2/HO/Backtracking2_R8_h5.00_iter1000_fabs1.78e-15_fsuc1.78e-15_TT200.jld2")
@@ -817,3 +826,92 @@ record_results = load("/Users/zeyuanli/Desktop/untitled folder 2/Backtracking2_R
 
 @show record_results[("HenonHeiles_cgvi_qerror4")]
 @show record_results[("HenonHeiles_cgvi_hams_err4")]
+
+
+YY1 = reshape(collect(sol.q[:, 6])[1:100], :, 1)
+# YY3 = reshape(collect(sol.q[:, 3]), :, 1)
+X = reshape(collect(sol.t)[1:100], :, 1)
+plot(YY1, label="q1")
+
+# animate the first index (q₁) over time and save as a gif
+# anim = @animate for i in 1:length(sol.t)-10
+#     plot(sol.q[i, :], ylim = (-0.5,1.2))
+# end
+
+# gif(anim, fps=15)
+
+model = SRRegressor(
+    binary_operators=[+, -, *, /],
+    unary_operators=[cos],
+    niterations=30,
+    nested_constraints = [cos => [cos => 0]],
+)
+mach = machine(model, X, YY1)
+fit!(mach)
+
+r = report(mach)
+r.equations[r.best_idx]
+
+plot(collect(imp_sol.t), collect(imp_sol.q[:, 1]), label="q1")
+
+# q1 discovered equation:
+plot_f(x1) = (cos(0.7854 * (0.10225 + x1)) * -0.25275) + 0.71809
+plot(X,plot_f.(X),label="Discovered q1")
+plot!(X,reshape(collect(sol.q[:, 1])[1:100], :, 1))
+
+# q2 discovered equation:
+plot_f(x1) = 0.7033961135550455 + (0.02564308151958197 * ((cos(x1 * 1.374470223088057) + cos(x1 * -0.10262191236947937)) + (-0.05196883935607318 * (x1 * cos(x1)))))
+plot_f(x1) = (cos((x1 + -0.16028) / -0.68201) * 0.025339) + 0.72871
+plot(X,plot_f.(X),label="Discovered q2")
+plot!(X,reshape(collect(sol.q[:, 2])[1:50], :, 1))
+
+# q3 discovered equation:
+plot_f(x1) = 0.74607 - ((cos(-0.65807 - (-0.15913 * x1)) * -0.27609) * cos(x1 / 1.2536))
+plot(X,plot_f.(X),label="Discovered q3")
+plot!(X,reshape(collect(sol.q[:, 3])[1:100], :, 1))
+
+#q4 discovered equation:
+plot_f(x₁) = ((((0.073415 * cos(x₁ / -0.77546)) - cos(x₁ * 0.8083)) * -0.25817) - -0.76175) - 0.041198
+plot(X,plot_f.(X),label="Discovered q4")
+plot!(X,reshape(collect(sol.q[:, 4])[1:100], :, 1))
+
+#q5 discovered equation:
+plot_f(x₁) = ((0.025836 * cos(1.3949 * x₁)) + 0.72447) - (((-1.5715 + cos(-0.41176)) + (x₁ - cos((x₁ / 0.46104) / 1.2723))) * (0.0022377 * cos(-0.50813 * x₁)))
+plot(X,plot_f.(X),label="Discovered q5")
+plot!(X,reshape(collect(sol.q[:, 5])[1:100], :, 1))
+
+#q6 discovered equation:
+X = reshape(collect(sol.t)[1:1000], :, 1)
+plot_f(x₁) = (cos(-0.2401) + -0.22056) - (cos(x₁ / -1.2461) * (0.25121 - (cos(-0.77484 * x₁) * -0.03474)))
+plot(X,plot_f.(X),label="Discovered q6")
+plot!(X,reshape(collect(sol.q[:, 6])[1:1000], :, 1))
+
+
+
+# Outer Solar System LODE problem solution plot
+TT = 200000.0
+h = 1.0
+HHP_lode = GeometricProblems.OuterSolarSystem.lodeproblem(timespan = (0,TT),timestep = h)
+HHP_sol = integrate(HHP_lode, ImplicitMidpoint())
+
+N_length = 200000
+plot(collect(HHP_sol.q[:, 1])[1:N_length], label="q1")
+X = reshape(collect(HHP_sol.t)[1:N_length], :, 1)
+YY1 = 1000 .* reshape(collect(HHP_sol.q[:, 1])[1:N_length], :, 1)
+
+model = SRRegressor(
+    binary_operators=[+, -, *],
+    unary_operators=[cos,sin,tanh,exp],
+    niterations=30,
+    # nested_constraints = [cos => [cos => 0]],
+)
+mach = machine(model, X, YY1)
+fit!(mach)
+
+r = report(mach)
+r.equations[r.best_idx]
+
+# q1 discovered equation:
+plot_f(x₁) = (-0.0057824 - (cos(-5.1303e-05 * ((x₁ + 1.2805) * (x₁ * -0.00012295))) * (-7.5606e-06 * (cos(x₁ * (4.4595e-05 * x₁)) - (0.43088 - x₁))))) / 1.0013
+plot(X,plot_f.(X),label="Discovered q1")
+plot!(X,reshape(collect(HHP_sol.q[:, 1])[1:N_length], :, 1))

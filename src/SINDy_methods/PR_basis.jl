@@ -22,8 +22,8 @@ struct PR_Basis{T} <: Basis{T}
                 dqdW[i] = Symbolics.derivative(q_expr[d],W[d][i])
                 dvdW[i] = Symbolics.derivative(v_expr[d],W[d][i])
             end
-            dqdW = [Symbolics.eval(Symbolics.build_function(dqdW[i],W,t)) for i in 1:W_sizes[d]]
-            dvdW = [Symbolics.eval(Symbolics.build_function(dvdW[i],W,t)) for i in 1:W_sizes[d]]
+            dqdW = [Symbolics.eval(Symbolics.build_function(dqdW[i],W[d],t)) for i in 1:W_sizes[d]]
+            dvdW = [Symbolics.eval(Symbolics.build_function(dvdW[i],W[d],t)) for i in 1:W_sizes[d]]
 
             push!(dqdW_Mat,dqdW)
             push!(dvdW_Mat,dvdW)

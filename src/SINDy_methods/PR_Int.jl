@@ -213,14 +213,16 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     # compute the derivatives of the coefficients on the quadrature nodes and at the boundaries
     for d in 1:D
         for j in eachindex(quad_nodes)
-            dqdWc[d][j, :] = map(f -> f(tem_W[d][:], sol.t - timestep(int) + quad_nodes[j] * timestep(int)), DQDW[d])
-            dvdWc[d][j, :] = map(f -> f(tem_W[d][:], sol.t - timestep(int) + quad_nodes[j] * timestep(int)), DVDW[d])
+            for p in eachindex(tem_W[d])
+                dqdWc[d][j, p] = DQDW[d][p](tem_W[d], sol.t - timestep(int) + quad_nodes[j] * timestep(int))
+                dvdWc[d][j, p] = DVDW[d][p](tem_W[d], sol.t - timestep(int) + quad_nodes[j] * timestep(int))
+            end
         end
         dqdWr₀[d][:] = map(f -> f(tem_W[d][:], sol.t - timestep(int)), DQDW[d])
         dqdWr₁[d][:] = map(f -> f(tem_W[d][:], sol.t), DQDW[d])
     end
 
-    # compute Q : q at quaadurature points
+    # compute Q : q at quadrature points
     for i in eachindex(Q)
         for d in eachindex(Q[i])
             Q[i][d] = q_expr[d](tem_W[d][:], sol.t - timestep(int) + quad_nodes[i] * timestep(int))
