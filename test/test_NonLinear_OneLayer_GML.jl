@@ -17,14 +17,14 @@ int_step = 0.1
 f_abs = 2.0
 x_abs = 2.0
 
-GeometricIntegratorsBase.default_options(::NonLinear_DenseNet_GML) = (
+GeometricIntegratorsBase.default_options(method::NonLinear_OneLayer_GML) = (
     x_suctol = x_abs * eps(),
     f_abstol = f_abs * eps(),
     max_iterations = 10000,
     linesearch=GeometricIntegratorsBase.default_linesearch(method),
 )
 
-GeometricIntegratorsBase.default_options(::IRKMethod) = (
+GeometricIntegratorsBase.default_options(method::IRKMethod) = (
     x_suctol = x_abs * eps(),
     f_abstol = f_abs * eps(),
     max_iterations = 10000,
@@ -40,7 +40,7 @@ k_list = [2,3,4]#
 int_timespan = 1000.0
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
-imp_sol = integrate(HO_lode,ImplicitMidpoint())
+# imp_sol = integrate(HO_lode,ImplicitMidpoint())
 
 
 HO_ref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timestep=int_step,timespan=(0,int_timespan)))

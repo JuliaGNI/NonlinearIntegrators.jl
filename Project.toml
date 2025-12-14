@@ -1,7 +1,7 @@
 name = "NonlinearIntegrators"
 uuid = "4ad56de4-0342-4c02-9694-ab2f23251d8c"
-authors = ["Michael Kraus <michael.kraus@ipp.mpg.de> and contributors"]
 version = "0.1.0"
+authors = ["Michael Kraus <michael.kraus@ipp.mpg.de> and contributors"]
 
 [deps]
 AbstractNeuralNetworks = "60874f82-5ada-4c70-bd1c-fa6be7711c8a"
@@ -33,6 +33,7 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
+GeometricProblems = "0.6.17"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
