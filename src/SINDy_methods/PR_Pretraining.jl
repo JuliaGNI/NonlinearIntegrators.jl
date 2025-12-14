@@ -92,7 +92,7 @@ t_step = 0.01
 SINDy_h = 1.0
 T = 10.0
 N_SindyStep = T / SINDy_h
-DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=t_step, tspan=(0, T))
+DP_lode = GeometricProblems.DoublePendulum.lodeproblem(timestep=t_step, timespan=(0, T))
 DP_pref = integrate(DP_lode, Gauss(8))
 
 trajectory_vector = collect(DP_pref.q[:, 1])[2:end]

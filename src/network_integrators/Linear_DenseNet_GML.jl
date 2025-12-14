@@ -160,7 +160,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Li
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local D = ndims(int)
-    local h = int.problem.tstep
+    local h = int.problem.timestep
 
     for i in eachindex(network_inputs)
         initialguess!(solstep(int).t̄+network_inputs[i]*h, cache(int).q̃, cache(int).p̃, solstep(int), int.problem, int.iguess)
@@ -174,7 +174,7 @@ end
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Linear_DenseNet_GML}, initial_trajectory::IntegratorExtrapolation)
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
-    local h = int.problem.tstep
+    local h = int.problem.timestep
     local N = method(int).nstages
     local D = ndims(int)
     local problem = int.problem

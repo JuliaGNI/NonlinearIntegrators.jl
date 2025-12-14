@@ -15,8 +15,8 @@ using Test
 # Set up the Harmonic Oscillator problem
 int_step = 0.03125
 int_timespan = 0.3125
-HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
-HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
+HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timespan = (0,int_timespan),timestep = int_step)
+HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timespan = (0,int_timespan),timestep = int_step))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0,HO_lode.ics.q,HO_lode.ics.p,HO_lode.parameters)
 
 R = 4
@@ -38,7 +38,7 @@ HO_NLOLsol_lux.q
 relative_maximum_error(HO_NLOLsol_lux.q,HO_pref.q)
 
 # Set up the DoublePendulum problem
-DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step/20,tspan=(0,int_timespan))
+DP_lode = GeometricProblems.DoublePendulum.lodeproblem(timestep=int_step/20,timespan=(0,int_timespan))
 @time DP_pref = integrate(DP_lode,Gauss(8))
 # DP_CGVI = integrate(DP_lode,CGVI(BGau4,QGau4))
 initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0,DP_lode.ics.q,DP_lode.ics.p,DP_lode.parameters)
@@ -51,7 +51,7 @@ OLnetwork = NonlinearIntegrators.OneLayerNetwork_Lux{Float64}(S,tanh,2)
 NLOLCGVNI = NonlinearIntegrators.NonLinear_OneLayer_Lux(OLnetwork,QGau4,
 problem_initial_hamitltonian = initial_hamiltonian, use_hamiltonian_loss=false,show_status=true,dict_amount = 100000)#OGA1d
 print(" R = $R h =$(int_step) S = $(S)\n")
-DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
+DP_lode = GeometricProblems.DoublePendulum.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 
 @time NLOLsol = integrate(DP_lode, NLOLCGVNI) 
 NLOLsol.q

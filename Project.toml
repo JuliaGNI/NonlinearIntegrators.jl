@@ -1,7 +1,7 @@
 name = "NonlinearIntegrators"
 uuid = "4ad56de4-0342-4c02-9694-ab2f23251d8c"
-version = "0.1.0"
 authors = ["Michael Kraus <michael.kraus@ipp.mpg.de> and contributors"]
+version = "0.1.0"
 
 [deps]
 AbstractNeuralNetworks = "60874f82-5ada-4c70-bd1c-fa6be7711c8a"
@@ -9,10 +9,12 @@ BSplineKit = "093aae92-e908-43d7-9660-e50ee39d5a0a"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 CompactBasisFunctions = "a09551c4-f815-4143-809e-dd1986753ba7"
 ContinuumArrays = "7ae1f121-cc2c-504b-ac30-9b923412ae5c"
+GeometricBase = "9a0b12b7-583b-4f04-aa1f-d8551b6addc9"
 GeometricIntegrators = "dcce2d33-59f6-5b8d-9047-0defad88ae06"
 GeometricIntegratorsBase = "71212ab4-08a2-48eb-a02b-4cbad0e9c44a"
 GeometricMachineLearning = "194d25b2-d3f5-49f0-af24-c124f4aa80cc"
 GeometricProblems = "18cb22b4-ad41-5c80-9c5f-710df63fbdc9"
+GeometricSolutions = "7843afe4-64f4-4df4-9231-049495c56661"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
@@ -30,12 +32,7 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
-[sources]
-GeometricProblems = {rev = "zeyuan", url = "https://github.com/JuliaGNI/GeometricProblems.jl.git"}
-
 [compat]
-GeometricIntegratorsBase = "0.1.7"
-GeometricProblems = "0.6.13"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

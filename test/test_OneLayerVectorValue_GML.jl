@@ -19,7 +19,7 @@ QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
 
 # Set up the DoublePendulum problem
-DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
+DP_lode = GeometricProblems.DoublePendulum.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 DP_pref = integrate(DP_lode,CGVI(BGau4, QGau4))
 initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0,DP_lode.ics.q,DP_lode.ics.p,DP_lode.parameters)
 # Set up the NonLinearOneLayerBasis

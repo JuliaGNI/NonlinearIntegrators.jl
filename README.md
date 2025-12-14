@@ -48,7 +48,7 @@ Like what we would do in *GeometricIntegrators.jl*, we first define the problem 
 ```
 T = 100.0
 h_step = 2.0
-HHlode = GeometricProblems.HenonHeilesPotential.lodeproblem([0.1,0.1],[0.1,0.1],tspan = (0,T),tstep = h_step)
+HHlode = GeometricProblems.HenonHeilesPotential.lodeproblem([0.1,0.1],[0.1,0.1],timespan = (0,T),timestep = h_step)
 ```
 
 For each dimension of generalized coordinates __q__ = (q<sub>1</sub>, q<sub>2</sub>), we prescribe a expression that approximates the coordinates.
@@ -71,7 +71,7 @@ PR_sol = integrate(HHlode, PR_Int)
 One good thing about continuous Galerkin variational integrators is that you could record the coordinates values between two discrete steps for free!
 ```
 
-HHlode_ref = GeometricProblems.HenonHeilesPotential.lodeproblem([0.1,0.1],[0.1,0.1],tspan = (0,TT),tstep = h_step/50)
+HHlode_ref = GeometricProblems.HenonHeilesPotential.lodeproblem([0.1,0.1],[0.1,0.1],timespan = (0,TT),timestep = h_step/50)
 ref_sol = integrate(HHlode_ref, ImplicitMidpoint())
 
 using Plots

@@ -16,14 +16,14 @@ QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
 cgvi_sol = integrate(HO_lode,CGVI(BGau4, QGau4))
 # #set up the Coupled Harmonic Oscillator problem
-# CHO = GeometricProblems.CoupledHarmonicOscillator.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
+# CHO = GeometricProblems.CoupledHarmonicOscillator.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 
 # QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
 # BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
 # CHO_pref = integrate(CHO, CGVI(BGau4, QGau4))
 
 # #set up the OuterSolarSystem
-# OSS = GeometricProblems.OuterSolarSystem.lodeproblem(tstep=int_step,tspan=(0,int_timespan),n=3)
+# OSS = GeometricProblems.OuterSolarSystem.lodeproblem(timestep=int_step,timespan=(0,int_timespan),n=3)
 # OSS_pref = integrate(OSS, CGVI(BGau4, QGau4))
 
 

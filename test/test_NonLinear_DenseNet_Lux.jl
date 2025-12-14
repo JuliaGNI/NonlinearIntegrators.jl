@@ -18,7 +18,7 @@ int_step = 0.6
 int_timespan = 3.
 
 #set up the DoublePendulum
-DP_lode = GeometricProblems.DoublePendulum.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
+DP_lode = GeometricProblems.DoublePendulum.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 DP_pref = integrate(DP_lode,Gauss(8))
 
 

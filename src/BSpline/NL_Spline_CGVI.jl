@@ -149,7 +149,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
     local D = ndims(int)
     local S = nbasis(method(int))
     local x = nlsolution(int)
-    local h = int.problem.tstep
+    local h = int.problem.timestep
     local problem = int.problem
     local K = method(int).basis.K
     local N = method(int).basis.N_internal_knots

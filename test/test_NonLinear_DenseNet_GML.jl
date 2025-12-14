@@ -80,7 +80,7 @@ for R in [12,16,24]#
     # filename2 = @sprintf(
     #     "parallel_result_figures/Backtracking2_R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.pdf",
         # R, h_step, max_iterations, f_abstol, f_suctol,TT)
-    # savefig(p,"result_figures/NVI_DenseS₁$(S₁)_S$(S)_fabs$(f_abstol)_fsuc$(f_suctol)_iter$(iterations)_h$(int_step)_tspan$(int_timespan)_tanh_harmonic_oscillator.png")
+    # savefig(p,"result_figures/NVI_DenseS₁$(S₁)_S$(S)_fabs$(f_abstol)_fsuc$(f_suctol)_iter$(iterations)_h$(int_step)_timespan$(int_timespan)_tanh_harmonic_oscillator.png")
     savefig(p,"parallel_result_figures/NVI_Densefabs$(f_abstol)_fsuc$(f_suctol)_iter$(max_iterations)_h$(h_step)_R$(R)tanh_harmonic_oscillator.pdf")
 
     save("parallel_result_figures/NVI_Densefabs$(f_abstol)_fsuc$(f_suctol)_iter$(max_iterations)_h$(h_step)_R$(R)tanh_harmonic_oscillator.jld2",record_results)

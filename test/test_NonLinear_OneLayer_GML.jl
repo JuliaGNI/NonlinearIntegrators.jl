@@ -1,67 +1,109 @@
-using GeometricIntegrators
+using GeometricIntegratorsBase
 using NonlinearIntegrators
 using QuadratureRules
 using CompactBasisFunctions
 using GeometricProblems
 # using BenchmarkTools
 using Plots
+using GeometricSolutions:relative_maximum_error
+using GeometricIntegrators
+using JLD2
+
+# int_step = parse(Float64,ARGS[1])
+# f_abs = eval(Meta.parse(ARGS[2]))
+# x_abs = eval(Meta.parse(ARGS[3]))
+
+int_step = 0.1
+f_abs = 2.0
+x_abs = 2.0
+
+GeometricIntegratorsBase.default_options(::NonLinear_DenseNet_GML) = (
+    x_suctol = x_abs * eps(),
+    f_abstol = f_abs * eps(),
+    max_iterations = 10000,
+    linesearch=GeometricIntegratorsBase.default_linesearch(method),
+)
+
+GeometricIntegratorsBase.default_options(::IRKMethod) = (
+    x_suctol = x_abs * eps(),
+    f_abstol = f_abs * eps(),
+    max_iterations = 10000,
+    linesearch=GeometricIntegratorsBase.default_linesearch(method),
+)
+
+R_list = [8,16,4]#
+S_list = [4,6,8]# 
+k_list = [2,3,4]# 
 
 # Set up the Harmonic Oscillator problem
-int_step = 0.5
-int_timespan = 10.0
-HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(tstep=int_step,tspan=(0,int_timespan))
+# int_step = 0.5
+int_timespan = 1000.0
+HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
+imp_sol = integrate(HO_lode,ImplicitMidpoint())
 
-HO_ref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tstep=int_step,tspan=(0,int_timespan)))
-HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(tstep=int_step/40,tspan=(0,int_timespan)))
 
-R = 4
-Q = 2 * R
-QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
-BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
+HO_ref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timestep=int_step,timespan=(0,int_timespan)))
+HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timestep=int_step/40,timespan=(0,int_timespan)))
 
-S = 4
-relu3 = x->max(0,x) .^3
-QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
-OLnetwork = OneLayerNetwork_GML{Float64}(relu3,S)
-NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau4, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
+for R in R_list
+    Q = 2 * R
+    QGau = QuadratureRules.GaussLegendreQuadrature(R)
 
-#HarmonicOscillator
-HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
-@show relative_maximum_error(HO_NLOLsol.q,HO_ref.q)
+    for S in S_list
+        for k_relu = k_list
+            # log_file="1412_parallel_results/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).txt"
+            # open(log_file, "w") do io
+            #     redirect_stdout(io) do
+                    record_results = Dict()
 
-# figure for q
-plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
-plot!(int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Truth", linestyle=:dash, linecolor=:black)
-scatter!(collect(0:int_step:int_timespan), collect(HO_NLOLsol.q[:, 1]), label="Discrete solution")
-savefig("result_figures/nn_harmonic_oscillator_solution.png")
+                    relu = x->max(0.0,x) ^ k_relu
+                    OLnetwork = OneLayerNetwork_GML{Float64}(relu,S)
+                    NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau, show_status = true, bias_interval = [-pi,pi], dict_amount = 400000)
 
-### Figures in the paper
-hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.q[:]), collect(HO_NLOLsol.p[:]))]
-relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
+                    #HarmonicOscillator
+                    HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
+                    HO_qerror = relative_maximum_error(HO_NLOLsol.q,HO_ref.q)
 
-p = plot(layout=@layout([a; b; c]), label="", size=(700, 700), plot_title="HarmonicOscillator,h = $(int_step)")
+                    hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.q[:]), collect(HO_NLOLsol.p[:]))]
+                    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
 
-plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...), label="S$(S)R$(R)Q$(Q)relu3", ylims=(-0.6, 0.6))
-plot!(p[1], int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Analytic Solution", xaxis="time", yaxis="q₁")
+                    record_results[("HO_sol_q")] = collect(HO_NLOLsol.q[:,1])
+                    record_results[("HO_sol_p")] = collect(HO_NLOLsol.p[:,1])
+                    record_results[("HO_internal_sol")] = internal_values
 
-plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.p[:, 1]), label="S$(S)R$(R)Q$(Q)relu3", ylims=(-0.6, 0.6))
-plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
+                    record_results[("HO_qerror")] = HO_qerror
+                    record_results[("HO_hams_err")] = relative_hams_err
+                    record_results[("HO_max_hams_err")] = maximum(relative_hams_err)
 
-plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="Relative Hamiltonian error")
-savefig(p, "result_figures/nn_harmonic_oscillator.png")
+                    save("1412_parallel_results/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).jld2",record_results)
 
+                    # # figure for q
+                    # plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
+                    # plot!(int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Truth", linestyle=:dash, linecolor=:black)
+                    # scatter!(collect(0:int_step:int_timespan), collect(HO_NLOLsol.q[:, 1]), label="Discrete solution")
+                    # savefig("result_figures/nn_harmonic_oscillator_solution.png")
+
+                    ### Figures in the paper
+                    p = plot(layout=@layout([a; b; c]), label="", size=(700, 700), plot_title="HarmonicOscillator,h = $(int_step)")
+
+                    plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...), label="S$(S)R$(R)Q$(Q)relu_k=$(k_relu)", ylims=(-0.6, 0.6))
+                    plot!(p[1], int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Analytic Solution", xaxis="time", yaxis="q₁")
+
+                    plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.p[:, 1]), label="S$(S)R$(R)Q$(Q)relu_k=$(k_relu)", ylims=(-0.6, 0.6))
+                    plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
+
+                    plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)relu_k=$(k_relu)", xaxis="time", yaxis="Relative Hamiltonian error")
+                    savefig(p, "1412_parallel_results/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).pdf")
+            #     end
+            # end
+        end
+    end
+end
 
 # DoublePendulum
-S = 8
-R = 8
-Q = 2 * R
-QGau = QuadratureRules.GaussLegendreQuadrature(R)
-OLnetwork = OneLayerNetwork_GML{Float64}(tanh,S)
-NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
-
-int_step = 1.0
-int_timespan = 10.0
+# int_step = 1.0
+# int_timespan = 1000.0
 DP_params = (
     l₁ = 1.0,
     l₂ = 1.0,
@@ -72,41 +114,74 @@ DP_params = (
 
 DP_ics = (t = 0.0, q = [0.7853981633974483, 1.5707963267948966], p = [0.2776801836348979, 0.39269908169872414], v = [0.0, 0.39269908169872414])
 
-DP_lode = GeometricProblems.DoublePendulum.lodeproblem(DP_ics.q, DP_ics.p; tstep = int_step, tspan = (0,int_timespan), parameters = DP_params)
+DP_lode = GeometricProblems.DoublePendulum.lodeproblem(DP_ics.q, DP_ics.p; timestep = int_step, timespan = (0,int_timespan), parameters = DP_params)
 DP_initial_hamiltonian = GeometricProblems.DoublePendulum.hamiltonian(0.0, DP_lode.ics.q, DP_lode.ics.p, DP_lode.parameters)
+DP_ref = integrate(DP_lode, Gauss(8))
 
-DP_NLOLsol,DP_internal = integrate(DP_lode, NLOLCGVNI_Gml)
-DP_hams = [GeometricProblems.DoublePendulum.hamiltonian(0, q, p, DP_lode.parameters) for (q, p) in zip(collect(DP_NLOLsol.q[:]), collect(DP_NLOLsol.p[:]))]
-DP_relative_hams_err = abs.((DP_hams .- DP_initial_hamiltonian) / DP_initial_hamiltonian)
-
-DP_ref1 = integrate(DP_lode, Gauss(8))
-@show relative_maximum_error(DP_NLOLsol.q,DP_ref1.q)
-
-pref_lode = GeometricProblems.DoublePendulum.lodeproblem(DP_ics.q, DP_ics.p; tstep = int_step/40, tspan = (0,int_timespan), parameters = DP_params)
+pref_lode = GeometricProblems.DoublePendulum.lodeproblem(DP_ics.q, DP_ics.p; timestep = int_step/40, timespan = (0,int_timespan), parameters = DP_params)
 DP_pref= integrate(pref_lode, Gauss(8))
 
 DP_internal_q1 = Array{Vector}(undef,Int(int_timespan/int_step))
 DP_internal_q2 = Array{Vector}(undef,Int(int_timespan/int_step))
 
-for i in 1:Int(int_timespan/int_step)
-    DP_internal_q1[i] = DP_internal[i][:,1]
-    DP_internal_q2[i] = DP_internal[i][:,2]
+for R in R_list
+    Q = 2 * R
+    QGau = QuadratureRules.GaussLegendreQuadrature(R)
+
+    for S = S_list
+        for k_relu = k_list
+            log_file="1412_parallel_results/NVI_DP_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).txt"
+            open(log_file, "w") do io
+                redirect_stdout(io) do
+                    record_results = Dict()
+
+                    relu = x->max(0.0,x) ^ k_relu
+                    OLnetwork = OneLayerNetwork_GML{Float64}(relu,S)
+                    NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau, show_status = true, bias_interval = [-pi,pi], dict_amount = 400000)
+
+                    DP_NLOLsol,DP_internal = integrate(DP_lode, NLOLCGVNI_Gml)
+                    DP_qerror = relative_maximum_error(DP_NLOLsol.q,DP_ref.q)
+
+                    DP_hams = [GeometricProblems.DoublePendulum.hamiltonian(0, q, p, DP_lode.parameters) for (q, p) in zip(collect(DP_NLOLsol.q[:]), collect(DP_NLOLsol.p[:]))]
+                    DP_relative_hams_err = abs.((DP_hams .- DP_initial_hamiltonian) / DP_initial_hamiltonian)
+
+                    
+                    record_results[("DP_sol_q1")] = collect(DP_NLOLsol.q[:,1])
+                    record_results[("DP_sol_q2")] = collect(DP_NLOLsol.q[:,2])
+                    record_results[("DP_sol_p1")] = collect(DP_NLOLsol.p[:,1])
+                    record_results[("DP_sol_p2")] = collect(DP_NLOLsol.p[:,2])
+                    record_results[("DP_internal_sol")] = DP_internal
+
+                    record_results[("DP_qerror")] = DP_qerror
+                    record_results[("DP_hams_err")] = DP_relative_hams_err
+                    record_results[("DP_max_hams_err")] = maximum(DP_relative_hams_err)
+
+                    save("1412_parallel_results/NVI_DP_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).jld2",record_results)
+
+                    # Figures for the paper
+                    for i in 1:Int(int_timespan/int_step)
+                        DP_internal_q1[i] = DP_internal[i][:,1]
+                        DP_internal_q2[i] = DP_internal[i][:,2]
+                    end
+
+                    p = plot(layout=@layout([a b; c d; e]), label="", size=(700, 700), plot_title="S$(S)R$(R)Q$(Q)relu_k=$(k_relu)")# d;e
+
+                    plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(DP_internal_q1...)[2:end,:]...), label="S$(S)R$(R)Q$(Q)relu_k=$(k_relu)", xaxis="time", yaxis="q₁")
+                    plot!(p[1], 0:int_step/40:int_timespan, collect(DP_pref.q[:, 1]), label="Reference Solution", ylims=(-2, 2))
+
+                    plot!(p[2], int_step/40:int_step/40:int_timespan, vcat(hcat(DP_internal_q2...)[2:end,:]...), label="S$(S)R$(R)Q$(Q)relu_k=$(k_relu)", xaxis="time", yaxis="q₂")
+                    plot!(p[2], 0:int_step/40:int_timespan, collect(DP_pref.q[:, 2]), label="Reference Solution", ylims=(-2, 2))
+
+                    plot!(p[3], 0:int_step:int_timespan, collect(DP_NLOLsol.p[:, 1]), label="S$(S)R$(R)Q$(Q)relu_k=$(k_relu)", xaxis="time", yaxis="p₁")
+                    plot!(p[3], 0:int_step/40:int_timespan, collect(DP_pref.p[:, 1]), label="Reference Solution", ylims=(-3, 3))
+
+                    plot!(p[4], 0:int_step:int_timespan, collect(DP_NLOLsol.p[:, 2]), label="S$(S)R$(R)Q$(Q)relu_k=$(k_relu)", xaxis="time", yaxis="p₂")
+                    plot!(p[4], 0:int_step/40:int_timespan, collect(DP_pref.p[:, 2]), label="Reference Solution", ylims=(-3, 3))
+
+                    plot!(p[5], 0:int_step:int_timespan, DP_relative_hams_err, label="S$(S)R$(R)Q$(Q)relu_k=$(k_relu)", xaxis="time", yaxis="Relative Hamiltonian error")
+                    savefig(p, "1412_parallel_results/NVI_DP_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).pdf")
+                end
+            end
+        end
+    end
 end
-
-# Figures for the paper
-p = plot(layout=@layout([a b; c d; e]), label="", size=(700, 700), plot_title="S$(S)R$(R)Q$(Q)relu3")# d;e
-
-plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(DP_internal_q1...)[2:end,:]...), label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="q₁")
-plot!(p[1], 0:int_step/40:int_timespan, collect(DP_pref.q[:, 1]), label="Reference Solution", ylims=(-2, 2))
-
-plot!(p[2], int_step/40:int_step/40:int_timespan, vcat(hcat(DP_internal_q2...)[2:end,:]...), label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="q₂")
-plot!(p[2], 0:int_step/40:int_timespan, collect(DP_pref.q[:, 2]), label="Reference Solution", ylims=(-2, 2))
-
-plot!(p[3], 0:int_step:int_timespan, collect(DP_NLOLsol.p[:, 1]), label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="p₁")
-plot!(p[3], 0:int_step/40:int_timespan, collect(DP_pref.p[:, 1]), label="Reference Solution", ylims=(-3, 3))
-
-plot!(p[4], 0:int_step:int_timespan, collect(DP_NLOLsol.p[:, 2]), label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="p₂")
-plot!(p[4], 0:int_step/40:int_timespan, collect(DP_pref.p[:, 2]), label="Reference Solution", ylims=(-3, 3))
-
-plot!(p[5], 0:int_step:int_timespan, DP_relative_hams_err, label="S$(S)R$(R)Q$(Q)relu3", xaxis="time", yaxis="Relative Hamiltonian error")
-savefig(p, "result_figures/nn_Double_Pendulum.pdf")

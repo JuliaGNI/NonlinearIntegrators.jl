@@ -20,8 +20,8 @@ using BSplineKit
 int_step = 4.
 int_timespan = 40.
 
-HO_iode = GeometricProblems.HarmonicOscillator.lodeproblem(tspan = (0,int_timespan),tstep = int_step)
-HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(tspan = (0,int_timespan),tstep = int_step))
+HO_iode = GeometricProblems.HarmonicOscillator.lodeproblem(timespan = (0,int_timespan),timestep = int_step)
+HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(timespan = (0,int_timespan),timestep = int_step))
 
 QGau = QuadratureRules.GaussLegendreQuadrature(8)
 knots_seq = 0:0.2:1

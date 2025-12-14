@@ -163,7 +163,7 @@ function GeometricIntegrators.Integrators.reset!(cache::NonLinear_OneLayer_Vecto
 end
 
 function GeometricIntegrators.Integrators.initial_guess!(int::GeometricIntegrator{<:NonLinear_OneLayer_VectorValue_GML})
-    local h = int.problem.tstep
+    local h = int.problem.timestep
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local show_status = method(int).show_status 
@@ -191,7 +191,7 @@ function initial_guess_Extrapolation!(int::GeometricIntegrator{<:NonLinear_OneLa
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local D = ndims(int)
-    local h = int.problem.tstep
+    local h = int.problem.timestep
 
     for i in eachindex(network_inputs)
         initialguess!(solstep(int).t̄+network_inputs[i]*h, cache(int).q̃, cache(int).p̃, solstep(int), int.problem, int.iguess)
@@ -205,7 +205,7 @@ end
 function initial_guess_integrator!(int::GeometricIntegrator{<:NonLinear_OneLayer_VectorValue_GML})
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
-    local h = int.problem.tstep
+    local h = int.problem.timestep
     local nstages = method(int).nstages
     local D = ndims(int)
     local problem = int.problem

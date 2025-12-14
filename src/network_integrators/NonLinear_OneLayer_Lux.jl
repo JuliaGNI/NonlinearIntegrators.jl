@@ -243,7 +243,7 @@ end
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_Lux}, initial_trajectory::IntegratorExtrapolation)
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
-    local h = int.problem.tstep
+    local h = int.problem.timestep
     local nstages = method(int).nstages
     local D = ndims(int)
     local problem = int.problem

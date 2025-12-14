@@ -1,13 +1,14 @@
 module NonlinearIntegrators
 
     using GeometricIntegrators
-    using GeometricIntegrators: LODEMethod
-
-    import GeometricIntegrators.Integrators: IODEIntegratorCache
-    import GeometricIntegrators.Integrators: CacheDict, Cache, default_solver, default_iguess,CacheType
-    import GeometricIntegrators.Integrators: create_internal_stage_vector,parameters
-    import GeometricIntegrators.Integrators: cache,nlsolution,solver,method,iguess,problem,current,update!
-    import GeometricIntegrators.Integrators: integrate!, solutionstep
+    using GeometricIntegrators.Integrators:create_internal_stage_vector
+    using GeometricIntegratorsBase
+    import GeometricIntegratorsBase: default_solver,default_options,initsolver,CacheDict,Cache,cache,CacheType,solutionstep,reset!,default_iguess,iguess
+    import GeometricIntegratorsBase: problem,method,parameters,SolverMethod,history, solver,residual!,copy_internal_variables!,internal,current,update!
+    import GeometricIntegratorsBase: _state, _vectorfield, compute_vectorfields!,_extrapolate!,internal_variables,nlsolution,integrate!,IODEIntegratorCache,LODEMethod
+    import GeometricBase: datatype,timetype,ntime
+    import GeometricBase: initialtime, finaltime, timespan, timestep,periodicity, NullPeriodicity
+    using GeometricSolutions:relative_maximum_error
 
     using NonlinearIntegrators
     using QuadratureRules
@@ -19,8 +20,7 @@ module NonlinearIntegrators
     using Statistics
     using Base
     using StaticArrays
-    using SimpleSolvers
-    import SimpleSolvers: solve!
+    using SimpleSolvers:NewtonMethod, Options, NonlinearSolver,Newton,solve!
     import GeometricMachineLearning
     using SymbolicNeuralNetworks
     using AbstractNeuralNetworks

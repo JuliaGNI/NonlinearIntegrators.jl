@@ -59,7 +59,7 @@ isimplicit(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = tru
 issymmetric(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
 issymplectic(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
 
-default_solver(::NonLinear_OneLayer_GML) = Newton()
+default_solver(::NonLinear_OneLayer_GML) = NewtonMethod()
 default_iguess(::NonLinear_OneLayer_GML) = IntegratorExtrapolation()#CoupledHarmonicOscillator
 default_iparams(::NonLinear_OneLayer_GML) = OGA1d()
 # default_iguess_integrator(::NonLinear_OneLayer_GML) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
@@ -106,14 +106,6 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    x_abstol_final::Vector{ST}
-    x_reltol_final::Vector{ST}
-    x_suctol_final::Vector{ST}
-    f_abstol_final::Vector{ST}
-    f_reltol_final::Vector{ST}
-    f_suctol_final::Vector{ST}
-    converge_status::Vector{Bool}
-
     function NonLinear_OneLayer_GMLCache{ST,D,S,R,N}() where {ST,D,S,R,N}
         x = zeros(ST, D * (S + 1 + 2 * S)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
 
@@ -156,19 +148,9 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
         stage_values = zeros(ST, 41, D)
         network_labels = zeros(ST, N + 1, D)
 
-        x_abstol_final = zeros(ST, 1)
-        x_reltol_final = zeros(ST, 1)
-        x_suctol_final = zeros(ST, 1)
-        f_abstol_final = zeros(ST, 1)
-        f_reltol_final = zeros(ST, 1)
-        f_suctol_final = zeros(ST, 1)
-        converge_status = [false]
-
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a,
             dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
-            current_step, stage_values, network_labels,
-            x_abstol_final,x_reltol_final, x_suctol_final,
-            f_abstol_final, f_reltol_final, f_suctol_final, converge_status)
+            current_step, stage_values, network_labels)
     end
 end
 
@@ -258,7 +240,7 @@ end
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initial_trajectory::IntegratorExtrapolation)
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
-    local h = int.problem.tstep
+    local h = int.problem.timestep
     local nstages = method(int).nstages
     local D = ndims(int)
     local problem = int.problem
@@ -345,25 +327,29 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
 
     quad_weights = simpson_quadrature(nstages)# Simpson's rule for 11 quad points 0:0.1:1
 
+    B = bias_interval[1]:(bias_interval[2]-bias_interval[1])/dict_amount:bias_interval[2]
+    w_list = vcat(-1 * ones(length(B), 1), ones(length(B), 1))
+    b_list = vcat(collect(B), collect(B))
+    A = hcat(w_list, b_list)
+    quad_nodes_mat = hcat(quad_nodes', ones(length(quad_nodes)))'
+    gx_quad = activation.(A * quad_nodes_mat)
+
+
     for d in 1:D
         W = zeros(S, 1)        # all parameters w
         Bias = zeros(S, 1)      # all parameters b
         C = zeros(S, nstages + 1)
+        f_weight = network_labels[d, :] .* quad_weights
+
         for k = 1:S
             #     The subproblem is key to the greedy algorithm, where the
             #     inner products |(u,g) - (f,g)| should be maximized.
             #     Part of the inner products can be computed in advance.
-            uk_quad = NN(quad_nodes, ps[d])'
 
             #select the Optimal basis
-            B = bias_interval[1]:(bias_interval[2]-bias_interval[1])/dict_amount:bias_interval[2]
-            w_list = vcat(-1 * ones(length(B), 1), ones(length(B), 1))
-            b_list = vcat(collect(B), collect(B))
-            A = hcat(w_list, b_list)
-            quad_nodes_mat = hcat(quad_nodes', ones(length(quad_nodes)))'
-            gx_quad = activation.(A * quad_nodes_mat)
 
-            f_weight = network_labels[d, :] .* quad_weights
+            uk_quad = NN(quad_nodes, ps[d])'
+
             uk_weight = uk_quad .* quad_weights
 
             loss = -(1 / 2) * (gx_quad * (uk_weight - f_weight)) .^ 2
@@ -496,7 +482,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
         r₁[:, d] = (NN.layers[1])([1.0], ps[d][1])
         for j in eachindex(quad_nodes)
             m[j, :, d] = (NN.layers[1])([quad_nodes[j]], ps[d][1])
-            a[j, :, d] = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))[1, 1].L2.W[:]
+            a[j, :, d] = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d])).L2.W[:]
         end
     end
 
@@ -504,21 +490,21 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     for d in 1:D
         for j in eachindex(quad_nodes)
             g = DQDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
-            dqdWc[j, :, d] = g[1, 1].L1.W[:]
-            dqdbc[j, :, d] = g[1, 1].L1.b[:]
+            dqdWc[j, :, d] = g.L1.W[:]
+            dqdbc[j, :, d] = g.L1.b[:]
 
             gv = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
-            dvdWc[j, :, d] = gv[1, 1].L1.W[:]
-            dvdbc[j, :, d] = gv[1, 1].L1.b[:]
+            dvdWc[j, :, d] = gv.L1.W[:]
+            dvdbc[j, :, d] = gv.L1.b[:]
         end
 
         g0 = DQDθ([0.0], NeuralNetworkParameters(ps[d]))
-        dqdWr₀[:, d] = g0[1, 1].L1.W[:]
-        dqdbr₀[:, d] = g0[1, 1].L1.b[:]
+        dqdWr₀[:, d] = g0.L1.W[:]
+        dqdbr₀[:, d] = g0.L1.b[:]
 
         g1 = DQDθ([1.0], NeuralNetworkParameters(ps[d]))
-        dqdWr₁[:, d] = g1[1, 1].L1.W[:]
-        dqdbr₁[:, d] = g1[1, 1].L1.b[:]
+        dqdWr₁[:, d] = g1.L1.W[:]
+        dqdbr₁[:, d] = g1.L1.b[:]
     end
 
     # compute Q : q at quaadurature points
@@ -659,22 +645,13 @@ end
 function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML,<:AbstractProblemIODE})
     # call nonlinear solver
     # solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
-    solve!(solver(int), nlsolution(int), (sol, params, int))
+    solve!(nlsolution(int),solver(int),  (sol, params, int))
 
     # print solver status
     # print_solver_status(int.solver.status, int.solver.params)
 
     # check if solution contains NaNs or error bounds are violated
     # check_solver_status(int.solver.status, int.solver.params)
-
-    # copy solution status
-    cache(int).x_abstol_final[1] = solver(int).status.rxₐ
-    cache(int).x_reltol_final[1] = solver(int).status.rxᵣ
-    cache(int).x_suctol_final[1] = solver(int).status.rxₛ
-    cache(int).f_abstol_final[1] = solver(int).status.rfₐ
-    cache(int).f_reltol_final[1] = solver(int).status.rfᵣ
-    cache(int).f_suctol_final[1] = solver(int).status.rfₛ
-    cache(int).converge_status[1] = solver(int).status.x_converged || solver(int).status.f_converged
 
     # compute final update
     GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
@@ -738,8 +715,19 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     internal_values = Vector{Matrix}(undef,n₂ - n₁ + 1)
     # loop over time steps
     for n in n₁:n₂
+        println("Start integrate at time step n = $(n)")
         # integrate one step and copy solution from cache to solution
         sol[n] = integrate!(solstep, int)
+
+        havenan = false
+        for s in current(solstep)
+            havenan = havenan || any(isnan, s)
+        end
+
+        if havenan
+            @warn "Solver encountered NaNs in solution at timestep n=$(n)."
+            break
+        end
 
         if hasproperty(cache(int),:stage_values)
             internal_values[n] = deepcopy(cache(int).stage_values)
@@ -749,12 +737,3 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     return sol, internal_values
 end
 
-
-GeometricIntegrators.Integrators.default_options(::NonLinear_OneLayer_GML) = (
-    x_reltol = 8eps(),
-    x_suctol = 2eps(),
-    f_abstol = 8eps(),
-    f_reltol = 8eps(),
-    f_suctol = 2eps(),
-    max_iterations = 10_000,
-)

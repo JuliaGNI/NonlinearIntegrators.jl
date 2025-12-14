@@ -12,23 +12,20 @@
 # Function to run the Julia script with the specified activation function
 run_configuration() {
     local h=$1
-    local max_iter=$2
-    local f_abs=$3
-    local f_suc=$4
+    local f_abs=$2
+    local x_abs=$3
     # Print the activation for debugging
-    echo "Running Julia script with Step Size: $h and Max Iterations: $max_iter, f_abs: $f_abs, f_suc: $f_suc"
+    echo "Running Julia script with Step Size: $h, f_abs: $f_abs, x_abs: $x_abs"
 
     # Run the Julia script in the background
-    julia --project=. test/test_NonLinear_DenseNet_GML.jl $h $max_iter $f_abs $f_suc &
+    julia --project=. test/test_NonLinear_OneLayer_GML.jl $h $f_abs $x_abs &
 }
 
 # Loop through the activations
-for h in {1.0,2.0,5.0}; do # ,
-    for max_iter in {1000,10000}; do #  
-        for f_abs in {"2eps()","8eps()"}; do # 
-            for f_suc in {"2eps()","8eps()"}; do # 
-                run_configuration $h $max_iter $f_abs $f_suc
-            done
+for h in {0.1,0.2,0.5,1.0,2.0,5.0}; do # ,  
+    for f_abs in {2.0,8.0}; do # 
+        for x_abs in {2.0,8.0}; do # 
+            run_configuration $h $f_abs $x_abs
         done
     done
 done
