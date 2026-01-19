@@ -19,8 +19,6 @@ x_abs = eval(Meta.parse(ARGS[3]))
 # x_abs = 2.0
 
 GeometricIntegratorsBase.default_options(method::Time_reversible_OneLayer) = (
-    x_suctol = x_abs * eps(),
-    f_abstol = f_abs * eps(),
     max_iterations = 10000,
     linesearch=GeometricIntegratorsBase.default_linesearch(method), 
 )

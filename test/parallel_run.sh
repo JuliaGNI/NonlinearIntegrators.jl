@@ -18,7 +18,7 @@ run_configuration() {
     echo "Running Julia script with Step Size: $h, f_abs: $f_abs, x_abs: $x_abs"
 
     # Run the Julia script in the background
-    julia --project=. test/test_NonLinear_OneLayer_GML.jl $h $f_abs $x_abs &
+    julia --project=. test/test_Time_Reversible_OneLayer.jl $h $f_abs $x_abs &
 }
 
 # Loop through the activations
