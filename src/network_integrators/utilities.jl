@@ -150,12 +150,3 @@ function lsgd_loss(network_inputs,labels,NN,ps)
     return sqrt(mean((labels .- NN_output).^2))
 end
 
-
-GeometricIntegrators.Integrators.default_options(::NetworkIntegratorMethod) = Options(
-    x_reltol = 8eps(),
-    x_suctol = 2eps(),
-    f_abstol = 8eps(),
-    f_reltol = 8eps(),
-    f_suctol = 2eps(),
-    max_iterations = 10_000,
-)
