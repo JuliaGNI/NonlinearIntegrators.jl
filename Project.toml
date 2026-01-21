@@ -7,6 +7,7 @@ authors = ["Michael Kraus <michael.kraus@ipp.mpg.de> and contributors"]
 AbstractNeuralNetworks = "60874f82-5ada-4c70-bd1c-fa6be7711c8a"
 BSplineKit = "093aae92-e908-43d7-9660-e50ee39d5a0a"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 CompactBasisFunctions = "a09551c4-f815-4143-809e-dd1986753ba7"
 ContinuumArrays = "7ae1f121-cc2c-504b-ac30-9b923412ae5c"
 GeometricBase = "9a0b12b7-583b-4f04-aa1f-d8551b6addc9"
@@ -33,6 +34,7 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
+Colors = "0.13.1"
 GeometricProblems = "0.6.17"
 
 [extras]
