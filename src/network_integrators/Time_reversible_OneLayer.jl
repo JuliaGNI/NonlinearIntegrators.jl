@@ -579,7 +579,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     local dqdWr₀ = cache(int, ST).dqdWr₀
     local dqdbr₁ = cache(int, ST).dqdbr₁
     local dqdbr₀ = cache(int, ST).dqdbr₀
-
+    local show_status = method(int).show_status
     # compute b = - [(P-AF)], the residual in actual action, vatiation with respect to Q_{n,i}
     for i in 1:S
         for k in 1:D
@@ -622,7 +622,8 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
             b[Int(D*(S+1+S/2)+D*(i-1)+k)] = (dqdbr₁[Int(2*i-1), k] * p̃[k] - dqdbr₀[Int(2*i-1), k] * p̄[k]) - z
         end
     end
-
+    show_status ?  println(" Residual vector b: \n", b) : nothing
+    show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
 end
 
 # Compute stages of Variational Partitioned Runge-Kutta methods.

@@ -611,7 +611,9 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
             b[D*(S+1+S)+D*(i-1)+k] = (dqdbr₁[i, k] * p̃[k] - dqdbr₀[i, k] * p̄[k]) - z
         end
     end
-
+    show_status ?  println(" Residual vector b: \n", b) : nothing
+    show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
+    
 end
 
 # Compute stages of Variational Partitioned Runge-Kutta methods.
