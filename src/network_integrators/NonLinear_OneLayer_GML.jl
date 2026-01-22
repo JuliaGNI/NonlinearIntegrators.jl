@@ -568,7 +568,8 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     local dqdWr₀ = cache(int, ST).dqdWr₀
     local dqdbr₁ = cache(int, ST).dqdbr₁
     local dqdbr₀ = cache(int, ST).dqdbr₀
-
+    local show_status = method(int).show_status
+    
     # compute b = - [(P-AF)], the residual in actual action, vatiation with respect to Q_{n,i}
     for i in 1:S
         for k in 1:D
@@ -611,7 +612,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
             b[D*(S+1+S)+D*(i-1)+k] = (dqdbr₁[i, k] * p̃[k] - dqdbr₀[i, k] * p̄[k]) - z
         end
     end
-    show_status ?  println(" Residual vector b: \n", b) : nothing
+    show_status ? println(" Residual vector b: \n", b) : nothing
     show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
     
 end

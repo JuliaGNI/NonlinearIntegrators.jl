@@ -12,18 +12,18 @@ using SimpleSolvers
 
 int_step = parse(Float64,ARGS[1])
 f_abs = eval(Meta.parse(ARGS[2]))
-x_abs = eval(Meta.parse(ARGS[3]))
+x_suc = eval(Meta.parse(ARGS[3]))
 
 # int_step = 0.1
 # f_abs = 2.0
 # x_abs = 2.0
 
 GeometricIntegratorsBase.default_options(method::NonLinear_OneLayer_GML) = (
-    x_suctol = x_abs * eps(),
+    x_suctol = x_suc * eps(),
     f_abstol = f_abs * eps(),
     max_iterations = 10000,
-    # linesearch=GeometricIntegratorsBase.default_linesearch(method), 
-    linesearch=SimpleSolvers.Bisection(), 
+    linesearch=GeometricIntegratorsBase.default_linesearch(method), 
+    # linesearch=SimpleSolvers.Bisection(), 
 )
 # SimpleSolvers.Backtracking() # The default linear search method is Backtracking()
 # # GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic()
@@ -39,7 +39,6 @@ int_timespan = 1000.0
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
 
-
 HO_ref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timestep=int_step,timespan=(0,int_timespan)))
 HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timestep=int_step/40,timespan=(0,int_timespan)))
 
@@ -50,8 +49,8 @@ for R in R_list
     for S in S_list
         # for k_relu in k_list
         try
-        #     log_file="Bisection/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).txt"
-            log_file="Bisection/NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh.txt"
+        #     log_file="Bisection/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xsuc$(x_suc).txt"
+            log_file="Bisection/NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xsuc$(x_suc)tanh.txt"
 
             open(log_file, "w") do io
                 redirect_stdio(stdout=log_file, stderr=log_file) do
@@ -76,7 +75,7 @@ for R in R_list
                     record_results[("HO_hams_err")] = relative_hams_err
                     record_results[("HO_max_hams_err")] = maximum(relative_hams_err)
 
-                    save("Bisection/NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh.jld2",record_results)
+                    save("Bisection/NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xsuc$(x_suc)tanh.jld2",record_results)
 
                     # # figure for q
                     # plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
@@ -94,11 +93,11 @@ for R in R_list
                     plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
 
                     plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)tanh", xaxis="time", yaxis="Relative Hamiltonian error")
-                    savefig(p, "Bisection/NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh.pdf")
+                    savefig(p, "Bisection/NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xsuc$(x_suc)tanh.pdf")
                 end
             end
         catch e
-            println("Error on Harmonic Oscillator, NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh",e)
+            println("Error on Harmonic Oscillator, NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xsuc$(x_suc)tanh",e)
             continue
         end
         # end
@@ -135,7 +134,7 @@ for R in R_list
     for S = S_list
         # for k_relu in k_list
         try
-            log_file="Bisection/NVI_DP_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh.txt"
+            log_file="Bisection/NVI_DP_h$(int_step)S$(S)R$(R)fabs$(f_abs)xsuc$(x_suc)tanh.txt"
             open(log_file, "w") do io
                 redirect_stdio(stdout=log_file, stderr=log_file) do
                     record_results = Dict()
@@ -160,7 +159,7 @@ for R in R_list
                     record_results[("DP_hams_err")] = DP_relative_hams_err
                     record_results[("DP_max_hams_err")] = maximum(DP_relative_hams_err)
 
-                    save("Bisection/NVI_DP_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh.jld2",record_results)
+                    save("Bisection/NVI_DP_h$(int_step)S$(S)R$(R)fabs$(f_abs)xsuc$(x_suc)tanh.jld2",record_results)
 
                     # Figures for the paper
                     for i in 1:Int(int_timespan/int_step)
@@ -183,11 +182,11 @@ for R in R_list
                     plot!(p[4], 0:int_step/40:int_timespan, collect(DP_pref.p[:, 2]), label="Reference Solution", ylims=(-3, 3))
 
                     plot!(p[5], 0:int_step:int_timespan, DP_relative_hams_err, label="S$(S)R$(R)Q$(Q)tanh", xaxis="time", yaxis="Relative Hamiltonian error")
-                    savefig(p, "Bisection/NVI_DP_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh.pdf")
+                    savefig(p, "Bisection/NVI_DP_h$(int_step)S$(S)R$(R)fabs$(f_abs)xsuc$(x_suc)tanh.pdf")
                 end
             end
         catch e
-            println("Error on Double Pendulum, NVI_DP_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh",e)
+            println("Error on Double Pendulum, NVI_DP_h$(int_step)S$(S)R$(R)fabs$(f_abs)xsuc$(x_suc)tanh",e)
             continue
         end
         # end
