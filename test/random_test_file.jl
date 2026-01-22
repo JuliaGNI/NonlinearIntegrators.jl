@@ -113,12 +113,12 @@ Q = 2 * R
 
 
 QGau = QuadratureRules.LobattoLegendreQuadrature(R)
-log_file="NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)_LobattoLegendre.txt"
+log_file="TR_NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)_LobattoLegendre.txt"
 record_results = Dict()
 
 relu = x->max(0.0,x) ^ k_relu
 OLnetwork = OneLayerNetwork_GML{Float64}(relu,S)
-NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
+NLOLCGVNI_Gml = Time_reversible_OneLayer(OLnetwork, QGau, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
 
 #HarmonicOscillator
 open(log_file, "w") do io
@@ -136,7 +136,7 @@ open(log_file, "w") do io
         record_results[("HO_hams_err")] = relative_hams_err
         record_results[("HO_max_hams_err")] = maximum(relative_hams_err)
 
-        save("NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)_LobattoLegendre.jld2",record_results)
+        save("TR_NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)_LobattoLegendre.jld2",record_results)
 
         ### Figures in the paper
         p = plot(layout=@layout([a; b; c]), label="", size=(700, 700), plot_title="HarmonicOscillator,h = $(int_step)")
@@ -148,6 +148,6 @@ open(log_file, "w") do io
         plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
 
         plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)reluk=$(k_relu)", xaxis="time", yaxis="Relative Hamiltonian error")
-        savefig(p, "NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)_LobattoLegendre.pdf")
+        savefig(p, "TR_NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)_LobattoLegendre.pdf")
     end
 end

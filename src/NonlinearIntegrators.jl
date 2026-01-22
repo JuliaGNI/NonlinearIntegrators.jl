@@ -26,8 +26,9 @@ module NonlinearIntegrators
     using AbstractNeuralNetworks
     using LinearAlgebra
     using BSplineKit
-    # using ForwardDiff
-    
+    using ForwardDiff
+    using Infiltrator
+
 
     include("methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
@@ -63,6 +64,10 @@ module NonlinearIntegrators
             Time_reversible_OneLayer,
             NonLinear_DenseNet_GML,NonLinear_DenseNet_Lux,
             Linear_DenseNet_GML
+
+    include("network_integrators/OneLayer_Hardcode_int.jl")
+    export OneLayer_Hardcode
+
 
     include("network_integrators/NonLinear_OneLayer_VectorValue_Lux.jl")
     include("network_integrators/NonLinear_OneLayer_VectorValue_GML.jl")
