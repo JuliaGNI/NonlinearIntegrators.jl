@@ -252,146 +252,155 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:On
         x[D*S+k] = cache(int).q̃[k]
     end
 end
+function apply_NN(t, ps, S, activation)
+    W2 = ps[1:S]
+    W1 = ps[S+1:2S]
+    b1 = ps[2S+1:3S]
 
-function NN_anstaz(plain_nn,plain_nn_ps,t,q̄,q)
-    return (1.0 .- t) .* q̄ .+ t .* q .+ t .* (1.0 .- t) .* plain_nn([t],plain_nn_ps)[1]
+    z1 = W1 .* t .+ b1
+    a1 = activation.(z1)
+    z2 = sum(W2 .* a1)
+    return z2
 end
 
-function VNN_anstaz(plain_nn,plain_nn_ps,t,q̄,q)
-    Zygote.gradient(tt ->NN_anstaz(plain_nn,plain_nn_ps,tt,q̄,q), t)[1]
+function NN_anstaz(ps, S::Int, activation, t, q̄, q)
+    # q_h(t) = (1-t)q_n + t*q_{n+1} + t(1-t)NN(t)
+    return (1.0 - t) * q̄ + t * q + t * (1.0 - t) * apply_NN(t, ps, S, activation)
 end
 
-∂NN_anstaz_∂params(plain_nn,plain_nn_ps,t,q̄,q) = Zygote.gradient(p -> NN_anstaz(plain_nn,p,t,q̄,q), plain_nn_ps)[1]
-∂VNN_anstaz_∂params(plain_nn,plain_nn_ps,t,q̄,q) = Zygote.gradient(p -> VNN_anstaz(plain_nn,p,t,q̄,q), plain_nn_ps)[1]
+VNN_anstaz_zygote(ps, S, activation, t, q̄, q) = Zygote.gradient(tt -> NN_anstaz(ps, S, activation, tt, q̄, q),t)[1]
 
-∂NN_anstaz_∂q̄(plain_nn,plain_nn_ps,t,q̄,q) = 1.0 .- t
-∂NN_anstaz_∂q(plain_nn,plain_nn_ps,t,q̄,q) = t
+VNN_anstaz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_anstaz(ps, S, activation, tt, q̄, q), t)
+∂NN_anstaz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> NN_anstaz(p, S, activation, t, q̄, q), ps)
+∂VNN_anstaz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> VNN_anstaz(p, S, activation, t, q̄, q), ps)
 
-∂VNN_anstaz_∂q̄(plain_nn,plain_nn_ps,t,q̄,q) = -1.0
-∂VNN_anstaz_∂q(plain_nn,plain_nn_ps,t,q̄,q) = 1.0
+∂NN_anstaz_∂q̄(ps,S,activation,t,q̄,q) = 1.0 .- t
+∂NN_anstaz_∂q(ps,S,activation,t,q̄,q) = t
 
-function initial_params!(int::GeometricIntegrator{<:OneLayer_Hardcode}, InitialParams::OGA1d,sol)
+∂VNN_anstaz_∂q̄(ps,S,activation,t,q̄,q)= -1.0
+∂VNN_anstaz_∂q(ps,S,activation,t,q̄,q) = 1.0
+
+function initial_params!(int::GeometricIntegrator{<:OneLayer_Hardcode}, InitialParams::OGA1d, sol)
     local S = nbasis(method(int))
     local D = ndims(int)
-    local quad_nodes = method(int).network_inputs
+    local quad_nodes = method(int).network_inputs # 0:0.1:1 (1x11)
     local NN = method(int).basis.NN
     local ps = cache(int).ps
-    local network_labels = cache(int).network_labels'
+    local network_labels = cache(int).network_labels' # (D x 11)
     local activation = method(int).basis.activation
     local x = nlsolution(int)
     local show_status = method(int).show_status
     local nstages = method(int).nstages
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
-    local q̄ = sol.q
-    local q̃ = cache(int).q̃
+    local q̄ = sol.q  # 起点 q_n
+    local q̃ = cache(int).q̃ # 终点估计 q_{n+1}
 
-    quad_weights = simpson_quadrature(nstages)# Simpson's rule for 11 quad points 0:0.1:1
+    # 1. 准备积分权重和节点
+    local t_vec = quad_nodes[:] # 转为向量
+    local quad_weights = simpson_quadrature(nstages)
+    local t_factor = t_vec .* (1 .- t_vec) # Ansatz 中的 t(1-t) 因子
 
+    # 2. 构造对称基函数字典 A = t(1-t) * [σ(wt+b) + σ(w(1-t)+b)]
     B = bias_interval[1]:(bias_interval[2]-bias_interval[1])/dict_amount:bias_interval[2]
-    w_list = vcat(-1 * ones(length(B), 1), ones(length(B), 1))
-    b_list = vcat(collect(B), collect(B))
-    A = hcat(w_list, b_list)
-    quad_nodes_mat = hcat(quad_nodes', ones(length(quad_nodes)))'
-    gx_quad = activation.(A * quad_nodes_mat)
-
-
-    for d in 1:D
-        W = zeros(S, 1)        # all parameters w
-        Bias = zeros(S, 1)      # all parameters b
-        C = zeros(S, nstages + 1)
-        f_weight = network_labels[d, :] .* quad_weights
-
-        for k = 1:S/2
-            #     The subproblem is key to the greedy algorithm, where the
-            #     inner products |(u,g) - (f,g)| should be maximized.
-            #     Part of the inner products can be computed in advance.
-
-            #select the Optimal basis
-
-            uk_quad = [NN_anstaz(NN, ps[d], qj, q̄[d], q̃[d]) for qj in quad_nodes]'
-
-            uk_weight = uk_quad .* quad_weights
-
-            loss = -(1 / 2) * (gx_quad * (uk_weight - f_weight)) .^ 2
-            argmin_index = argmin(loss)
-
-            W[Int(2k-1)] = A[argmin_index[1], :][1]
-            Bias[Int(2k-1)] = A[argmin_index[1], :][2]
-
-            W[Int(2k)] = -1 * A[argmin_index[1], :][1]
-            Bias[Int(2k)] =  W[Int(2k-1)] + Bias[Int(2k-1)]
-            @infiltrate
-            @show W
-            @show Bias
-
-            ak = hcat(W[Int(2k-1)], Bias[Int(2k-1)])
-            ak_1 = hcat(W[Int(2k)], Bias[Int(2k)])
-            C[Int(2k-1), :] = ak * quad_nodes_mat
-            C[Int(2k), :] = ak_1 * quad_nodes_mat
-            selected_g = activation.(C[1:Int(2k), :])
-            Gk = selected_g * (selected_g .* quad_weights')'
-            rhs = selected_g * (network_labels[d, :] .* quad_weights)
-            xk = Gk \ rhs
-
-            ps[d][1].W[:] .= W
-            ps[d][1].b[:] .= Bias
-            ps[d][2].W[1:Int(2k)] .= xk
-
-            if show_status
-                @show ps[d][2].W[:]
-                @show ps[d][1].W[:]
-                @show ps[d][1].b[:]
-            end
-
-            # opt = Optimisers.Descent(0.00001)
-            # st_opt = Optimisers.setup(opt, ps[d])
-
-            # errs = sum(network_labels[d, :] - NN(quad_nodes, ps[d])') .^ 2
-            # show_status ? print("\n OGA error $errs before training \n ") : nothing
-            # @show ps[d]
-            # @show W
-            # @show Bias
-            # @show xk
-
-            # gs = Zygote.gradient(p -> sum(network_labels[d, :] - NN(quad_nodes, p)') .^ 2, ps[d])[1]
-            # gs[1].W[:] = Float64[x === nothing ? 0.0 : x for x in gs[1].W[:]]
-            # gs[1].b[:] = Float64[x === nothing ? 0.0 : x for x in gs[1].b[:]]
-
-            # st_opt, ps[d] = Optimisers.update(st_opt, ps[d], gs)
-
-            errs = sum(network_labels[d, :] - [NN_anstaz(NN, ps[d], qj, q̄[d], q̃[d]) for qj in quad_nodes]') .^ 2
-            show_status ? print("\n OGA error $errs after training ") : nothing
-
-            # W .= ps[d][1].W[:]
-            # Bias .= ps[d][1].b[:]
-            # xk .= ps[d][2].W[1:k]
-
-            # @show ps[d]
-            # @show W
-            # @show Bias
-            # @show xk
-
-
-        end
-        show_status ? print("\n Finish OGA for dimension $d ") : nothing
+    # 我们只用正权重 w=1 构造字典即可，对称性由公式保证
+    w_fixed = ones(length(B)) 
+    A_dict = hcat(w_fixed, collect(B)) 
+    
+    # 预计算整个字典在积分点上的输出 (Symmetric Dictionary)
+    # gx_quad_sym: (字典大小 x 积分点数)
+    gx_quad_sym = zeros(size(A_dict, 1), length(t_vec))
+    for i in 1:size(A_dict, 1)
+        w, b = A_dict[i, 1], A_dict[i, 2]
+        # 对称对的输出: σ(wt + b) + σ(w(1-t) + b)
+        val = activation.(w .* t_vec .+ b) + activation.(-w .* t_vec .+ (w + b))
+        gx_quad_sym[i, :] = t_factor .* val
     end
 
+    for d in 1:D
+        # 3. 计算拟合目标：目标轨迹减去线性插值部分
+        # f_target = q_label(t) - [(1-t)q_n + t*q_{n+1}]
+        f_target = [network_labels[d, j] - ((1-t_vec[j])*q̄[d] + t_vec[j]*q̃[d]) for j in eachindex(t_vec)]
+
+        W = zeros(S)
+        Bias = zeros(S)
+        selected_indices = Int[]
+        
+        # OGA 循环：每次选出一对对称神经元
+        for k = 1:Int(S/2)
+            # 计算当前残差
+            if k == 1
+                current_residual = f_target
+            else
+                current_fit = (gx_quad_sym[selected_indices, :]' * xk_low)
+                current_residual = f_target - current_fit
+            end
+
+            # 计算投影 (Inner product with weights)
+            f_res_weighted = current_residual .* quad_weights
+            projections = (gx_quad_sym * f_res_weighted) .^ 2
+            
+            # 避开已选索引防止 Gk 奇异
+            for idx in selected_indices
+                projections[idx] = -1.0
+            end
+
+            best_idx = argmax(projections)
+            push!(selected_indices, best_idx)
+
+            # 填充参数
+            W[2k-1] = A_dict[best_idx, 1]
+            Bias[2k-1] = A_dict[best_idx, 2]
+            W[2k] = -W[2k-1]
+            Bias[2k] = W[2k-1] + Bias[2k-1]
+
+            # 4. 构造并求解 Gram 矩阵 Gk (维度为 k x k)
+            selected_g = gx_quad_sym[selected_indices, :]
+            Gk = selected_g * (selected_g .* quad_weights')'
+            rhs = selected_g * (f_target .* quad_weights)
+            
+            # 使用带正则化的求解防止奇异
+            global xk_low = (Gk + 1e-14*I) \ rhs 
+
+            # 更新 ps 结构：每一对共享同一个输出权重以保证对称性
+            ps[d][1].W[:] .= W
+            ps[d][1].b[:] .= Bias
+            for j in 1:k
+                ps[d][2].W[2j-1] = xk_low[j]
+                ps[d][2].W[2j] = xk_low[j]
+            end
+
+            if show_status
+                errs = sum((f_target - selected_g' * xk_low).^2)
+                println("Dimension $d, Pair $k, Current OGA Residual Error: $errs")
+            end
+        end
+        show_status ? println("Finish OGA for dimension $d") : nothing
+    end
+
+    # 5. 将结果映射回非线性求解器的初始向量 x
+    # 布局必须与 components! 严格一致
     for k in 1:D
+        # 终点 q_{n+1}
+        x[D*S+k] = q̃[k] 
+
+        # 输出层权重 W2
         for i in 1:S
             x[D*(i-1)+k] = ps[k][2].W[i]
         end
         
+        # 隐藏层 W1, b (只映射独立的部分，即 2i-1)
         for i in 1:Int(S/2)
-            x[Int(D*(S+1)+D*(i-1)+k)] = ps[k][1].W[Int(2i-1)]
-            x[Int(D*(S+1+S/2)+D*(i-1)+k)] = ps[k][1].b[Int(2i-1)]
+            idx_W1 = Int(D*(S+1)+D*(i-1)+k)
+            idx_b  = Int(D*(S+1+S/2)+D*(i-1)+k)
+            x[idx_W1] = ps[k][1].W[2i-1]
+            x[idx_b]  = ps[k][1].b[2i-1]
         end
     end
 
-    # st = st_tem[1]
-    show_status ? print("\n initial guess for DOF from OGA  ") : nothing
-    show_status ? print("\n ", x) : nothing
-
+    if show_status
+        println("Initial guess for DOF from OGA successfully computed.")
+    end
 end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:OneLayer_Hardcode}) where {ST}
@@ -427,6 +436,8 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     local dqdbr₁ = cache(int, ST).dqdbr₁
     local dqdbr₀ = cache(int, ST).dqdbr₀
 
+    local activation = method(int).basis.activation
+
     # copy x to q 
     for k in eachindex(q)
         q[k] = x[D*S+k]
@@ -444,42 +455,56 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
         end
     end
 
+    ps_vec = zeros(ST, 3S)
     # compute the derivatives of the coefficients on the quadrature nodes and at the boundaries
     for d in 1:D
-        for j in eachindex(quad_nodes)
-            g = ∂NN_anstaz_∂p(NN, NeuralNetworkParameters(ps[d]),[quad_nodes[j]],q̄[d],q[d])
-            dqdW1c[j, :, d] = g.L1.W[:]
-            dqdbc[j, :, d] = g.L1.b[:]
-            dqdW2c[j, :, d] = g.L2.W[:]
+        ps_vec[1:S] = ps[d][2].W[:]
+        ps_vec[S+1:2S] = ps[d][1].W[:]
+        ps_vec[2S+1:3S] = ps[d][1].b[:]
 
-            gv = ∂VNN_anstaz_∂p(NN, NeuralNetworkParameters(ps[d]),[quad_nodes[j]],q̄[d],q[d])
-            dvdW1c[j, :, d] = gv.L1.W[:] 
-            dvdbc[j, :, d] = gv.L1.b[:] 
-            dvdW2c[j, :, d] = gv.L2.W[:] 
+        for j in eachindex(quad_nodes)
+            # @infiltrate
+            g = ∂NN_anstaz_∂params(ps_vec,S,activation,quad_nodes[j],q̄[d],cache(int).q̃[d])
+            dqdW2c[j, :, d] = g[1:S]
+            dqdW1c[j, :, d] = g[S+1:2S]
+            dqdbc[j, :, d] = g[2S+1:3S]
+
+            gv = ∂VNN_anstaz_∂params(ps_vec,S,activation,quad_nodes[j],q̄[d],cache(int).q̃[d])
+            dvdW1c[j, :, d] = gv[S+1:2S] 
+            dvdbc[j, :, d] = gv[2S+1:3S] 
+            dvdW2c[j, :, d] = gv[1:S]
         end
 
-        g0 = ∂NN_anstaz_∂p(NN, NeuralNetworkParameters(ps[d]),[0.0],q̄[d],q[d])
-        dqdW1r₀[:, d] = g0.L1.W[:] 
-        dqdbr₀[:, d] = g0.L1.b[:]
-        dqdW2r₀[:, d] = g0.L2.W[:]
+        g0 = ∂NN_anstaz_∂params(ps_vec,S,activation,0.0,q̄[d],cache(int).q̃[d])
+        dqdW1r₀[:, d] = g0[S+1:2S]
+        dqdbr₀[:, d] = g0[2S+1:3S]
+        dqdW2r₀[:, d] = g0[1:S]
 
-        g1 = ∂NN_anstaz_∂p(NN, NeuralNetworkParameters(ps[d]),[1.0],q̄[d],q[d])
-        dqdW1r₁[:, d] = g1.L1.W[:]
-        dqdbr₁[:, d] = g1.L1.b[:]
-        dqdW2r₁[:, d] = g1.L2.W[:]
+        g1 = ∂NN_anstaz_∂params(ps_vec,S,activation,1.0,q̄[d],cache(int).q̃[d])
+        dqdW1r₁[:, d] = g1[S+1:2S]
+        dqdbr₁[:, d] = g1[2S+1:3S]
+        dqdW2r₁[:, d] = g1[1:S]
     end
 
     # compute Q : q at quaadurature points
-    for i in eachindex(Q)
-        for d in eachindex(Q[i])
-            Q[i][d] = NN_anstaz(NN, ps[d], [quad_nodes[i]], q̄[d], q[d])
+    for d in 1:D
+        ps_vec = zeros(ST, 3S)
+        ps_vec[1:S] = ps[d][2].W[:]
+        ps_vec[S+1:2S] = ps[d][1].W[:]
+        ps_vec[2S+1:3S] = ps[d][1].b[:]
+        for i in eachindex(quad_nodes)
+            Q[i][d] = NN_anstaz(ps_vec, S, activation, quad_nodes[i], q̄[d], q[d])
         end
     end
 
     # compute V volicity at quadrature points
-    for i in eachindex(V)
-        for k in eachindex(V[i])
-            V[i][k] = VNN_anstaz(NN, ps[k], [quad_nodes[i]], q̄[k], q[k]) / timestep(int)
+    for d in 1:D
+        ps_vec = zeros(ST, 3S)
+        ps_vec[1:S] = ps[d][2].W[:]
+        ps_vec[S+1:2S] = ps[d][1].W[:]
+        ps_vec[2S+1:3S] = ps[d][1].b[:]
+        for i in eachindex(quad_nodes)
+            V[i][d] = VNN_anstaz_zygote(ps_vec,S,activation,quad_nodes[i],q̄[d],q[d]) / timestep(int)
         end
     end
 
@@ -509,6 +534,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     local dvdW1c = cache(int, ST).dvdW1c
     local dqdbc = cache(int, ST).dqdbc
     local dvdbc = cache(int, ST).dvdbc
+    local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
 
     local show_status = method(int).show_status
     
@@ -540,7 +566,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
                 z += timestep(int) * method(int).b[j] * F[j][k] * dqdW1c[j, Int(2*i-1), k]
                 z += method(int).b[j] * P[j][k] * dvdW1c[j, Int(2*i-1), k]
             end
-            b[D*(S+1)+D*(i-1)+k] =  z
+            b[Int(D*(S+1)+D*(i-1)+k)] =  z
         end
     end
 
@@ -551,11 +577,11 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
                 z += timestep(int) * method(int).b[j] * F[j][k] * dqdbc[j, Int(2*i-1), k]
                 z += method(int).b[j] * P[j][k] * dvdbc[j, Int(2*i-1), k]
             end
-            b[D*(S+1+S)+D*(i-1)+k] = z
+            b[Int(D*(S+1+S/2)+D*(i-1)+k)] = z
         end
     end
 
-    show_status ?  println(" Residual vector b: \n", b) : nothing
+    show_status ? println(" Residual vector b: \n", b) : nothing
     show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
 end
 
@@ -628,6 +654,9 @@ function stages_compute!(sol, int::GeometricIntegrator{<:OneLayer_Hardcode})
     local NN = method(int).basis.NN
     local ps = cache(int).ps
     local show_status = method(int).show_status
+    local q̄ = SolutionStep(int.problem).q
+    local q = sol.q
+    local activation = method(int).basis.activation
 
     network_inputs = reshape(collect(0:1/40:1),1,41)
 
@@ -635,7 +664,7 @@ function stages_compute!(sol, int::GeometricIntegrator{<:OneLayer_Hardcode})
         print("\n solution x after solving by Newton \n")
         print(x)
     end
-
+    # @infiltrate
     for k in 1:D
         for i in 1:S
             ps[k][2].W[i] = x[D*(i-1)+k]
@@ -646,7 +675,16 @@ function stages_compute!(sol, int::GeometricIntegrator{<:OneLayer_Hardcode})
             ps[k][1].W[Int(2i)] = -1 * ps[k][1].W[Int(2i-1)]
             ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)] 
         end
-        stage_values[:, k] = NN(network_inputs, ps[k])[:]
+        
+        ps_vec = zeros(3S)
+        ps_vec[1:S] = ps[k][2].W[:]
+        ps_vec[S+1:2S] = ps[k][1].W[:]
+        ps_vec[2S+1:3S] = ps[k][1].b[:]
+
+        for i in eachindex(network_inputs)
+            stage_values[i, k] = NN_anstaz(ps_vec, S, activation, network_inputs[i], q̄[k], q[k])
+        end
+
         if show_status
             @show ps[k][2].W[:]
             @show ps[k][1].W[:]

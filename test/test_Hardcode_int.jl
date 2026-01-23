@@ -24,7 +24,7 @@ R = 8
 k_relu = 3 
 
 # Set up the Harmonic Oscillator problem
-int_timespan = 1.0
+int_timespan = 1000.0
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
 
@@ -36,11 +36,10 @@ QGau = QuadratureRules.LobattoLegendreQuadrature(R)
 log_file="HC_NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)_LobattoLegendre.txt"
 record_results = Dict()
 
-relu = x->max(0.0,x) ^ k_relu
+relu(x) = max(0.0,x) ^ k_relu
 OLnetwork = OneLayerNetwork_GML{Float64}(relu,S)
 NLOLCGVNI_Gml = OneLayer_Hardcode(OLnetwork, QGau, show_status = true, bias_interval = [-pi,pi], dict_amount = 400000)
 
-#HarmonicOscillator
 open(log_file, "w") do io
     redirect_stdio(stdout=log_file, stderr=log_file) do
         HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)

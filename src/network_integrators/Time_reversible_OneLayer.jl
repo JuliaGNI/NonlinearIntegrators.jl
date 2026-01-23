@@ -622,7 +622,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
             b[Int(D*(S+1+S/2)+D*(i-1)+k)] = (dqdbr₁[Int(2*i-1), k] * p̃[k] - dqdbr₀[Int(2*i-1), k] * p̄[k]) - z
         end
     end
-    show_status ?  println(" Residual vector b: \n", b) : nothing
+    show_status ? println(" Residual vector b: \n", b) : nothing
     show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
 end
 

@@ -121,8 +121,8 @@ OLnetwork = OneLayerNetwork_GML{Float64}(relu,S)
 NLOLCGVNI_Gml = Time_reversible_OneLayer(OLnetwork, QGau, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
 
 #HarmonicOscillator
-open(log_file, "w") do io
-    redirect_stdio(stdout=log_file, stderr=log_file) do
+# open(log_file, "w") do io
+#     redirect_stdio(stdout=log_file, stderr=log_file) do
         HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
         HO_qerror = relative_maximum_error(HO_NLOLsol.q,HO_ref.q)
         hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.q[:]), collect(HO_NLOLsol.p[:]))]
@@ -149,5 +149,5 @@ open(log_file, "w") do io
 
         plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)reluk=$(k_relu)", xaxis="time", yaxis="Relative Hamiltonian error")
         savefig(p, "TR_NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)_LobattoLegendre.pdf")
-    end
-end
+#     end
+# end
