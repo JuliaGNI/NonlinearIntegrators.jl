@@ -16,7 +16,7 @@ makedocs(
     authors="Michael Kraus <michael.kraus@ipp.mpg.de> and contributors",
     format=Documenter.HTML(;
         canonical="https://JuliaGNI.github.io/NonlinearIntegrators.jl",
-        edit_link="main",
+        edit_link="zeyuan",
         assets=String[],
     ),
     pages=[
@@ -26,6 +26,6 @@ makedocs(
 
 deploydocs(;
     repo="github.com/JuliaGNI/NonlinearIntegrators.jl",
-    devbranch="main",
-    devurl="latest",
+    devbranch="zeyuan",
+    devurl="stable",
 )
