@@ -7,14 +7,15 @@ using GeometricProblems
 using GeometricIntegratorsBase
 
 # Set up the Harmonic Oscillator problem
-int_step = 0.5
-int_timespan = 5.
+int_step = 0.1
+int_timespan = 0.2
 
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timespan = (0,int_timespan),timestep = int_step)
 HO_pref = HarmonicOscillator.exact_solution(HarmonicOscillator.podeproblem(timespan = (0,int_timespan),timestep = int_step))
-QGau4 = QuadratureRules.GaussLegendreQuadrature(4)
-BGau4 = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau4))
-cgvi_sol = integrate(HO_lode,CGVI(BGau4, QGau4))
+R = 8
+QGau = QuadratureRules.LobattoLegendreQuadrature(R)
+BGau = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(QGau))
+cgvi_sol = integrate(HO_lode,CGVI(BGau, QGau))
 # #set up the Coupled Harmonic Oscillator problem
 # CHO = GeometricProblems.CoupledHarmonicOscillator.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 

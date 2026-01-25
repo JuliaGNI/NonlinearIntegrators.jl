@@ -55,19 +55,21 @@ module NonlinearIntegrators
 
     include("network_integrators/NonLinear_OneLayer_GML.jl")
     include("network_integrators/NonLinear_OneLayer_Lux.jl")
-    include("network_integrators/Time_reversible_OneLayer.jl")
-
     include("network_integrators/NonLinear_DenseNet_GML.jl")
     include("network_integrators/NonLinear_DenseNet_Lux.jl")
     include("network_integrators/Linear_DenseNet_GML.jl")
     export NonLinear_OneLayer_GML,NonLinear_OneLayer_Lux,
-            Time_reversible_OneLayer,
             NonLinear_DenseNet_GML,NonLinear_DenseNet_Lux,
             Linear_DenseNet_GML
 
-    include("network_integrators/OneLayer_Hardcode_int.jl")
-    export OneLayer_Hardcode
+    include("network_integrators/Hardcode_int.jl")
+    export Hardcode_int
 
+
+    include("network_integrators/Time_reversible_OneLayer.jl")
+    include("network_integrators/Time_reversible_Hardcode_int.jl")
+    export Time_Reversible_Hardcode
+    export Time_reversible_OneLayer
 
     include("network_integrators/NonLinear_OneLayer_VectorValue_Lux.jl")
     include("network_integrators/NonLinear_OneLayer_VectorValue_GML.jl")
