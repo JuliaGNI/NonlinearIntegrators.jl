@@ -252,33 +252,33 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
         x[D*S+k] = cache(int).q̃[k]
     end
 end
-function apply_NN(t, ps, S, activation)
-    W2 = ps[1:S]
-    W1 = ps[S+1:2S]
-    b1 = ps[2S+1:3S]
+# function apply_NN(t, ps, S, activation)
+#     W2 = ps[1:S]
+#     W1 = ps[S+1:2S]
+#     b1 = ps[2S+1:3S]
 
-    z1 = W1 .* t .+ b1
-    a1 = activation.(z1)
-    z2 = sum(W2 .* a1)
-    return z2
-end
+#     z1 = W1 .* t .+ b1
+#     a1 = activation.(z1)
+#     z2 = sum(W2 .* a1)
+#     return z2
+# end
 
-function NN_anstaz(ps, S::Int, activation, t, q̄, q)
-    # q_h(t) = (1-t)q_n + t*q_{n+1} + t(1-t)NN(t)
-    return (1.0 - t) * q̄ + t * q + t * (1.0 - t) * apply_NN(t, ps, S, activation)
-end
+# function NN_anstaz(ps, S::Int, activation, t, q̄, q)
+#     # q_h(t) = (1-t)q_n + t*q_{n+1} + t(1-t)NN(t)
+#     return (1.0 - t) * q̄ + t * q + t * (1.0 - t) * apply_NN(t, ps, S, activation)
+# end
 
-VNN_anstaz_zygote(ps, S, activation, t, q̄, q) = Zygote.gradient(tt -> NN_anstaz(ps, S, activation, tt, q̄, q),t)[1]
+# VNN_anstaz_zygote(ps, S, activation, t, q̄, q) = Zygote.gradient(tt -> NN_anstaz(ps, S, activation, tt, q̄, q),t)[1]
 
-VNN_anstaz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_anstaz(ps, S, activation, tt, q̄, q), t)
-∂NN_anstaz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> NN_anstaz(p, S, activation, t, q̄, q), ps)
-∂VNN_anstaz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> VNN_anstaz(p, S, activation, t, q̄, q), ps)
+# VNN_anstaz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_anstaz(ps, S, activation, tt, q̄, q), t)
+# ∂NN_anstaz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> NN_anstaz(p, S, activation, t, q̄, q), ps)
+# ∂VNN_anstaz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> VNN_anstaz(p, S, activation, t, q̄, q), ps)
 
-∂NN_anstaz_∂q̄(ps,S,activation,t,q̄,q) = 1.0 .- t
-∂NN_anstaz_∂q(ps,S,activation,t,q̄,q) = t
+# ∂NN_anstaz_∂q̄(ps,S,activation,t,q̄,q) = 1.0 .- t
+# ∂NN_anstaz_∂q(ps,S,activation,t,q̄,q) = t
 
-∂VNN_anstaz_∂q̄(ps,S,activation,t,q̄,q)= -1.0
-∂VNN_anstaz_∂q(ps,S,activation,t,q̄,q) = 1.0
+# ∂VNN_anstaz_∂q̄(ps,S,activation,t,q̄,q)= -1.0
+# ∂VNN_anstaz_∂q(ps,S,activation,t,q̄,q) = 1.0
 
 function initial_params!(int::GeometricIntegrator{<:Time_Reversible_Hardcode}, InitialParams::OGA1d, sol)
     local S = nbasis(method(int))

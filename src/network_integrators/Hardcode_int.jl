@@ -558,7 +558,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
             b[D*(S+1+S)+D*(i-1)+k] = z
         end
     end
-    @infiltrate
+    # @infiltrate
 
     show_status ? println(" Residual vector b: \n", b) : nothing
     show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
