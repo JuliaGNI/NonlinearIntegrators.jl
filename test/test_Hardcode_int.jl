@@ -63,7 +63,10 @@ for R in R_list
                 
                     #HarmonicOscillator
                     HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
-                    
+                    HO_qerror = relative_maximum_error(HO_NLOLsol.q,HO_ref.q)
+                    hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.q[:]), collect(HO_NLOLsol.p[:]))]
+                    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
+
                     ### Figures in the paper
                     p = plot(layout=@layout([a; b; c]), label="", size=(700, 700), plot_title="HarmonicOscillator,h = $(int_step)")
                     plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...), label="S$(S)R$(R)k$(k_relu)", ylims=(-0.6, 0.6))
@@ -74,9 +77,6 @@ for R in R_list
                     savefig(p, "HC_int_072/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xsuc$(x_suc).pdf")
 
                     # save results
-                    HO_qerror = relative_maximum_error(HO_NLOLsol.q,HO_ref.q)
-                    hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.q[:]), collect(HO_NLOLsol.p[:]))]
-                    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
                     record_results[("HO_sol_q")] = collect(HO_NLOLsol.q[:,1])
                     record_results[("HO_sol_p")] = collect(HO_NLOLsol.p[:,1])
                     record_results[("HO_internal_sol")] = internal_values
