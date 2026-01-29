@@ -90,4 +90,8 @@ module NonlinearIntegrators
     include("SINDy_methods/PR_Int.jl")
     include("SINDy_methods/PR_basis.jl")
     export PR_Integrator, PR_Basis
+
+    # CGVI Standard
+    include("CGVI_standard/CGVI_standard.jl")
+    export CGVI_standard
 end
