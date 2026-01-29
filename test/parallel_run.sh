@@ -18,7 +18,7 @@ run_configuration() {
     echo "Running Julia script with Step Size: $h, f_abs: $f_abs, x_suc: $x_suc"
 
     # Run the Julia script in the background
-    julia --project=. test/test_NonLinear_OneLayer_GML.jl $h $f_abs $x_suc &
+    julia --project=. test/test_Hardcode_int.jl $h $f_abs $x_suc &
     
     # julia --project=. test/test_Hardcode_int.jl $h $f_abs $x_suc &
 }

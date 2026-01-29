@@ -35,7 +35,7 @@ S_list = [4,6,8]#
 k_list = [2,3,4]# 
 
 # Set up the Harmonic Oscillator problem
-int_timespan = 1000.0
+int_timespan = 100.0
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
 
