@@ -10,13 +10,14 @@ using GeometricIntegrators
 using JLD2
 using SimpleSolvers
 using Infiltrator
-int_step = parse(Float64,ARGS[1])
-f_abs = eval(Meta.parse(ARGS[2]))
-x_suc = eval(Meta.parse(ARGS[3]))
 
-# int_step = 0.1
-# f_abs = 2.0
-# x_abs = 2.0
+# int_step = parse(Float64,ARGS[1])
+# f_abs = eval(Meta.parse(ARGS[2]))
+# x_suc = eval(Meta.parse(ARGS[3]))
+
+int_step = 0.1
+f_abs = 2.0
+x_suc = 8.0
 
 GeometricIntegratorsBase.default_options(method::Hardcode_int) = (
     x_suctol = x_suc * eps(),
@@ -30,12 +31,16 @@ GeometricIntegratorsBase.default_options(method::Hardcode_int) = (
 # SimpleSolvers.Bisection()
 # SimpleSolvers.Static()
 
-R_list = [8,16,4]#
-S_list = [4,6,8]# 
-k_list = [2,3,4]# 
+# R_list = [8,16,4]#
+# S_list = [4,6,8]# 
+# k_list = [2,3,4]# 
+
+S = 4
+R = 8
+k_relu = 2
 
 # Set up the Harmonic Oscillator problem
-int_timespan = 100.0
+int_timespan = 0.2
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
 initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
 

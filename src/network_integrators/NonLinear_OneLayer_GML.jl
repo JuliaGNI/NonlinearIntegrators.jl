@@ -389,9 +389,9 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
 
             # st_opt, ps[d] = Optimisers.update(st_opt, ps[d], gs)
 
-            # errs = sum(network_labels[d, :] - NN(quad_nodes, ps[d])') .^ 2
-            # show_status ? print("\n OGA error $errs after training ") : nothing
-
+            errs = sum(network_labels[d, :] - NN(quad_nodes, ps[d])') .^ 2
+            show_status ? print("\n OGA error $errs after training ") : nothing
+            # println("\n OGA error $errs at k = $k for dimension $d ")
             # W .= ps[d][1].W[:]
             # Bias .= ps[d][1].b[:]
             # xk .= ps[d][2].W[1:k]

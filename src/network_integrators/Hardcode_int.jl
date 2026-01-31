@@ -365,7 +365,7 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
         end
         
         # show_status ? println("Finish OGA for dimension $d, residual MSE: $(sum(f_res.^2))") : nothing
-        println("Finish OGA for dimension $d, residual MSE: $(sum(f_res.^2))")
+        println("Finish OGA for dimension $d, residual MSE: $(sum(f_res).^2)")
     end
 
 
