@@ -6,7 +6,7 @@ using Colors
 R_list = [8,16,4]
 S_list = [4,6,8]
 k_list = [2,3,4]
-h_list = [0.1,0.2,0.5,1.0,2.0]
+h_list = [0.1,0.2,0.5,1.0,]#2.0,5.0
 f_abs_list = [2.0,8.0]
 x_abs_list = [2.0,8.0]
 
@@ -25,11 +25,16 @@ begin
                     Q = 2 * R
                     for (fi,f_abs) in enumerate(f_abs_list)
                         for (xi,x_abs) in enumerate(x_abs_list)
-                            data_file="default_linesearch_072/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xsuc$(x_abs).jld2"
-                            isfile(data_file) ? nothing : continue
-                            result_data = load(data_file)
-                            HO_err_tensor[hi,Si,ki,Ri,fi,xi] = result_data["HO_max_hams_err"]
-                            q_err_tensor[hi,Si,ki,Ri,fi,xi] = result_data["HO_qerror"] 
+                            data_file="time_reversible/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).jld2"
+                            # isfile(data_file) ? nothing : continue
+                            try
+                                result_data = load(data_file)
+                                HO_err_tensor[hi,Si,ki,Ri,fi,xi] = result_data["HO_max_hams_err"]
+                                q_err_tensor[hi,Si,ki,Ri,fi,xi] = result_data["HO_qerror"] 
+                            catch e
+                                println("Failed to load data from $(data_file): $(e)")
+                                continue
+                            end
                         end
                     end
                 end
@@ -78,7 +83,7 @@ begin
         end
     end
     axislegend(ax, position=:rb)
-    save("default_linesearch_072/HO_hamiltonian_error.pdf", fig)
+    save("time_reversible/HO_hamiltonian_error_0-1.pdf", fig)
 end
 
 ### Harmonic Oscillator with Time-Reversible Neural Variational Integrators
@@ -162,7 +167,7 @@ end
 
 #     axislegend(ax2, position=:rb)
 #     fig2
-#     save("default_linesearch_072/HO_hamiltonian_error_TR.pdf", fig2)
+#     save("time_reversible/HO_hamiltonian_error_TR.pdf", fig2)
 # end
 
 ### Double Pendulum with Plain Neural Variational Integrators
@@ -177,7 +182,7 @@ end
 #                     Q = 2 * R
 #                     for (fi,f_abs) in enumerate(f_abs_list)
 #                         for (xi,x_abs) in enumerate(x_abs_list)
-#                             data_file="default_linesearch_072/NVI_DP_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).jld2"
+#                             data_file="time_reversible/NVI_DP_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).jld2"
 #                             isfile(data_file) ? nothing : continue
 #                             result_data = load(data_file)
 #                             DP_err_tensor[hi,Si,ki,Ri,fi,xi] = result_data["DP_max_hams_err"]
@@ -230,7 +235,7 @@ end
 #         end
 #     end
 #     axislegend(ax3, position=:rb)
-#     save("default_linesearch_072/DP_hamiltonian_error.pdf", fig3)
+#     save("time_reversible/DP_hamiltonian_error.pdf", fig3)
 # end
 
 ### Double Pendulum with Time-Reversible Neural Variational Integrators
@@ -315,7 +320,7 @@ end
 
 #     axislegend(ax4, position=:rb)
 #     fig4
-#     save("default_linesearch_072/DP_hamiltonian_error_TR.pdf", fig4)
+#     save("time_reversible/DP_hamiltonian_error_TR.pdf", fig4)
 # end
 
 # # Harmonic Oscillator with tanh activation function 
@@ -329,7 +334,7 @@ end
 #                 Q = 2 * R
 #                 for (fi,f_abs) in enumerate(f_abs_list)
 #                     for (xi,x_abs) in enumerate(x_abs_list)
-#                         data_file="default_linesearch_072/NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh.jld2"
+#                         data_file="time_reversible/NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh.jld2"
 #                         isfile(data_file) ? nothing : continue
 #                         result_data = load(data_file)
 #                         HO_err_tensor_tanh[hi,Si,Ri,fi,xi] = result_data["HO_max_hams_err"]
@@ -377,7 +382,7 @@ end
 #     end
 #     axislegend(ax5, position=:rb)
 #     fig5
-#     save("default_linesearch_072/HO_hamiltonian_error_tanh.pdf", fig5)
+#     save("time_reversible/HO_hamiltonian_error_tanh.pdf", fig5)
 # end
 
 # # Double Pendulum with tanh activation function 
@@ -391,7 +396,7 @@ end
 #                 Q = 2 * R
 #                 for (fi,f_abs) in enumerate(f_abs_list)
 #                     for (xi,x_abs) in enumerate(x_abs_list)
-#                         data_file="default_linesearch_072/NVI_DP_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh.jld2"
+#                         data_file="time_reversible/NVI_DP_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)tanh.jld2"
 #                         isfile(data_file) ? nothing : continue
 #                         result_data = load(data_file)
 #                         DP_err_tensor_tanh[hi,Si,Ri,fi,xi] = result_data["DP_max_hams_err"]

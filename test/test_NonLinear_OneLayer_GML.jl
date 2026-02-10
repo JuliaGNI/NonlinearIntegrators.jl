@@ -22,8 +22,8 @@ GeometricIntegratorsBase.default_options(method::NonLinear_OneLayer_GML) = (
     x_suctol = x_suc * eps(),
     f_abstol = f_abs * eps(),
     max_iterations = 10000,
-    linesearch=GeometricIntegratorsBase.default_linesearch(method), 
-    # linesearch=SimpleSolvers.Bisection(), 
+    # linesearch=GeometricIntegratorsBase.default_linesearch(method), 
+    linesearch=SimpleSolvers.Static(), 
 )
 # SimpleSolvers.Backtracking() # The default linear search method is Backtracking()
 # # GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic()
