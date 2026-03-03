@@ -6,9 +6,10 @@ using Colors
 R_list = [8,16,4]
 S_list = [4,6,8]
 k_list = [2,3,4]
-h_list = [0.1,0.2,0.5,1.0,]#2.0,5.0
+h_list = [0.05,0.1,0.2,0.5,1.0]#2.0,5.0
 f_abs_list = [2.0,8.0]
 x_abs_list = [2.0,8.0]
+λ_list = [0.0,1e-3,1e-5,1e-7]
 
 num_lines = length(S_list) * length(k_list)
 col = distinguishable_colors(num_lines,[RGB(1,1,1), RGB(0,0,0)], dropseed=true)
@@ -16,25 +17,23 @@ line_colors = map(col -> (red(col), green(col), blue(col)), col)
 
 ## Harmonic Oscillator with Plain Neural Variational Integrators
 begin
-    HO_err_tensor = zeros(length(h_list),length(S_list),length(k_list),length(R_list),length(f_abs_list),length(x_abs_list))
-    q_err_tensor = zeros(length(h_list),length(S_list),length(k_list),length(R_list),length(f_abs_list),length(x_abs_list))
+    HO_err_tensor = zeros(length(h_list),length(S_list),length(k_list),length(R_list),length(λ_list))
+    q_err_tensor = zeros(length(h_list),length(S_list),length(k_list),length(R_list),length(λ_list))
     for (hi,int_step) in enumerate(h_list)
         for (Si,S) in enumerate(S_list)
             for (ki,k_relu) in enumerate(k_list)
                 for (Ri,R) in enumerate(R_list)
                     Q = 2 * R
-                    for (fi,f_abs) in enumerate(f_abs_list)
-                        for (xi,x_abs) in enumerate(x_abs_list)
-                            data_file="time_reversible/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xabs$(x_abs).jld2"
-                            # isfile(data_file) ? nothing : continue
-                            try
-                                result_data = load(data_file)
-                                HO_err_tensor[hi,Si,ki,Ri,fi,xi] = result_data["HO_max_hams_err"]
-                                q_err_tensor[hi,Si,ki,Ri,fi,xi] = result_data["HO_qerror"] 
-                            catch e
-                                println("Failed to load data from $(data_file): $(e)")
-                                continue
-                            end
+                    for (λi,λ) in enumerate(λ_list)
+                        data_file="add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(λ).jld2"
+                        # isfile(data_file) ? nothing : continue
+                        try
+                            result_data = load(data_file)
+                            HO_err_tensor[hi,Si,ki,Ri,λi] = result_data["HO_max_hams_err"]
+                            q_err_tensor[hi,Si,ki,Ri,λi] = result_data["HO_qerror"] 
+                        catch e
+                            println("Failed to load data from $(data_file): $(e)")
+                            continue
                         end
                     end
                 end
@@ -43,9 +42,11 @@ begin
         end
     end
 
-    fig = Figure(size = (700, 800))
+    fig = Figure(size = (1500, 800))
     ax = Axis(fig[1, 1], xlabel = "Time Step h", ylabel = "Maximum Hamiltonian Error", 
-        xscale = log10, yscale = log10, title = "Neural Variational Integrators" ,limits = (nothing, (1e-10, 1e2)))
+        xscale = log10, yscale = log10, title = "Neural Variational Integrators" ,limits = (nothing, (1e-13, 1e3)))
+    ax2 = Axis(fig[1, 2], xlabel = "Time Step h", ylabel = "Minimum Error", 
+        xscale = log10, yscale = log10, title = "Neural Variational Integrators" ,limits = (nothing, (1e-13, 1e3)))
 
     global line_idx = 1
 
@@ -57,7 +58,7 @@ begin
             err_min = zeros(length(h_list))
             
             for (hi, h) in enumerate(h_list)
-                errors = HO_err_tensor[hi, Si, ki, :, :, :]
+                errors = HO_err_tensor[hi, Si, ki, :, :]
                 if S == 6 && k_relu == 3 && h == 1.0
                     @show errors
                 end
@@ -79,11 +80,17 @@ begin
             scatterlines!(ax, h_list, err_mean, label="S$(S)k$(k_relu)", color=line_colors[line_idx],
                         markersize=6, linewidth=2)
             errorbars!(ax, h_list, err_mean, errlow, errhigh, linewidth=2, color=line_colors[line_idx],whiskerwidth = 10)
+
+            scatterlines!(ax2, h_list, err_min, label="S$(S)k$(k_relu)", color=line_colors[line_idx],
+                        markersize=6, linewidth=2)
+                        
             line_idx += 1
         end
     end
     axislegend(ax, position=:rb)
-    save("time_reversible/HO_hamiltonian_error_0-1.pdf", fig)
+    axislegend(ax2, position=:rb)
+
+    save("add_lambda_in_solver077/HO_hamiltonian_error.pdf", fig)
 end
 
 ### Harmonic Oscillator with Time-Reversible Neural Variational Integrators

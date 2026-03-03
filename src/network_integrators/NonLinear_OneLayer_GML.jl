@@ -291,7 +291,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
         end
 
         show_status ? print("\n dimension $k,final loss: $err by $nepochs epochs") : nothing
-
+        println(err)
         for i in 1:S
             x[D*(i-1)+k] = ps[k][2].W[i]
             x[D*(S+1)+D*(i-1)+k] = ps[k][1].W[i]
