@@ -531,7 +531,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     for k in eachindex(p̄)
         z = zero(ST)
         for j in eachindex(P, F)
-            z += timestep(int) * method(int).b[j] * F[j][k] * (1-quad_nodes[j])
+            z += timestep(int) * method(int).b[j] * F[j][k] * (1.0 - quad_nodes[j])
             z += method(int).b[j] * P[j][k] * (-1.0)
         end
         b[D*S+k] = p̄[k] + z
@@ -586,7 +586,7 @@ function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricInt
     sol.q .= cache(int, DT).q̃
 
     for k in 1:D
-        z = zero(1)
+        z = zero(eltype(sol.p))
         for j in eachindex(P, F)
             # dQ/dq_{n+1} = τ, dV/dq_{n+1} = 1/h
             z += timestep(int) * method(int).b[j] * F[j][k] * (quad_nodes[j])
