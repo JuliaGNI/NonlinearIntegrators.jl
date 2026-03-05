@@ -58,6 +58,8 @@ issymmetric(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = mi
 issymplectic(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
 
 default_solver(::NonLinear_OneLayer_GML) = NewtonMethod()
+# default_solver(::NonLinear_OneLayer_GML) = DogLeg()
+
 # default_iguess(::NonLinear_OneLayer_GML) = IntegratorExtrapolation()
 # default_iparams(::NonLinear_OneLayer_GML) = OGA1d()
 # default_iguess_integrator(::NonLinear_OneLayer_GML) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
@@ -668,7 +670,7 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
     # call nonlinear solver
     # solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
     t1 = time()
-    solve!(nlsolution(int),solver(int),  (sol, params, int))
+    solve!(nlsolution(int),solver(int), solverstate(int), (sol, params, int))
     t2 = time()
     cache(int).solving_time[1] = t2 - t1
     # print solver status
