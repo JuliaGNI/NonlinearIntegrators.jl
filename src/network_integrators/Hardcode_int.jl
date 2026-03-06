@@ -284,7 +284,7 @@ VNN_anstaz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_ansta
 function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams::OGA1d, sol)
     local S = nbasis(method(int))
     local D = ndims(int)
-    local quad_nodes = method(int).network_inputs # 假设是 1x(nstages+1) 的行向量
+    local quad_nodes = method(int).network_inputs # Assumed to be a 1x(nstages+1) row vector
     local NN = method(int).basis.NN
     local ps = cache(int).ps
     local network_labels = cache(int).network_labels' # (D x nstages+1)
@@ -294,36 +294,36 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
     local nstages = method(int).nstages
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
-    local q_start = sol.q # 起点 q_n
+    local q_start = sol.q # Starting point q_n
 
-    # 1. 准备积分权重和 Ansatz 因子
-    local t_vec = quad_nodes[:] # 转为向量
+    # 1. Prepare quadrature weights and Ansatz factors
+    local t_vec = quad_nodes[:] # Convert to vector
     local quad_weights = simpson_quadrature(nstages)
-    local t_factor = t_vec .* (1 .- t_vec) # 核心：Ansatz 中的 t(1-t)
+    local t_factor = t_vec .* (1 .- t_vec) # Core: t(1-t) in the Ansatz
 
-    # 2. 构造“带权”基函数字典 (Weighted Dictionary)
-    # 每一行代表一个基函数: g_i(t) = t(1-t) * σ(wt + b)
+    # 2. Construct "weighted" basis function dictionary (Weighted Dictionary)
+    # Each row represents a basis function: g_i(t) = t(1-t) * σ(wt + b)
     B = bias_interval[1]:(bias_interval[2]-bias_interval[1])/dict_amount:bias_interval[2]
-    # 允许正负权重以覆盖所有可能的非线性形状
+    # Allow positive and negative weights to cover all possible nonlinear shapes
     w_vals = [-1.0, 1.0]
     A_dict = hcat(repeat(w_vals, inner=length(B)), repeat(collect(B), outer=length(w_vals)))
     
     gx_quad = zeros(size(A_dict, 1), length(t_vec))
     for i in 1:size(A_dict, 1)
         w, b = A_dict[i, 1], A_dict[i, 2]
-        # 基础神经元输出再乘以 t(1-t)
+        # Base neuron output multiplied by t(1-t)
         gx_quad[i, :] = t_factor .* activation.(w .* t_vec .+ b)
     end
 
-    # 归一化字典，提高搜索稳定性
+    # Normalize dictionary to improve search stability
     dict_norms = sqrt.( (gx_quad .^ 2) * quad_weights )
     dict_norms[dict_norms .< 1e-12] .= 1.0
     gx_quad_normed = gx_quad ./ dict_norms
 
     for d in 1:D
-        # 3. 计算拟合目标：目标轨迹减去线性部分
-        # 因为 Ansatz 是 q_h = linear + t(1-t)NN，所以 NN 要拟合的部分是 (q_label - linear)
-        q_end_guess = network_labels[d, end] # 使用初值积分器给出的终点估计
+        # 3. Compute fitting target: reference trajectory minus linear part
+        # Since Ansatz is q_h = linear + t(1-t)NN, NN should fit the (q_label - linear) part
+        q_end_guess = network_labels[d, end] # Use the endpoint estimate from initial value integrator
         f_target = [network_labels[d, j] - ((1-t_vec[j])*q_start[d] + t_vec[j]*q_end_guess) for j in eachindex(t_vec)]
         
         f_res = copy(f_target)
@@ -333,11 +333,11 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
         selected_indices = Int[]
 
         for k = 1:S
-            # 4. 贪婪选择：寻找与当前残差方向最一致的神经元
+            # 4. Greedy selection: find the neuron most consistent with current residual direction
             projections = gx_quad_normed * (f_res .* quad_weights)
             
             for idx in selected_indices
-                projections[idx] = 0.0 # 避免重复选择
+                projections[idx] = 0.0 # Avoid reselection
             end
             
             best_idx = argmax(abs.(projections))
@@ -347,18 +347,18 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
             b1[k] = A_dict[best_idx, 2]
             selected_g[k, :] = gx_quad[best_idx, :]
 
-            # 5. 正交投影求解输出权重 W2
-            # 这里的 Phi 已经包含了 t(1-t) 因子
+            # 5. Orthogonal projection to solve output weights W2
+            # Phi already includes the t(1-t) factor
             Phi = selected_g[1:k, :]
             Gk = Phi * (Phi .* quad_weights')'
             rhs = Phi * (f_target .* quad_weights)
             
             W2_k = (Gk + 1e-12*I) \ rhs
 
-            # 更新残差
+            # Update residual
             f_res = f_target - (W2_k' * Phi)[:]
 
-            # 写入临时参数结构
+            # Write to temporary parameter structure
             ps[d][1].W[:] .= W1
             ps[d][1].b[:] .= b1
             ps[d][2].W[1:k] .= W2_k
