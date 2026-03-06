@@ -102,7 +102,7 @@ struct Hardcode_intCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
     network_labels::Matrix{ST}
 
     function Hardcode_intCache{ST,D,S,R,N}() where {ST,D,S,R,N}
-        x = zeros(ST, D * (1 + 3 * S)) # Last layer Weight S (no bias for now) + q + hidden layer W S/2 + hidden layer bias S/2
+        x = zeros(ST, D * (1 + 3 * S)) 
 
         q̄ = zeros(ST, D)
         p̄ = zeros(ST, D)
@@ -362,6 +362,10 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
             ps[d][1].W[:] .= W1
             ps[d][1].b[:] .= b1
             ps[d][2].W[1:k] .= W2_k
+
+            errs = sum(network_labels[d, :] - NN(reshape(t_vec, 1, :), ps[d])[1, :]) .^ 2
+            print("\n OGA error $errs after training ")
+
         end
         
         # show_status ? println("Finish OGA for dimension $d, residual MSE: $(sum(f_res.^2))") : nothing

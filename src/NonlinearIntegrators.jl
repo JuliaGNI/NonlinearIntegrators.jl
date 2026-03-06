@@ -20,7 +20,7 @@ module NonlinearIntegrators
     using Statistics
     using Base
     using StaticArrays
-    using SimpleSolvers:NewtonMethod, Options, NonlinearSolver,Newton,solve!
+    using SimpleSolvers:NewtonMethod, Options, NonlinearSolver,Newton,solve!,DogLeg
     import GeometricMachineLearning
     using SymbolicNeuralNetworks
     using AbstractNeuralNetworks

@@ -24,7 +24,7 @@ GeometricIntegratorsBase.default_options(method::NonLinear_OneLayer_GML) = (
     # f_abstol = f_abs * eps(),
     max_iterations = 10000,
     linesearch=GeometricIntegratorsBase.default_linesearch(method),
-    regularization_factor = 0.0, 
+    regularization_factor = 1e-5, 
 )
 # SimpleSolvers.Backtracking() # The default linear search method is Backtracking()
 # # GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic()
@@ -79,7 +79,7 @@ HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.
                     plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.sol.p[:, 1]), label="S$(S)R$(R)k$(k_relu)", ylims=(-0.6, 0.6))
                     plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
                     plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)k$(k_relu)", xaxis="time", yaxis="Relative Hamiltonian error")
-                    savefig(p, "NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xsuc$(x_suc)_T$(int_timespan)_Dogleg078.pdf")
+                    savefig(p, "NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xsuc$(x_suc)_T$(int_timespan)_Dogleg078_reg.pdf")
 
                     # save results
                     record_results[("HO_sol_q")] = collect(HO_NLOLsol.sol.q[:,1])
@@ -88,7 +88,7 @@ HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.
                     record_results[("HO_qerror")] = HO_qerror
                     record_results[("HO_hams_err")] = relative_hams_err
                     record_results[("HO_max_hams_err")] = maximum(relative_hams_err)
-                    save("NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xsuc$(x_suc)_T$(int_timespan)_Dogleg078.jld2",record_results)
+                    save("NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)fabs$(f_abs)xsuc$(x_suc)_T$(int_timespan)_Dogleg078_reg.jld2",record_results)
 
                     # # figure for q
                     # plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
