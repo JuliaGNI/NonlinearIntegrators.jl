@@ -8,33 +8,30 @@ using Plots
 using SimpleSolvers 
 using JLD2
 
-GeometricIntegrators.Integrators.default_linesearch(method::NonLinear_DenseNet_GML) =SimpleSolvers.Backtracking()
-# GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic2()
+# GeometricIntegrators.Integrators.default_linesearch(method::NonLinear_DenseNet_GML) =SimpleSolvers.Backtracking() #SimpleSolvers.Quadratic2()
 
 
-# f_suctol = 2eps()
-# f_abstol = 2eps()
-# max_iterations = 10000
-# h_step =1.0
+f_abstol = 2eps()
+x_suctol = 2eps()
+max_iterations = 10000
+int_step =0.2
+reg_factor = 0.0
 
-f_suctol = eval(Meta.parse(ARGS[4]))
-f_abstol = eval(Meta.parse(ARGS[3]))
-max_iterations = parse(Int,ARGS[2])
-h_step = parse(Float64,ARGS[1])
+# f_suctol = eval(Meta.parse(ARGS[4]))
+# f_abstol = eval(Meta.parse(ARGS[3]))
+# max_iterations = parse(Int,ARGS[2])
+# int_step = parse(Float64,ARGS[1])
 
 GeometricIntegrators.Integrators.default_options(method::NonLinear_DenseNet_GML) = (
-    # f_abstol = 8eps(),
-    # f_suctol = 2eps(),
-    # f_abstol = parse(Float64,eval(ARGS[4])),
-    f_suctol = f_suctol,
+    x_suctol = x_suctol,
     f_abstol = f_abstol,
     max_iterations = max_iterations,
     linesearch=GeometricIntegrators.Integrators.default_linesearch(method),
+    regularization_factor = reg_factor,
+
 )
 
-
 # Set up the Harmonic Oscillator problem
-int_step = h_step
 int_timespan = 100.0
 
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timespan = (0,int_timespan),timestep = int_step)
@@ -79,9 +76,9 @@ for R in [12,16,24]#
 
     # filename2 = @sprintf(
     #     "parallel_result_figures/Backtracking2_R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.pdf",
-        # R, h_step, max_iterations, f_abstol, f_suctol,TT)
+        # R, int_step, max_iterations, f_abstol, f_suctol,TT)
     # savefig(p,"result_figures/NVI_DenseS₁$(S₁)_S$(S)_fabs$(f_abstol)_fsuc$(f_suctol)_iter$(iterations)_h$(int_step)_timespan$(int_timespan)_tanh_harmonic_oscillator.png")
-    savefig(p,"parallel_result_figures/NVI_Densefabs$(f_abstol)_fsuc$(f_suctol)_iter$(max_iterations)_h$(h_step)_R$(R)tanh_harmonic_oscillator.pdf")
+    savefig(p,"parallel_result_figures/NVI_Densefabs$(f_abstol)_fsuc$(f_suctol)_iter$(max_iterations)_h$(int_step)_R$(R)tanh_harmonic_oscillator.pdf")
 
-    save("parallel_result_figures/NVI_Densefabs$(f_abstol)_fsuc$(f_suctol)_iter$(max_iterations)_h$(h_step)_R$(R)tanh_harmonic_oscillator.jld2",record_results)
+    save("parallel_result_figures/NVI_Densefabs$(f_abstol)_fsuc$(f_suctol)_iter$(max_iterations)_h$(int_step)_R$(R)tanh_harmonic_oscillator.jld2",record_results)
 end

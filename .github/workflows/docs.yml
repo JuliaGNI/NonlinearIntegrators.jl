@@ -1,22 +1,22 @@
-name: Documentation
+# name: Documentation
 
-on:
-  # push:
-  #   branches:
-  #     - zeyuan
+# on:
+#   # push:
+#   #   branches:
+#   #     - zeyuan
 
-jobs:
-  docs:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
+# jobs:
+#   docs:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
 
-      - name: Setup Julia
-        uses: julia-actions/setup-julia@latest
+#       - name: Setup Julia
+#         uses: julia-actions/setup-julia@latest
 
-      - name: Install docs dependencies
-        run: julia --project=docs -e 'using Pkg;Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate();Pkg.build();Pkg.precompile()'
+#       - name: Install docs dependencies
+#         run: julia --project=docs -e 'using Pkg;Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate();Pkg.build();Pkg.precompile()'
 
-      - name: Build docs
-        run: julia --project=docs docs/make.jl
+#       - name: Build docs
+#         run: julia --project=docs docs/make.jl
 
