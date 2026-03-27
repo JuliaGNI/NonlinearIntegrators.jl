@@ -6,7 +6,6 @@ struct NonLinear_DenseNet_GML{T, NNODES, basisType <: Basis{T},ET<:IntegratorExt
     c::SVector{NNODES,T}
 
     nstages::Int
-    show_status::Bool
     network_inputs::Matrix{T}
     training_epochs::Int
 
@@ -14,7 +13,7 @@ struct NonLinear_DenseNet_GML{T, NNODES, basisType <: Basis{T},ET<:IntegratorExt
     initial_guess_method::IPMT
 
     function NonLinear_DenseNet_GML(basis::Basis{T}, quadrature::QuadratureRule{T};
-        nstages::Int = 10,show_status::Bool=true,training_epochs::Int=50000,
+        nstages::Int = 10,training_epochs::Int=50000,
         initial_trajectory::ET=IntegratorExtrapolation(),
         initial_guess_method::IPMT=LSGD()) where {T, ET, IPMT}
         # get number of quadrature nodes and number of basis functions
@@ -25,7 +24,7 @@ struct NonLinear_DenseNet_GML{T, NNODES, basisType <: Basis{T},ET<:IntegratorExt
         quad_nodes = QuadratureRules.nodes(quadrature)
         network_inputs = reshape(collect(0:1/nstages:1),1,nstages+1)
 
-        new{T,NNODES, typeof(basis),ET,IPMT}(basis, quadrature, quad_weights, quad_nodes,nstages, show_status, network_inputs, training_epochs,
+        new{T,NNODES, typeof(basis),ET,IPMT}(basis, quadrature, quad_weights, quad_nodes,nstages, network_inputs, training_epochs,
             initial_trajectory, initial_guess_method)
     end
 end
@@ -43,7 +42,7 @@ issymmetric(::Union{NonLinear_DenseNet_GML, Type{<:NonLinear_DenseNet_GML}}) = m
 issymplectic(::Union{NonLinear_DenseNet_GML, Type{<:NonLinear_DenseNet_GML}}) = true
 
 
-default_solver(::NonLinear_DenseNet_GML) = Newton()
+default_solver(::NonLinear_DenseNet_GML) = NewtonMethod()
 # default_iguess(::NonLinear_DenseNet_GML) = HermiteExtrapolation()# HarmonicOscillator
 default_iguess(::NonLinear_DenseNet_GML) = MidpointExtrapolation()#CoupledHarmonicOscillator
 default_iguess_integrator(::NonLinear_DenseNet_GML) = ImplicitMidpoint()
@@ -146,20 +145,14 @@ end
 function GeometricIntegrators.Integrators.initial_guess!(sol, history, params,int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) 
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
-    local show_status = method(int).show_status 
     local initial_trajectory = method(int).initial_trajectory
     local initial_guess_method = method(int).initial_guess_method
 
     # choose initial guess method based on the value of h
     initial_trajectory!(sol, history, params, int, initial_trajectory)
     
-    if show_status
-        print("\n network inputs")
-        print(network_inputs)
-
-        print("\n network labels from initial guess methods")
-        print(network_labels)
-    end
+    @debug "network inputs " network_inputs
+    @debug "network labels from initial guess methods " network_labels    
 
     initial_params!(int, initial_guess_method)
 end
@@ -206,7 +199,6 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
     local S = int.method.basis.S
     local S₁ = int.method.basis.S₁
 
-    local show_status = method(int).show_status 
     local x = nlsolution(int)
     local NN = method(int).basis.NN
     local ps = cache(int).ps
@@ -216,11 +208,11 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
     local nepochs = method(int).training_epochs
     local backend = method(int).basis.backend
     local NP = method(int).basis.NP
+
+    Random.seed!(42)
+
     for k in 1:D
-        if show_status
-            print("\n network lables for dimension $k \n")
-            print(network_labels[:,k])
-        end
+        @debug "For dimension" k network_labels[:, k]
 
         labels = reshape(network_labels[:,k],1,nstages+1)
 
@@ -235,10 +227,10 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
             err = mse_loss(network_inputs,labels,PNN,PNN.params)[1]
 
             if err < 5e-8
-                show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
+                @debug "dimension $k,final loss: $err by $ep epochs"
                 break
             elseif ep == nepochs
-                show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
+                @debug "dimension $k,final loss: $err by $ep epochs"
             end
         end
 
@@ -253,14 +245,8 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
         end
     end
 
-
-    if show_status
-        print("\n network parameters \n")
-        print(ps)
-
-        print("\n initial guess x from network training \n")
-        print(x)
-    end
+    @debug "network parameters" ps
+    @debug "Initial guess from network training" x 
 
 end
 
@@ -269,7 +255,6 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
     local S = int.method.basis.S
     local S₁ = int.method.basis.S₁
 
-    local show_status = method(int).show_status 
     local x = nlsolution(int)
     local NN = method(int).basis.NN
     local ps = cache(int).ps
@@ -279,11 +264,10 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
     local nepochs = method(int).training_epochs
     local backend = method(int).basis.backend
     local NP = method(int).basis.NP
+
+    Random.seed!(42)
     for k in 1:D
-        if show_status
-            print("\n network lables for dimension $k \n")
-            print(network_labels[:,k])
-        end
+        @debug "network labels for dimension $k" network_labels[:,k]
 
         labels = reshape(network_labels[:,k],1,nstages+1)
 
@@ -306,11 +290,11 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
             tem_gs = (L1 = gs.L1, L2 = gs.L2)
             GeometricMachineLearning.optimization_step!(opt,λ, tem_ps, tem_gs)
             err = lsgd_loss(network_inputs,labels,NN,PNN.params)
-            if err < 5e-5
-                show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
+              if err < 5e-5
+                @debug "dimension $k,final loss: $err by $ep epochs"
                 break
             elseif ep == nepochs
-                show_status ? print("\n dimension $k,final loss: $err by $ep epochs") : nothing
+                @debug "dimension $k,final loss: $err by $ep epochs"
             end
         end
 
@@ -325,14 +309,8 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
         end
     end
 
-
-    if show_status
-        print("\n network parameters \n")
-        print(ps)
-
-        print("\n initial guess x from network training \n")
-        print(x)
-    end
+    @debug "network parameters" ps
+    @debug "Initial guess from network training" x 
 
 end
 
@@ -507,7 +485,7 @@ end
 function GeometricIntegrators.Integrators.integrate_step!(sol, history, params,int::GeometricIntegrator{<:NonLinear_DenseNet_GML, <:AbstractProblemIODE})
     # call nonlinear solver
     # solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
-    solve!(solver(int), nlsolution(int), (sol, params, int))
+    solve!(nlsolution(int),solver(int), solverstate(int), (sol, params, int))
 
     # print solver status
     # print_solver_status(int.solver.status, int.solver.params)
@@ -534,16 +512,12 @@ function stages_compute!(sol,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
     local S = int.method.basis.S
     local NN = method(int).basis.NN
     local ps = cache(int).ps
-    local show_status = method(int).show_status
     local S₁ = method(int).basis.S₁
     local NP = method(int).basis.NP
 
     network_inputs = reshape(collect(0:1/40:1),1,41)
 
-    if show_status
-        print("\n solution x after solving by Newton \n")
-        print(x)
-    end
+    @debug "solution x after solving by Newton" x
 
     for d in 1:D
         for i in 1:S₁
@@ -558,10 +532,8 @@ function stages_compute!(sol,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
         stage_values[:,d] = NN(network_inputs,ps[d])[:]
     end
 
-    if show_status
-        print("\n stages prediction after solving \n")
-        print(stage_values)
-    end
+    @debug "stages prediction after solving" stage_values
+    @debug "sol from this step q:", sol.q, "p:", sol.p
 
 end
 

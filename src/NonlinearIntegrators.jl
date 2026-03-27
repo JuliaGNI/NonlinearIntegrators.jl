@@ -33,7 +33,7 @@ module NonlinearIntegrators
     include("methods.jl")
     export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
     export IntegratorExtrapolation
-    export InitialParametersMethod, TrainingMethod, OGA1d
+    export InitialParametersMethod, TrainingMethod, OGA1d,LSGD
 
     include("network_integrators/utilities.jl")
 

@@ -6,7 +6,6 @@ struct NonLinear_OneLayer_GML{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Extrapolat
     c::SVector{NNODES,T}
 
     nstages::Int
-    show_status::Bool
     network_inputs::Matrix{T}
 
     initial_trajectory::ET
@@ -16,19 +15,13 @@ struct NonLinear_OneLayer_GML{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Extrapolat
     problem_initial_hamitltonian::Float64
     use_hamiltonian_loss::Bool
 
-    bias_interval::Vector{T}
+    bias_interval::SVector{2,T}
     dict_amount::Int
     function NonLinear_OneLayer_GML(basis::Basis{T}, quadrature::QuadratureRule{T};
-        nstages::Int=10, show_status::Bool=true, training_epochs::Int=50000, problem_initial_hamitltonian::Float64=0.0, use_hamiltonian_loss::Bool=true,
+        nstages::Int=10, training_epochs::Int=50000, problem_initial_hamitltonian::Float64=0.0, use_hamiltonian_loss::Bool=true,
         initial_trajectory::ET=IntegratorExtrapolation(),
         initial_guess_method::IPMT=OGA1d(),
         bias_interval=[-pi, pi], dict_amount=50000) where {T,ET,IPMT}
-        # get number of quadrature nodes and number of basis functions
-        # initial_trajectory_list = subtypes(Extrapolation)
-        # @assert initial_trajectory in initial_trajectory_list "initial_trajectory should be one of $(initial_trajectory_list)"
-
-        # initial_guess_methods_list = subtypes(InitialParametersMethod)
-        # @assert initial_guess_method in initial_guess_methods_list "initial_guess_methods should be one of $(initial_guess_methods_list)"
 
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = basis.S
@@ -38,7 +31,7 @@ struct NonLinear_OneLayer_GML{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Extrapolat
         quad_nodes = QuadratureRules.nodes(quadrature)
 
         network_inputs = reshape(collect(0:1/nstages:1), 1, nstages + 1)
-        new{T,NBASIS,NNODES,typeof(basis),ET,IPMT}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, initial_trajectory, initial_guess_method,
+        new{T,NBASIS,NNODES,typeof(basis),ET,IPMT}(basis, quadrature, quad_weights, quad_nodes, nstages, network_inputs, initial_trajectory, initial_guess_method,
             training_epochs, problem_initial_hamitltonian, use_hamiltonian_loss, bias_interval, dict_amount)
     end
 end
@@ -49,7 +42,6 @@ CompactBasisFunctions.nbasis(method::NonLinear_OneLayer_GML) = method.basis.S
 nnodes(method::NonLinear_OneLayer_GML) = QuadratureRules.nnodes(method.quadrature)
 activation(method::NonLinear_OneLayer_GML) = method.basis.activation
 nstages(method::NonLinear_OneLayer_GML) = method.nstages
-show_status(method::NonLinear_OneLayer_GML) = method.show_status
 training_epochs(method::NonLinear_OneLayer_GML) = method.training_epochs
 
 isexplicit(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = false
@@ -102,7 +94,6 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N,NEpochs} <: IODEIntegratorCache{ST
     dqdbr₁::Matrix{ST}
     dqdbr₀::Matrix{ST}
 
-    current_step::Vector{ST}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
@@ -151,7 +142,6 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N,NEpochs} <: IODEIntegratorCache{ST
         dqdbr₁ = zeros(ST, S, D)
         dqdbr₀ = zeros(ST, S, D)
 
-        current_step = zeros(ST, 1)
         stage_values = zeros(ST, 41, D)
         network_labels = zeros(ST, N + 1, D)
         training_errors = zeros(ST, D, NEpochs)
@@ -162,7 +152,7 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N,NEpochs} <: IODEIntegratorCache{ST
         integrating_time = zeros(ST, 1)
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a,
             dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
-            current_step, stage_values, network_labels,
+            stage_values, network_labels,
             training_errors, mse_err, abs_err, training_time, solving_time, integrating_time)
     end
 end
@@ -192,23 +182,14 @@ end
 function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML})
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
-    local show_status = method(int).show_status
-    local current_step = cache(int).current_step
     local initial_trajectory = method(int).initial_trajectory
     local initial_guess_method = method(int).initial_guess_method
 
-    show_status ? print("\n current time step: $current_step") : nothing
-    current_step[1] += 1
 
     initial_trajectory!(sol, history, params, int, initial_trajectory)
 
-    if show_status
-        print("\n network inputs \n")
-        print(network_inputs)
-
-        print("\n network labels from initial guess methods \n")
-        print(network_labels')
-    end
+    @debug "network inputs " network_inputs
+    @debug "network labels from initial guess methods " network_labels'    
 
     initial_params!(int, initial_guess_method)
 end
@@ -273,11 +254,10 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
     end
 end
 
-function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, InitialParams::TrainingMethod)
+function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initialParams::TrainingMethod)
     local D = ndims(int)
     local S = nbasis(method(int))
 
-    local show_status = method(int).show_status
     local x = nlsolution(int)
     local NN = method(int).basis.NN
     local ps = cache(int).ps
@@ -289,12 +269,11 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
     local mse_err = cache(int).mse_err
     local abs_err = cache(int).abs_err
     local training_time = cache(int).training_time
-    for k in 1:D
-        if show_status
-            print("\n network lables for dimension $k \n")
-            print(network_labels[:, k])
-        end
 
+    Random.seed!(42)
+
+    for k in 1:D
+        @debug "For dimension" k network_labels[:, k]
         labels = reshape(network_labels[:, k], 1, nstages + 1)
 
         PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
@@ -309,11 +288,11 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
         end
         t2 = time()
         training_time[k] = t2 - t1
-        show_status ? print("\n dimension $k,final loss: $(training_errors[k, end]) by $nepochs epochs") : nothing
-        println(sum(labels - NN(network_inputs, PNN.params)) .^ 2)
 
         mse_err[k] = training_errors[k, end]
         abs_err[k] = sum(labels - NN(network_inputs, PNN.params)) .^ 2
+        @debug "dimension" k "final loss:" mse_err[k] "in" nepochs "epochs"
+        @debug "Sum of squared errors for dimension" k ":" abs_err[k]
 
         for i in 1:S
             x[D*(i-1)+k] = PNN.params[2].W[i]
@@ -321,18 +300,11 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
             x[D*(S+1+S)+D*(i-1)+k] = PNN.params[1].b[i]
         end
     end
-
-    if show_status
-        print("\n network parameters \n")
-        print(PNN.params)
-        print("\n initial guess x from network training \n")
-        print(x)
-    end
-
+    @debug "Initial guess from network training" x 
 end
 
 
-function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, InitialParams::OGA1d)
+function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initialParams::OGA1d)
     local S = nbasis(method(int))
     local D = ndims(int)
     local quad_nodes = method(int).network_inputs
@@ -341,7 +313,6 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
     local network_labels = cache(int).network_labels'
     local activation = method(int).basis.activation
     local x = nlsolution(int)
-    local show_status = method(int).show_status
     local nstages = method(int).nstages
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
@@ -390,43 +361,10 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
             ps[d][1].b[:] .= Bias
             ps[d][2].W[1:k] .= xk
 
-            if show_status
-                @show ps[d][2].W[:]
-                @show ps[d][1].W[:]
-                @show ps[d][1].b[:]
-            end
-
-            # opt = Optimisers.Descent(0.00001)
-            # st_opt = Optimisers.setup(opt, ps[d])
-
-            # errs = sum(network_labels[d, :] - NN(quad_nodes, ps[d])') .^ 2
-            # show_status ? print("\n OGA error $errs before training \n ") : nothing
-            # @show ps[d]
-            # @show W
-            # @show Bias
-            # @show xk
-
-            # gs = Zygote.gradient(p -> sum(network_labels[d, :] - NN(quad_nodes, p)') .^ 2, ps[d])[1]
-            # gs[1].W[:] = Float64[x === nothing ? 0.0 : x for x in gs[1].W[:]]
-            # gs[1].b[:] = Float64[x === nothing ? 0.0 : x for x in gs[1].b[:]]
-
-            # st_opt, ps[d] = Optimisers.update(st_opt, ps[d], gs)
-
             errs = sum(network_labels[d, :] - NN(quad_nodes, ps[d])') .^ 2
-            show_status ? print("\n OGA error $errs after training ") : nothing
-            # println("\n OGA error $errs at k = $k for dimension $d ")
-            # W .= ps[d][1].W[:]
-            # Bias .= ps[d][1].b[:]
-            # xk .= ps[d][2].W[1:k]
-
-            # @show ps[d]
-            # @show W
-            # @show Bias
-            # @show xk
-
-
+            @debug "Sum of squared errors after adding neuron " k ":" errs
         end
-        show_status ? print("\n Finish OGA for dimension $d ") : nothing
+        @debug "Finish OGA for dimension" d 
 
     end
 
@@ -438,8 +376,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, Ini
         end
     end
     # st = st_tem[1]
-    show_status ? print("\n initial guess for DOF from OGA  ") : nothing
-    show_status ? print("\n ", x) : nothing
+    @debug "Initial guess for DOF from OGA " x
 
 end
 
@@ -591,7 +528,6 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     local dqdWr₀ = cache(int, ST).dqdWr₀
     local dqdbr₁ = cache(int, ST).dqdbr₁
     local dqdbr₀ = cache(int, ST).dqdbr₀
-    local show_status = method(int).show_status
     
     # compute b = - [(P-AF)], the residual in actual action, vatiation with respect to Q_{n,i}
     for i in 1:S
@@ -635,8 +571,8 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
             b[D*(S+1+S)+D*(i-1)+k] = (dqdbr₁[i, k] * p̃[k] - dqdbr₀[i, k] * p̄[k]) - z
         end
     end
-    show_status ? println(" Residual vector b: \n", b) : nothing
-    show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
+    # @debug " Residual vector b: " b
+    # @debug " Norm of Residual vector b: " norm(b)
     
 end
 
@@ -695,14 +631,10 @@ function stages_compute!(sol, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}
     local S = nbasis(method(int))
     local NN = method(int).basis.NN
     local ps = cache(int).ps
-    local show_status = method(int).show_status
 
     network_inputs = reshape(collect(0:1/40:1),1,41)
 
-    if show_status
-        print("\n solution x after solving by Newton \n")
-        print(x)
-    end
+    @debug "solution x after solving by Newton" x
 
     for k in 1:D
         for i in 1:S
@@ -711,22 +643,10 @@ function stages_compute!(sol, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}
             ps[k][1].b[i] = x[D*(S+1+S)+D*(i-1)+k]
         end
         stage_values[:, k] = NN(network_inputs, ps[k])[:]
-        if show_status
-            @show ps[k][2].W[:]
-            @show ps[k][1].W[:]
-            @show ps[k][1].b[:]
-        end
     end
 
-    if show_status
-        print("\n stages prediction after solving \n")
-        print(stage_values)
-        print("\n sol from this step \n")
-        print("q:", sol.q, "\n")
-        print("p:", sol.p, "\n")
-
-    end
-
+    @debug "stages prediction after solving" stage_values
+    @debug "sol from this step q:", sol.q, "p:", sol.p
 end
 
 
@@ -748,7 +668,7 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     solving_time_list = zeros(n₂ - n₁ + 1)
     # loop over time steps
     for n in n₁:n₂
-        println("Start integrate at time step n = $(n)")
+        @debug "Start integrate at time step: " n
         # integrate one step and copy solution from cache to solution
         t1 = time()
         sol[n] = integrate!(solstep, int)
