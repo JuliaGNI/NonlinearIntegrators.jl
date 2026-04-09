@@ -34,6 +34,7 @@ OLnetwork = OneLayerNetwork_GML{Float64}(relu,S)
 @info "Testing NonLinear_OneLayer_GML with OGA1d initial guess method"
 NLOLCGVNI_Gml_OGA = NonLinear_OneLayer_GML(OLnetwork, QGau,  bias_interval = [-pi,pi], dict_amount = 400000)
 HO_NLOLsol_OGA = integrate(HO_lode, NLOLCGVNI_Gml_OGA)
+
 @test relative_maximum_error(HO_NLOLsol_OGA.sol.q,HO_ref.q) < 1e-12
 
 @info "Testing NonLinear_OneLayer_GML with Training initial guess method"

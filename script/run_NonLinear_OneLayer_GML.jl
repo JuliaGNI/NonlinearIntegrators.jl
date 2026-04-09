@@ -45,42 +45,44 @@ for R in R_list
     Q = 2 * R
     QGau = QuadratureRules.GaussLegendreQuadrature(R)
     for S in S_list
-        for k_relu in k_list
+        # for k_relu in k_list
             try
                 # log_file="add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).txt"
-                # log_file="add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xsuc$(x_suc)tanh.txt"
+                # log_file="add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)tanh_reg_factor=$(reg_factor).txt"
 
                 # open(log_file, "w") do io
                 #     redirect_stdio(stdout=log_file, stderr=log_file) do
                         record_results = Dict()
 
                         relu = x->max(0.0,x) ^ k_relu
-                        OLnetwork = OneLayerNetwork_GML{Float64}(relu,S)
-                        NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
+                        OLnetwork = OneLayerNetwork_GML{Float64}(tanh,S)
+                        NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau, bias_interval = [-pi,pi], dict_amount = 400000)
                     
                         #HarmonicOscillator
-                        HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
-                        HO_qerror = relative_maximum_error(HO_NLOLsol.q,HO_ref.q)
-                        hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.q[:]), collect(HO_NLOLsol.p[:]))]
+                        HO_NLOLsol = integrate(HO_lode, NLOLCGVNI_Gml)
+                        HO_qerror = relative_maximum_error(HO_NLOLsol.sol.q,HO_ref.q)
+                        hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.sol.q[:]), collect(HO_NLOLsol.sol.p[:]))]
                         relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
 
                         ### Figures in the paper
                         p = plot(layout=@layout([a; b; c]), label="", size=(300, 300), plot_title="HarmonicOscillator,h = $(int_step)")
-                        plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...), label="S$(S)R$(R)k$(k_relu)", ylims=(-0.6, 0.6))
+                        plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(HO_NLOLsol.internal_values...)[2:end,:]...), label="S$(S)R$(R)tanh", ylims=(-0.6, 0.6))
                         plot!(p[1], int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Analytic Solution", xaxis="time", yaxis="q₁")
-                        plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.p[:, 1]), label="S$(S)R$(R)k$(k_relu)", ylims=(-0.6, 0.6))
+                        plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.sol.p[:, 1]), label="S$(S)R$(R)tanh", ylims=(-0.6, 0.6))
                         plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
-                        plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)k$(k_relu)", xaxis="time", yaxis="Relative Hamiltonian error")
-                        savefig(p, "add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).pdf")
+                        plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)tanh", xaxis="time", yaxis="Relative Hamiltonian error")
+                        savefig(p, "add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)tanh_reg_factor=$(reg_factor).pdf")
+                        # savefig(p, "add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).pdf")
+
 
                         # save results
-                        record_results[("HO_sol_q")] = collect(HO_NLOLsol.q[:,1])
-                        record_results[("HO_sol_p")] = collect(HO_NLOLsol.p[:,1])
-                        record_results[("HO_internal_sol")] = internal_values
+                        record_results[("HO_sol_q")] = collect(HO_NLOLsol.sol.q[:,1])
+                        record_results[("HO_sol_p")] = collect(HO_NLOLsol.sol.p[:,1])
+                        record_results[("HO_internal_sol")] = HO_NLOLsol.internal_values
                         record_results[("HO_qerror")] = HO_qerror
                         record_results[("HO_hams_err")] = relative_hams_err
                         record_results[("HO_max_hams_err")] = maximum(relative_hams_err)
-                        save("add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).jld2",record_results)
+                        save("add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)tanh_reg_factor=$(reg_factor).jld2",record_results)
                         # # figure for q
                         # plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
                         # plot!(int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Truth", linestyle=:dash, linecolor=:black)
@@ -89,10 +91,10 @@ for R in R_list
                 #     end
                 # end
             catch e
-                println("Error on Harmonic Oscillator, NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor)",e)
+                println("Error on Harmonic Oscillator, NVI_HO_h$(int_step)S$(S)R$(R)tanh_reg_factor=$(reg_factor)",e)
                 continue
             end
-        end
+        # end
     end
 end
 

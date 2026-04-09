@@ -17,7 +17,7 @@ run_configuration() {
     echo "Running Julia script with Step Size: $h, Regularization Factor: $reg_factor"
 
     # Run the Julia script in the background
-    julia --project=. test/test_NonLinear_OneLayer_GML.jl $h $reg_factor &
+    julia --project=. script/run_NonLinear_OneLayer_GML.jl $h $reg_factor &
     
     # julia --project=. test/test_Hardcode_int.jl $h $f_abs $x_suc &
 }

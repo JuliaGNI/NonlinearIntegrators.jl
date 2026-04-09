@@ -33,15 +33,6 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
-[compat]
-Colors = "0.13.1"
-ForwardDiff = "1.0.0"
-GeometricIntegratorsBase = "0.1.11"
-GeometricMachineLearning = "0.4.6"
-GeometricProblems = "0.6.17"
-Infiltrator = "1.9.7"
-SimpleSolvers = "0.7.8"
-
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 

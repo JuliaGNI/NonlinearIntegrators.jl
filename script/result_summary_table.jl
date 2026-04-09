@@ -11,6 +11,9 @@ f_abs_list = [2.0,8.0]
 x_abs_list = [2.0,8.0]
 λ_list = [0.0,1e-3,1e-5,1e-7]
 
+second_order_reference = h_list .^ 2
+third_order_reference = h_list .^ 3
+
 num_lines = length(S_list) * length(k_list)
 col = distinguishable_colors(num_lines,[RGB(1,1,1), RGB(0,0,0)], dropseed=true)
 line_colors = map(col -> (red(col), green(col), blue(col)), col)
@@ -42,11 +45,15 @@ begin
         end
     end
 
-    fig = Figure(size = (1500, 800))
+    tick_size = 22
+    label_size = 22
+    fig = Figure(size = (1100, 1600))
     ax = Axis(fig[1, 1], xlabel = "Time Step h", ylabel = "Maximum Hamiltonian Error", 
-        xscale = log10, yscale = log10, title = "Neural Variational Integrators" ,limits = (nothing, (1e-13, 1e3)))
-    ax2 = Axis(fig[1, 2], xlabel = "Time Step h", ylabel = "Minimum Error", 
-        xscale = log10, yscale = log10, title = "Neural Variational Integrators" ,limits = (nothing, (1e-13, 1e3)))
+        xscale = log10, yscale = log10 ,limits = (nothing, (1e-13, 1e3)),
+        yticklabelsize=tick_size, xticklabelsize=tick_size,xlabelsize=label_size, ylabelsize=label_size)
+    ax2 = Axis(fig[2, 1], xlabel = "Time Step h", ylabel = "Minimum Error", 
+        xscale = log10, yscale = log10, limits = (nothing, (1e-13, 1e3)),
+        yticklabelsize=tick_size, xticklabelsize=tick_size,xlabelsize=label_size, ylabelsize=label_size)
 
     global line_idx = 1
 
@@ -87,8 +94,18 @@ begin
             line_idx += 1
         end
     end
-    axislegend(ax, position=:rb)
-    axislegend(ax2, position=:rb)
+    axislegend(ax, position=:rb, labelsize=22)
+    axislegend(ax2, position=:rb,labelsize=22)
+
+    # ref2 = lines!(ax2, h_list, 1e-4 .* second_order_reference, color=:black, linestyle=:dash)
+    # ref3 = lines!(ax2, h_list, 1e-5 .* third_order_reference, color=:black, linestyle=:dot)
+
+    # Legend(
+    #     fig[3, 1],
+    #     [ref2, ref3],
+    #     ["second-order reference", "third-order reference"],
+    #     orientation = :horizontal,fontsize=label_size
+    # )
 
     save("add_lambda_in_solver077/HO_hamiltonian_error.pdf", fig)
 end
