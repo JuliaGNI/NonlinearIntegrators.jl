@@ -15,6 +15,7 @@ default_linesearch_071_gau/
 /*.jld2
 /*.pdf
 HC_int_072/
+HC_073_def/
 default_linesearch_072_lob/
 default_linesearch_073_gau/
 add_lambda_in_solver075/

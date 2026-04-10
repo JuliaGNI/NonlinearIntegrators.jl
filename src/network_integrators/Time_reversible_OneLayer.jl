@@ -255,58 +255,6 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
     end
 end
 
-function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, InitialParams::TrainingMethod)
-    local D = ndims(int)
-    local S = nbasis(method(int))
-
-    local show_status = method(int).show_status
-    local x = nlsolution(int)
-    local NN = method(int).basis.NN
-    local ps = cache(int).ps
-    local nstages = method(int).nstages
-    local network_inputs = method(int).network_inputs
-    local network_labels = cache(int).network_labels
-    local nepochs = method(int).training_epochs
-    local backend = method(int).basis.backend
-
-    for k in 1:D
-        if show_status
-            print("\n network lables for dimension $k \n")
-            print(network_labels[:, k])
-        end
-
-        labels = reshape(network_labels[:, k], 1, nstages + 1)
-
-        ps[k] = AbstractNeuralNetworks.initialparameters(NN, backend, Float64)
-
-        # opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
-        opt = GeometricMachineLearning.Optimizer(AdamOptimizerWithDecay(nepochs, 1e-3, 5e-5), ps[k])
-
-        err = 0
-        for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs, labels, NN, p)[1], ps[k])[1]
-            optimization_step!(opt, NN, ps[k], gs)
-            err = mse_loss(network_inputs, labels, NN, ps[k])[1]
-        end
-
-        show_status ? print("\n dimension $k,final loss: $err by $nepochs epochs") : nothing
-
-        for i in 1:S
-            x[D*(i-1)+k] = ps[k][2].W[i]
-            x[D*(S+1)+D*(i-1)+k] = ps[k][1].W[i]
-            x[D*(S+1+S)+D*(i-1)+k] = ps[k][1].b[i]
-        end
-    end
-
-    if show_status
-        print("\n network parameters \n")
-        print(ps)
-        print("\n initial guess x from network training \n")
-        print(x)
-    end
-
-end
-
 
 function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, InitialParams::OGA1d)
     local S = nbasis(method(int))
