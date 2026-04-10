@@ -6,12 +6,17 @@ using GeometricProblems.HarmonicOscillator
 using Test
 using Logging
 
-# enable all debug logs for this test file
-# ENV["JULIA_DEBUG"] = "all"
+GeometricIntegratorsBase.default_options(method::NonLinear_DenseNet_GML) = (
+    max_iterations = 10000,
+    regularization_factor = 1e-5,
+    linesearch=GeometricIntegratorsBase.default_linesearch(method), 
+    f_abstol = 2eps(),
+    x_suctol = 2eps()
+)
 
 #HarmonicOscillator Problem
-HO_lode = lodeproblem()
-HO_ref = exact_solution(podeproblem())
+HO_lode = lodeproblem(timestep = 0.5, timespan = (0.0, 100.0))
+HO_ref = exact_solution(podeproblem(timestep = 0.5, timespan = (0.0, 100.0)))
 
 # Define the network structure and the quadrature rule
 S₁ = 5
