@@ -16,7 +16,6 @@ using CompactBasisFunctions
 using Zygote
 using Random
 using Optimisers
-using Lux
 using Statistics
 using Base
 using StaticArrays
