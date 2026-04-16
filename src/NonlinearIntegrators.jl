@@ -27,6 +27,7 @@ using LinearAlgebra
 using BSplineKit
 using ForwardDiff
 using Infiltrator
+using Symbolics
 
 
 include("methods.jl")
@@ -75,18 +76,17 @@ export Time_reversible_OneLayer
 # include("network_integrators/NonLinear_OneLayer_VectorValue_GML.jl")
 # export NonLinear_OneLayer_VectorValue_Lux, NonLinear_OneLayer_VectorValue_GML
 
-# BSpline
-include("BSpline/BSplineBasis.jl")
-include("BSpline/CGVI_SplineBasis.jl")
-export BSplineDirichlet, CGVI_BSpline
+# # BSpline
+# include("BSpline/BSplineBasis.jl")
+# include("BSpline/CGVI_SplineBasis.jl")
+# export BSplineDirichlet, CGVI_BSpline
 
-# Nonlinear BSpline
-include("BSpline/NL_BSplineBasis.jl")
-include("BSpline/NL_Spline_CGVI.jl")
-export Nonlinear_BSpline_Basis, Nonlinear_BSpline_Integrator
+# # Nonlinear BSpline
+# include("BSpline/NL_BSplineBasis.jl")
+# include("BSpline/NL_Spline_CGVI.jl")
+# export Nonlinear_BSpline_Basis, Nonlinear_BSpline_Integrator
 
 # Sindy models
-using Symbolics
 include("SINDy_methods/PR_Int.jl")
 include("SINDy_methods/PR_basis.jl")
 export PR_Integrator, PR_Basis
