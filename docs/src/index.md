@@ -1,14 +1,16 @@
-```@meta
-CurrentModule = NonlinearIntegrators
-```
+
 
 # NonlinearIntegrators
 
-Documentation for [NonlinearIntegrators](https://github.com/JuliaGNI/NonlinearIntegrators.jl).
+<!-- *Julia Package aims to generalize Galerkin variational integrator with polynomial basis to nonlinear basis.* -->
 
-```@index
-```
+
+
 
 ```@autodocs
 Modules = [NonlinearIntegrators]
+```
+
+```@meta
+CurrentModule = NonlinearIntegrators
 ```
