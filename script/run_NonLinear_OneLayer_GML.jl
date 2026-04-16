@@ -64,15 +64,38 @@ for R in R_list
                         hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.sol.q[:]), collect(HO_NLOLsol.sol.p[:]))]
                         relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
 
-                        ### Figures in the paper
-                        p = plot(layout=@layout([a; b; c]), label="", size=(300, 300), plot_title="HarmonicOscillator,h = $(int_step)")
-                        plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(HO_NLOLsol.internal_values...)[2:end,:]...), label="S$(S)R$(R)tanh", ylims=(-0.6, 0.6))
-                        plot!(p[1], int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Analytic Solution", xaxis="time", yaxis="q₁")
-                        plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.sol.p[:, 1]), label="S$(S)R$(R)tanh", ylims=(-0.6, 0.6))
-                        plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
-                        plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)tanh", xaxis="time", yaxis="Relative Hamiltonian error")
-                        savefig(p, "add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)tanh_reg_factor=$(reg_factor).pdf")
-                        # savefig(p, "add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).pdf")
+                        fig = Figure(size = (1000, 650))
+                        # Label(fig[0, 1], "Step Size h = $h", fontsize = 28, tellwidth = false)
+                        
+                        sol_q = collect(HO_NLOLsol.sol.q[:, 1])
+                        total_length = length(sol_q)
+                        half_length = Int((length(sol_q) -1 ) ÷ 2)
+
+                        ax = Axis(fig[1, 1], xlabel="Time", ylabel = "q(t)",
+                        xticks = ([0,half_length,total_length], ["0","500","1000"]),yticklabelsize=tick_size, xticklabelsize=tick_size,xlabelsize=label_size, ylabelsize=label_size)
+                        lines!(ax, sol_q, )
+
+                        sol_p = collect(HO_NLOLsol.sol.p[:, 1])
+                        ax = Axis(fig[2, 1], xlabel="Time", ylabel = "p(t)",
+                        xticks = ([0,half_length,total_length], ["0","500","1000"]),yticklabelsize=tick_size, xticklabelsize=tick_size,xlabelsize=label_size, ylabelsize=label_size)
+                        lines!(ax, sol_p, )
+
+                        hams_err = relative_hams_err
+                        ax = Axis(fig[3, 1], xlabel="Time", ylabel = "Relative Hamiltonian Error",
+                        xticks = ([0,half_length,total_length], ["0","500","1000"]),yticklabelsize=tick_size, xticklabelsize=tick_size,xlabelsize=label_size, ylabelsize=label_size)
+                        lines!(ax, hams_err)
+                        save("add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)tanh_reg_factor=$(reg_factor).pdf", fig)
+
+
+                        # ### Figures in the paper
+                        # p = plot(layout=@layout([a; b; c]), label="", size=(300, 300), plot_title="HarmonicOscillator,h = $(int_step)")
+                        # plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(HO_NLOLsol.internal_values...)[2:end,:]...), label="S$(S)R$(R)tanh", ylims=(-0.6, 0.6))
+                        # plot!(p[1], int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Analytic Solution", xaxis="time", yaxis="q₁")
+                        # plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.sol.p[:, 1]), label="S$(S)R$(R)tanh", ylims=(-0.6, 0.6))
+                        # plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
+                        # plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)tanh", xaxis="time", yaxis="Relative Hamiltonian error")
+                        # savefig(p, "add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)tanh_reg_factor=$(reg_factor).pdf")
+                        # # savefig(p, "add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).pdf")
 
 
                         # save results
