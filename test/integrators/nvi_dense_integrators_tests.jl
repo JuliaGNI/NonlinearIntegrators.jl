@@ -15,14 +15,14 @@ GeometricIntegratorsBase.default_options(method::NonLinear_DenseNet_GML) = (
 )
 
 #HarmonicOscillator Problem
-HO_lode = lodeproblem(timestep = 0.5, timespan = (0.0, 100.0))
-HO_ref = exact_solution(podeproblem(timestep = 0.5, timespan = (0.0, 100.0)))
+int_step = 0.5
+HO_lode = lodeproblem(timestep = int_step, timespan = (0.0, 100.0))
+HO_ref = exact_solution(podeproblem(timestep = int_step, timespan = (0.0, 100.0)))
 
 # Define the network structure and the quadrature rule
 S₁ = 5
 S = 5
 Densenetwork = DenseNet_GML{Float64}(tanh,S₁,S)
-
 
 R = 8 
 QGau = QuadratureRules.GaussLegendreQuadrature(R)
@@ -40,3 +40,5 @@ HO_Dense_sol_LSGD,internal_values = integrate(HO_lode, NL_DenseGML_LSGD)
 
 @info "The following test is unstable and may fail due to the randomness in the training process. As a result, there is a Random.seed() inside the initial_params! function."
 @test relative_maximum_error(HO_Dense_sol_LSGD.q,HO_ref.q) < 1e-2
+
+
