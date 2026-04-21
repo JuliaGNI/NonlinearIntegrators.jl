@@ -24,3 +24,11 @@ GeometricIntegrators.jl and all of its dependencies can be installed via the Jul
 ```
 ]add NonlinearIntegrators.jl
 ```
+
+## Development
+
+We are using git hooks, e.g., to enforce that all tests pass before pushing.
+In order to activate these hooks, the following command must be executed once:
+```
+git config core.hooksPath .githooks
+```

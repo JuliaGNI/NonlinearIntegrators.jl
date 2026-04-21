@@ -76,14 +76,14 @@ export Time_reversible_OneLayer
 # export NonLinear_OneLayer_VectorValue_Lux, NonLinear_OneLayer_VectorValue_GML
 
 # BSpline
-include("BSpline/BSplineBasis.jl")
-include("BSpline/CGVI_SplineBasis.jl")
-export BSplineDirichlet, CGVI_BSpline
+# include("BSpline/BSplineBasis.jl")
+# include("BSpline/CGVI_SplineBasis.jl")
+# export BSplineDirichlet, CGVI_BSpline
 
 # Nonlinear BSpline
-include("BSpline/NL_BSplineBasis.jl")
-include("BSpline/NL_Spline_CGVI.jl")
-export Nonlinear_BSpline_Basis, Nonlinear_BSpline_Integrator
+# include("BSpline/NL_BSplineBasis.jl")
+# include("BSpline/NL_Spline_CGVI.jl")
+# export Nonlinear_BSpline_Basis, Nonlinear_BSpline_Integrator
 
 # Sindy models
 using Symbolics
