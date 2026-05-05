@@ -1,4 +1,4 @@
-struct PR_Integrator{T,NNODES,basisType <: Basis{T}} <: LODEMethod
+struct PR_Integrator{T,NNODES,basisType<:Basis{T}} <: LODEMethod
     basis::basisType
     quadrature
 
@@ -9,13 +9,13 @@ struct PR_Integrator{T,NNODES,basisType <: Basis{T}} <: LODEMethod
     nstages::Int
 
     function PR_Integrator(basis::Basis{T}, quadrature, init_w::Vector{Vector{T}};
-        nstages::Int=10) where T
+        nstages::Int=10) where {T}
         quad_weights = quadrature.weights
         quad_nodes = quadrature.nodes
         NNODES = QuadratureRules.nnodes(quadrature)
         new{T,NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, init_w, nstages)
     end
-end 
+end
 
 CompactBasisFunctions.basis(method::PR_Integrator) = method.basis
 quadrature(method::PR_Integrator) = method.quadrature
@@ -26,7 +26,7 @@ isimplicit(::Union{PR_Integrator,Type{<:PR_Integrator}}) = true
 issymmetric(::Union{PR_Integrator,Type{<:PR_Integrator}}) = missing
 issymplectic(::Union{PR_Integrator,Type{<:PR_Integrator}}) = missing
 
-default_solver(::PR_Integrator) = Newton()
+default_solver(::PR_Integrator) = NewtonMethod()
 nstages(method::PR_Integrator) = method.nstages
 default_iguess_integrator(::PR_Integrator) = ImplicitMidpoint()
 
@@ -62,7 +62,7 @@ struct PR_IntegratorCache{ST,D,R} <: IODEIntegratorCache{ST,D}
 
     function PR_IntegratorCache{ST,D,R}(W_sizes) where {ST,D,R}
         S = sum(W_sizes)
-        x = zeros(ST, sum(S) + D) 
+        x = zeros(ST, sum(S) + D)
         int_x = zeros(ST, S)
 
         q̄ = zeros(ST, D)
@@ -84,7 +84,7 @@ struct PR_IntegratorCache{ST,D,R} <: IODEIntegratorCache{ST,D}
 
         # dqdWc = zeros(ST, R, S, D)
         # dvdWc = zeros(ST, R, S, D)
-    
+
         # dqdWr₁ = zeros(ST, S, D)
         # dqdWr₀ = zeros(ST, S, D)
         # dvdWr₁ = zeros(ST, S, D)
@@ -103,7 +103,7 @@ struct PR_IntegratorCache{ST,D,R} <: IODEIntegratorCache{ST,D}
 
         stage_values = zeros(ST, 41, D)
 
-        new{ST,D,R}(x,int_x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, Q, P, V, F,dqdWc, dvdWc, dqdWr₁, dqdWr₀, dvdWr₁, dvdWr₀, tem_W,stage_values)
+        new{ST,D,R}(x, int_x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, Q, P, V, F, dqdWc, dvdWc, dqdWr₁, dqdWr₀, dvdWr₁, dvdWr₀, tem_W, stage_values)
     end
 end
 
@@ -130,7 +130,7 @@ function GeometricIntegrators.Integrators.internal_variables(method::PR_Integrat
     S = sum(method.basis.W_sizes)
 
     intermidiate_x = zeros(S)
-    (int_x = intermidiate_x,)
+    (int_x=intermidiate_x,)
 end
 
 function copy_internal_variables(solstep::SolutionStep, cache::PR_IntegratorCache)
@@ -152,7 +152,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
     if sol.t == h || LinearAlgebra.norm(cache(int).int_x .- vcat(method(int).init_w...)) > 1.0
         x[1:S] = vcat(method(int).init_w...)
     else
-        x[1:S] = cache(int).int_x 
+        x[1:S] = cache(int).int_x
     end
     println("current time: $(sol.t), initial guess x: $(x[1:S])")
 
@@ -198,9 +198,9 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     #         tem_W[k,i] = x[D*(i-1)+k]
     #     end
     # end
-    # copy x to X.    
+    # copy x to X.
     start_idx = 1
-    for (d,W_size) in enumerate(W_sizes)
+    for (d, W_size) in enumerate(W_sizes)
         tem_W[d][:] = x[start_idx:start_idx+W_size-1]
         start_idx += W_size
     end
@@ -321,7 +321,7 @@ function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector
 end
 
 
-function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:PR_Integrator, <:AbstractProblemIODE})
+function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:PR_Integrator,<:AbstractProblemIODE})
     # call nonlinear solver
     # solve!(nlsolution(int), (b,x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))+
     solve!(solver(int), nlsolution(int), (sol, params, int))
@@ -334,7 +334,7 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
 
     # compute final update
     GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
-    println("solution after solving,",nlsolution(int))
+    println("solution after solving,", nlsolution(int))
 
     stages_compute!(sol, int)
 end
@@ -348,10 +348,10 @@ function stages_compute!(sol, int::GeometricIntegrator{<:PR_Integrator})
     local tem_W = cache(int).tem_W
     local W_sizes = method(int).basis.W_sizes
 
-    network_inputs = reshape(collect(0:1/40:1),1,41)
+    network_inputs = reshape(collect(0:1/40:1), 1, 41)
 
     start_idx = 1
-    for (d,W_size) in enumerate(W_sizes)
+    for (d, W_size) in enumerate(W_sizes)
         tem_W[d][:] = x[start_idx:start_idx+W_size-1]
         start_idx += W_size
     end
@@ -363,14 +363,14 @@ function stages_compute!(sol, int::GeometricIntegrator{<:PR_Integrator})
     # end
     for d in 1:D
         for i in eachindex(network_inputs)
-            stage_values[i,d] = q_expr[d](tem_W[d][:], sol.t - timestep(int) + network_inputs[i] * timestep(int))
+            stage_values[i, d] = q_expr[d](tem_W[d][:], sol.t - timestep(int) + network_inputs[i] * timestep(int))
         end
     end
 
 end
 
 
-function create_quadrature_points_derivative_vector(ST::Type, R::Int, D::Int,W_sizes::Vector{Int})
+function create_quadrature_points_derivative_vector(ST::Type, R::Int, D::Int, W_sizes::Vector{Int})
     mat = []
     for d in 1:D
         push!(mat, zeros(ST, R, W_sizes[d]))
@@ -378,7 +378,7 @@ function create_quadrature_points_derivative_vector(ST::Type, R::Int, D::Int,W_s
     return mat
 end
 
-function create_boundary_derivative_vector(ST::Type, D::Int,W_sizes::Vector{Int})
+function create_boundary_derivative_vector(ST::Type, D::Int, W_sizes::Vector{Int})
     mat = []
     for d in 1:D
         push!(mat, zeros(ST, W_sizes[d]))
@@ -395,8 +395,8 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
 
     # copy initial condition from solution to solutionstep and initialize
     solstep = solutionstep(int, sol[n₁-1])
-    internal_values = Vector{Matrix}(undef,n₂ - n₁ + 1)
-    each_step_solution = Vector{Vector}(undef,n₂ - n₁ + 1)
+    internal_values = Vector{Matrix}(undef, n₂ - n₁ + 1)
+    each_step_solution = Vector{Vector}(undef, n₂ - n₁ + 1)
     # loop over time steps
     for n in n₁:n₂
         # integrate one step and copy solution from cache to solution
@@ -408,4 +408,3 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
 
     return sol, internal_values, each_step_solution
 end
-

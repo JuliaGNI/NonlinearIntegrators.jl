@@ -19,7 +19,7 @@ using Optimisers
 using Statistics
 using Base
 using StaticArrays
-using SimpleSolvers: NewtonMethod, Options, NonlinearSolver, Newton, solve!, DogLeg
+using SimpleSolvers: NewtonMethod, Options, NonlinearSolver, solve!, DogLeg
 import GeometricMachineLearning
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks
