@@ -59,7 +59,7 @@ Statistics = "1"
 SymbolicNeuralNetworks = "0.3"
 SymbolicUtils = "4"
 Symbolics = "7"
-Zygote = "0.6"
+Zygote = "0.6, 0.7"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
