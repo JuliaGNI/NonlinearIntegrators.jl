@@ -12,7 +12,7 @@
 #       - uses: actions/checkout@v3
 
 #       - name: Setup Julia
-#         uses: julia-actions/setup-julia@latest
+#         uses: julia-actions/setup-julia@v3
 
 #       - name: Install docs dependencies
 #         run: julia --project=docs -e 'using Pkg;Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate();Pkg.build();Pkg.precompile()'
