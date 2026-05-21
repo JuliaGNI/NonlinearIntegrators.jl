@@ -16,8 +16,8 @@ end
 
 function mse_loss(x,y::AbstractArray{T},NN,ps;λ=0.0,μ = 0.00001) where T
     y_pred = NN(x,ps)
-    mse_loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1] - y[1])
-    return mse_loss
+    loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1] - y[1])
+    return loss
 end
 
 function basis_first_order_central_difference(NN,ps,x;ϵ=0.00001)
@@ -55,8 +55,8 @@ end
 
 function vector_mse_loss(x,y,model, ps, st;λ=1000)
     y_pred, st = model(x, ps, st)
-    mse_loss = mean(abs2,y_pred - y) + λ*sum(abs2,y_pred[:,1]-y[:,1])
-    return mse_loss, ps,()
+    loss = mean(abs2,y_pred - y) + λ*sum(abs2,y_pred[:,1]-y[:,1])
+    return loss, ps,()
 end
 
 function vector_mse_energy_loss(x,y,model,ps,st,problem_module,params,initial_hamiltonian;λ=1000,ϵ = 0.00001,μ = 0.1)

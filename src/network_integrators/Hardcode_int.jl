@@ -199,6 +199,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ha
     local D = ndims(int)
     local S = nbasis(method(int))
     local x = nlsolution(int)
+    local network_inputs = method(int).network_inputs
 
     # TODO: here we should not initialise with the solution q but with the degree of freedom x,
     # obtained e.g. from an L2 projection of q onto the basis
@@ -368,8 +369,7 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
 
         end
         
-        # show_status ? println("Finish OGA for dimension $d, residual MSE: $(sum(f_res.^2))") : nothing
-        println("Finish OGA for dimension $d, residual MSE: $(sum(f_res).^2)")
+        println("Finish OGA for dimension $d, residual MSE: $(sum(f_res.^2))")
     end
 
 
