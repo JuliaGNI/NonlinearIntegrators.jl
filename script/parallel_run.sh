@@ -17,9 +17,9 @@ run_configuration() {
     echo "Running Julia script with Step Size: $h, Regularization Factor: $reg_factor"
 
     # Run the Julia script in the background
-    julia --project=. script/test_Time_Reversible_OneLayer.jl $h $reg_factor &
+    julia --project=script script/test_Time_Reversible_OneLayer.jl $h $reg_factor &
     
-    # julia --project=. test/test_Hardcode_int.jl $h $f_abs $x_suc &
+    # julia --project=script test/test_Hardcode_int.jl $h $f_abs $x_suc &
 }
 
 # Loop through the activations
@@ -41,8 +41,8 @@ done
 # for h in {0.1,0.2,0.5,1.0}; do # ,  
 #     for f_abs in {2.0,8.0}; do #
 #         for x_suc in {2.0,8.0}; do #
-#             run_with_limit julia --project=. test/test_NonLinear_OneLayer_GML.jl $h $f_abs $x_suc  &
-#         # run_with_limit julia --project=. test/test_Hardcode_int.jl $h $f_abs $x_suc
+#             run_with_limit julia --project=script test/test_NonLinear_OneLayer_GML.jl $h $f_abs $x_suc  &
+#         # run_with_limit julia --project=script test/test_Hardcode_int.jl $h $f_abs $x_suc
 #         done
 #     done
 # done
