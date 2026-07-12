@@ -26,11 +26,11 @@ isimplicit(::Union{PR_Integrator,Type{<:PR_Integrator}}) = true
 issymmetric(::Union{PR_Integrator,Type{<:PR_Integrator}}) = missing
 issymplectic(::Union{PR_Integrator,Type{<:PR_Integrator}}) = missing
 
-default_solver(::PR_Integrator) = NewtonMethod()
+default_solver(::PR_Integrator) = Newton()
 nstages(method::PR_Integrator) = method.nstages
 default_iguess_integrator(::PR_Integrator) = ImplicitMidpoint()
 
-struct PR_IntegratorCache{ST,D,R} <: IODEIntegratorCache{ST,D}
+struct PR_IntegratorCache{ST,R} <: IODEIntegratorCache{ST}
     x::Vector{ST}
     int_x::Vector{ST}
 
@@ -60,7 +60,8 @@ struct PR_IntegratorCache{ST,D,R} <: IODEIntegratorCache{ST,D}
 
     stage_values
 
-    function PR_IntegratorCache{ST,D,R}(W_sizes) where {ST,D,R}
+    function PR_IntegratorCache{ST,R}(W_sizes, ics) where {ST,R}
+        D = length(vec(ics.q))
         S = sum(W_sizes)
         x = zeros(ST, sum(S) + D)
         int_x = zeros(ST, S)
@@ -103,7 +104,7 @@ struct PR_IntegratorCache{ST,D,R} <: IODEIntegratorCache{ST,D}
 
         stage_values = zeros(ST, 41, D)
 
-        new{ST,D,R}(x, int_x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, Q, P, V, F, dqdWc, dvdWc, dqdWr₁, dqdWr₀, dvdWr₁, dvdWr₀, tem_W, stage_values)
+        new{ST,R}(x, int_x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, Q, P, V, F, dqdWc, dvdWc, dqdWr₁, dqdWr₀, dvdWr₁, dvdWr₀, tem_W, stage_values)
     end
 end
 
@@ -111,10 +112,10 @@ GeometricIntegrators.Integrators.nlsolution(cache::PR_IntegratorCache) = cache.x
 
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::PR_Integrator; kwargs...) where {ST}
-    PR_IntegratorCache{ST,ndims(problem),nnodes(method)}(method.basis.W_sizes; kwargs...)
+    PR_IntegratorCache{ST,nnodes(method)}(method.basis.W_sizes, initial_conditions(problem); kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::PR_Integrator) = PR_IntegratorCache{ST,ndims(problem),nnodes(method)}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::PR_Integrator) = PR_IntegratorCache{ST,nnodes(method)}
 
 @inline function Base.getindex(c::PR_IntegratorCache, ST::DataType)
     key = hash(Threads.threadid(), hash(ST))
@@ -144,7 +145,7 @@ end
 
 function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, int::GeometricIntegrator{<:PR_Integrator})
     local S = sum(method(int).basis.W_sizes)
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local x = nlsolution(int)
     local integrator = default_iguess_integrator(method(int))
     local h = timestep(int)
@@ -167,7 +168,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
 end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:PR_Integrator}) where {ST}
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = sum(method(int).basis.W_sizes)
     local W_sizes = method(int).basis.W_sizes
     local C = cache(int, ST)
@@ -251,7 +252,7 @@ end
 
 
 function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:PR_Integrator}) where {ST}
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = sum(method(int).basis.W_sizes)
     local W_sizes = method(int).basis.W_sizes
 
@@ -344,7 +345,7 @@ function stages_compute!(sol, int::GeometricIntegrator{<:PR_Integrator})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     local q_expr = method(int).basis.q_expr
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local tem_W = cache(int).tem_W
     local W_sizes = method(int).basis.W_sizes
 
@@ -400,7 +401,8 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     # loop over time steps
     for n in n₁:n₂
         # integrate one step and copy solution from cache to solution
-        sol[n] = integrate!(solstep, int)
+        integrate!(solstep, int)
+        copy!(sol, current(solstep), n)
 
         internal_values[n] = deepcopy(cache(int).stage_values)
         each_step_solution[n] = deepcopy(nlsolution(int))

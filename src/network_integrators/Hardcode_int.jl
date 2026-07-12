@@ -56,14 +56,14 @@ isimplicit(::Union{Hardcode_int,Type{<:Hardcode_int}}) = true
 issymmetric(::Union{Hardcode_int,Type{<:Hardcode_int}}) = missing
 issymplectic(::Union{Hardcode_int,Type{<:Hardcode_int}}) = missing
 
-default_solver(::Hardcode_int) = NewtonMethod()
+default_solver(::Hardcode_int) = Newton()
 default_iguess(::Hardcode_int) = IntegratorExtrapolation()#CoupledHarmonicOscillator
 default_iparams(::Hardcode_int) = OGA1d()
 # default_iguess_integrator(::Hardcode_int) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
 
 default_iguess_integrator(::Hardcode_int) = ImplicitMidpoint()
 
-struct Hardcode_intCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
+struct Hardcode_intCache{ST,S,R,N} <: IODEIntegratorCache{ST}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -101,7 +101,8 @@ struct Hardcode_intCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    function Hardcode_intCache{ST,D,S,R,N}() where {ST,D,S,R,N}
+    function Hardcode_intCache{ST,S,R,N}(ics) where {ST,S,R,N}
+        D = length(vec(ics.q))
         x = zeros(ST, D * (1 + 3 * S)) 
 
         q̄ = zeros(ST, D)
@@ -152,10 +153,10 @@ end
 GeometricIntegrators.Integrators.nlsolution(cache::Hardcode_intCache) = cache.x
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Hardcode_int; kwargs...) where {ST}
-    Hardcode_intCache{ST,ndims(problem),nbasis(method),nnodes(method),nstages(method)}(; kwargs...)
+    Hardcode_intCache{ST,nbasis(method),nnodes(method),nstages(method)}(initial_conditions(problem); kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Hardcode_int) = Hardcode_intCache{ST,ndims(problem),nbasis(method),nnodes(method),nstages(method)}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Hardcode_int) = Hardcode_intCache{ST,nbasis(method),nnodes(method),nstages(method)}
 
 @inline function Base.getindex(c::Hardcode_intCache, ST::DataType)
     key = hash(Threads.threadid(), hash(ST))
@@ -196,7 +197,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
 end
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int}, initial_trajectory::HermiteExtrapolation)
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
 
@@ -237,7 +238,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ha
     local integrator = default_iguess_integrator(method(int))
     local h = int.problem.timestep
     local nstages = method(int).nstages
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local problem = int.problem
     local S = nbasis(method(int))
     local x = nlsolution(int)
@@ -283,7 +284,7 @@ VNN_anstaz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_ansta
 
 function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams::OGA1d, sol)
     local S = nbasis(method(int))
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local quad_nodes = method(int).network_inputs # Assumed to be a 1x(nstages+1) row vector
     local NN = method(int).basis.NN
     local ps = cache(int).ps
@@ -390,7 +391,7 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
 end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Hardcode_int}) where {ST}
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local C = cache(int, ST)
 
@@ -500,7 +501,7 @@ end
 
 
 function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:Hardcode_int}) where {ST}
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q
     local p̄ = sol.p
@@ -582,7 +583,7 @@ end
 
 
 function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:Hardcode_int}, DT)
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
     local P = cache(int).P
     local F = cache(int).F
@@ -632,7 +633,7 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Hardcode_int})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     # local network_inputs = method(int).network_inputs
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local NN = method(int).basis.NN
     local ps = cache(int).ps
@@ -696,7 +697,8 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     for n in n₁:n₂
         println("Start integrate at time step n = $(n)")
         # integrate one step and copy solution from cache to solution
-        sol[n] = integrate!(solstep, int)
+        integrate!(solstep, int)
+        copy!(sol, current(solstep), n)
 
         havenan = false
         for s in current(solstep)

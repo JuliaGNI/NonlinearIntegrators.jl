@@ -5,7 +5,7 @@ using GeometricIntegrators.Integrators: create_internal_stage_vector
 using GeometricIntegratorsBase
 import GeometricIntegratorsBase: default_solver, default_options, initsolver, CacheDict, Cache, cache, CacheType, solutionstep, reset!, default_iguess, iguess
 import GeometricIntegratorsBase: problem, method, parameters, SolverMethod, history, solver, residual!, copy_internal_variables!, internal, current, update!, solverstate
-import GeometricIntegratorsBase: _state, _vectorfield, compute_vectorfields!, _extrapolate!, internal_variables, nlsolution, integrate!, IODEIntegratorCache, LODEMethod
+import GeometricIntegratorsBase: compute_vectorfields!, _extrapolate!, internal_variables, nlsolution, integrate!, IODEIntegratorCache, LODEMethod
 import GeometricBase: datatype, timetype, ntime
 import GeometricBase: initialtime, finaltime, timespan, timestep, periodicity, NullPeriodicity
 using GeometricSolutions: relative_maximum_error
@@ -19,7 +19,7 @@ using Optimisers
 using Statistics
 using Base
 using StaticArrays
-using SimpleSolvers: NewtonMethod, Options, NonlinearSolver, solve!, DogLeg
+using SimpleSolvers: Newton, Options, NonlinearSolver, solve!, DogLeg
 import GeometricMachineLearning
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks

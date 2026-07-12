@@ -27,7 +27,7 @@ GeometricIntegratorsBase.default_options(method::NonLinear_OneLayer_GML) = (
 # # GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic()
 # SimpleSolvers.Bisection()
 # SimpleSolvers.Static()
-# default_solver(::NonLinear_OneLayer_GML) = NewtonMethod()
+# default_solver(::NonLinear_OneLayer_GML) = Newton()
 
 R_list = [8,16,4]#
 S_list = [4,6,8]# 

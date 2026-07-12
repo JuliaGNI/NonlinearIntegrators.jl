@@ -49,7 +49,7 @@ isimplicit(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = tru
 issymmetric(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
 issymplectic(::Union{NonLinear_OneLayer_GML,Type{<:NonLinear_OneLayer_GML}}) = missing
 
-default_solver(::NonLinear_OneLayer_GML) = NewtonMethod()
+default_solver(::NonLinear_OneLayer_GML) = Newton()
 # default_solver(::NonLinear_OneLayer_GML) = DogLeg()
 
 # default_iguess(::NonLinear_OneLayer_GML) = IntegratorExtrapolation()
@@ -58,7 +58,7 @@ default_solver(::NonLinear_OneLayer_GML) = NewtonMethod()
 
 default_iguess_integrator(::NonLinear_OneLayer_GML) = ImplicitMidpoint()
 
-struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N,NEpochs} <: IODEIntegratorCache{ST,D}
+struct NonLinear_OneLayer_GMLCache{ST,S,R,N,NEpochs} <: IODEIntegratorCache{ST}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -104,7 +104,8 @@ struct NonLinear_OneLayer_GMLCache{ST,D,S,R,N,NEpochs} <: IODEIntegratorCache{ST
     solving_time::Vector{ST}
     integrating_time::Vector{ST}
     
-    function NonLinear_OneLayer_GMLCache{ST,D,S,R,N,NEpochs}() where {ST,D,S,R,N,NEpochs}
+    function NonLinear_OneLayer_GMLCache{ST,S,R,N,NEpochs}(ics) where {ST,S,R,N,NEpochs}
+        D = length(vec(ics.q))
         x = zeros(ST, D * (S + 1 + 2 * S)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
 
         q̄ = zeros(ST, D)
@@ -160,10 +161,10 @@ end
 GeometricIntegrators.Integrators.nlsolution(cache::NonLinear_OneLayer_GMLCache) = cache.x
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML; kwargs...) where {ST}
-    NonLinear_OneLayer_GMLCache{ST,ndims(problem),nbasis(method),nnodes(method),nstages(method),method.training_epochs}(; kwargs...)
+    NonLinear_OneLayer_GMLCache{ST,nbasis(method),nnodes(method),nstages(method),method.training_epochs}(initial_conditions(problem); kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML) = NonLinear_OneLayer_GMLCache{ST,ndims(problem),nbasis(method),nnodes(method),nstages(method),method.training_epochs}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML) = NonLinear_OneLayer_GMLCache{ST,nbasis(method),nnodes(method),nstages(method),method.training_epochs}
 
 @inline function Base.getindex(c::NonLinear_OneLayer_GMLCache, ST::DataType)
     key = hash(Threads.threadid(), hash(ST))
@@ -195,7 +196,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
 end
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initial_trajectory::GeometricIntegratorsBase.HermiteExtrapolation)
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
     local network_inputs = method(int).network_inputs
@@ -238,7 +239,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
     local integrator = default_iguess_integrator(method(int))
     local h = int.problem.timestep
     local nstages = method(int).nstages
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local problem = int.problem
     local S = nbasis(method(int))
     local x = nlsolution(int)
@@ -255,7 +256,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
 end
 
 function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initialParams::TrainingMethod)
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
 
     local x = nlsolution(int)
@@ -306,7 +307,7 @@ end
 
 function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initialParams::OGA1d)
     local S = nbasis(method(int))
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local quad_nodes = method(int).network_inputs
     local NN = method(int).basis.NN
     local ps = cache(int).ps
@@ -381,7 +382,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
 end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local C = cache(int, ST)
 
@@ -506,7 +507,7 @@ end
 
 
 function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q
     local p̄ = sol.p
@@ -627,7 +628,7 @@ function stages_compute!(sol, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     # local network_inputs = method(int).network_inputs
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local NN = method(int).basis.NN
     local ps = cache(int).ps
@@ -671,7 +672,8 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
         @debug "Start integrate at time step: " n
         # integrate one step and copy solution from cache to solution
         t1 = time()
-        sol[n] = integrate!(solstep, int)
+        integrate!(solstep, int)
+        copy!(sol, current(solstep), n)
         t2 = time()
         cache(int).integrating_time[1] = t2 - t1
 
