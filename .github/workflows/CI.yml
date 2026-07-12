@@ -58,6 +58,8 @@ jobs:
                   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
               with:
                   files: lcov.info
+            - name: Instantiate docs environment
+              run: julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
             - name: Run doctests
               shell: julia --project=docs --color=yes {0}
               run: |

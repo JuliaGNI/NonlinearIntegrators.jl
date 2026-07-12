@@ -56,14 +56,14 @@ isimplicit(::Union{Time_Reversible_Hardcode,Type{<:Time_Reversible_Hardcode}}) =
 issymmetric(::Union{Time_Reversible_Hardcode,Type{<:Time_Reversible_Hardcode}}) = missing
 issymplectic(::Union{Time_Reversible_Hardcode,Type{<:Time_Reversible_Hardcode}}) = missing
 
-default_solver(::Time_Reversible_Hardcode) = NewtonMethod()
+default_solver(::Time_Reversible_Hardcode) = Newton()
 default_iguess(::Time_Reversible_Hardcode) = IntegratorExtrapolation()#CoupledHarmonicOscillator
 default_iparams(::Time_Reversible_Hardcode) = OGA1d()
 # default_iguess_integrator(::Time_Reversible_Hardcode) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
 
 default_iguess_integrator(::Time_Reversible_Hardcode) = ImplicitMidpoint()
 
-struct Time_Reversible_HardcodeCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
+struct Time_Reversible_HardcodeCache{ST,S,R,N} <: IODEIntegratorCache{ST}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -101,7 +101,8 @@ struct Time_Reversible_HardcodeCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    function Time_Reversible_HardcodeCache{ST,D,S,R,N}() where {ST,D,S,R,N}
+    function Time_Reversible_HardcodeCache{ST,S,R,N}(ics) where {ST,S,R,N}
+        D = length(vec(ics.q))
         x = zeros(ST, D * (1 + 2 * S)) # Last layer Weight S (no bias for now) + q + hidden layer W S/2 + hidden layer bias S/2
 
         q̄ = zeros(ST, D)
@@ -152,10 +153,10 @@ end
 GeometricIntegrators.Integrators.nlsolution(cache::Time_Reversible_HardcodeCache) = cache.x
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Time_Reversible_Hardcode; kwargs...) where {ST}
-    Time_Reversible_HardcodeCache{ST,ndims(problem),nbasis(method),nnodes(method),nstages(method)}(; kwargs...)
+    Time_Reversible_HardcodeCache{ST,nbasis(method),nnodes(method),nstages(method)}(initial_conditions(problem); kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_Reversible_Hardcode) = Time_Reversible_HardcodeCache{ST,ndims(problem),nbasis(method),nnodes(method),nstages(method)}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_Reversible_Hardcode) = Time_Reversible_HardcodeCache{ST,nbasis(method),nnodes(method),nstages(method)}
 
 @inline function Base.getindex(c::Time_Reversible_HardcodeCache, ST::DataType)
     key = hash(Threads.threadid(), hash(ST))
@@ -196,7 +197,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
 end
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}, initial_trajectory::HermiteExtrapolation)
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
 
@@ -237,7 +238,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
     local integrator = default_iguess_integrator(method(int))
     local h = int.problem.timestep
     local nstages = method(int).nstages
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local problem = int.problem
     local S = nbasis(method(int))
     local x = nlsolution(int)
@@ -282,7 +283,7 @@ end
 
 function initial_params!(int::GeometricIntegrator{<:Time_Reversible_Hardcode}, InitialParams::OGA1d, sol)
     local S = nbasis(method(int))
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local quad_nodes = method(int).network_inputs # 0:0.1:1 (1x11)
     local NN = method(int).basis.NN
     local ps = cache(int).ps
@@ -405,7 +406,7 @@ function initial_params!(int::GeometricIntegrator{<:Time_Reversible_Hardcode}, I
 end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}) where {ST}
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local C = cache(int, ST)
 
@@ -519,7 +520,7 @@ end
 
 
 function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}) where {ST}
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q
     local p̄ = sol.p
@@ -600,7 +601,7 @@ end
 
 
 function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}, DT)
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
     local P = cache(int).P
     local F = cache(int).F
@@ -650,7 +651,7 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Time_Reversible_Hardcod
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     # local network_inputs = method(int).network_inputs
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local NN = method(int).basis.NN
     local ps = cache(int).ps
@@ -718,7 +719,8 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     for n in n₁:n₂
         println("Start integrate at time step n = $(n)")
         # integrate one step and copy solution from cache to solution
-        sol[n] = integrate!(solstep, int)
+        integrate!(solstep, int)
+        copy!(sol, current(solstep), n)
 
         havenan = false
         for s in current(solstep)

@@ -44,7 +44,7 @@ Documenter = "1.17.0"
 ForwardDiff = "1"
 GeometricBase = "0.14"
 GeometricIntegrators = "0.16"
-GeometricIntegratorsBase = "0.2"
+GeometricIntegratorsBase = "0.2, 0.3"
 GeometricMachineLearning = "0.4"
 GeometricProblems = "0.6"
 GeometricSolutions = "0.6"
@@ -55,7 +55,7 @@ Optimisers = "0.4"
 Plots = "1"
 QuadratureRules = "0.1"
 Random = "1"
-SimpleSolvers = "0.8"
+SimpleSolvers = "0.9"
 StaticArrays = "1"
 Statistics = "1"
 SymbolicNeuralNetworks = "0.3"
@@ -64,7 +64,8 @@ Symbolics = "7"
 Zygote = "0.6"
 
 [extras]
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Logging", "Test"]

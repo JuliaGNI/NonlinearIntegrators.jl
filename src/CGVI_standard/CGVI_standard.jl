@@ -66,7 +66,7 @@ issymplectic(::Union{CGVI_standard,Type{<:CGVI_standard}}) = true
 
 isiodemethod(::Union{CGVI_standard,Type{<:CGVI_standard}}) = true
 
-default_solver(::CGVI_standard) = NewtonMethod()
+default_solver(::CGVI_standard) = Newton()
 default_iguess(::CGVI_standard) = HermiteExtrapolation()
 
 function Base.show(io::IO, method::CGVI_standard)
@@ -85,7 +85,7 @@ function Base.show(io::IO, method::CGVI_standard)
 end
 
 
-struct CGVI_standardCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
+struct CGVI_standardCache{ST,S,R} <: IODEIntegratorCache{ST}
     x::Vector{ST}
 
     q̃::Vector{ST}
@@ -101,7 +101,8 @@ struct CGVI_standardCache{ST,D,S,R} <: IODEIntegratorCache{ST,D}
     F::Vector{Vector{ST}}
 
 
-    function CGVI_standardCache{ST,D,S,R}() where {ST,D,S,R}
+    function CGVI_standardCache{ST,S,R}(ics) where {ST,S,R}
+        D = length(vec(ics.q))
         x = zeros(ST, D * (S-1))
 
         # create temporary vectors
@@ -125,15 +126,15 @@ end
 GeometricIntegrators.Integrators.nlsolution(cache::CGVI_standardCache) = cache.x
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::CGVI_standard; kwargs...) where {ST}
-    CGVI_standardCache{ST,ndims(problem),nbasis(method),nnodes(method)}(; kwargs...)
+    CGVI_standardCache{ST,nbasis(method),nnodes(method)}(initial_conditions(problem); kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::CGVI_standard) = CGVI_standardCache{ST,ndims(problem),nbasis(method),nnodes(method)}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::CGVI_standard) = CGVI_standardCache{ST,nbasis(method),nnodes(method)}
 
 
 function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, int::GeometricIntegrator{<:CGVI_standard})
     # set some local variables for convenience
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
 
@@ -160,7 +161,7 @@ end
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_standard}) where {ST}
     # set some local variables for convenience and clarity
     local C = cache(int, ST)
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q    
 
@@ -209,7 +210,7 @@ end
 function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_standard}) where {ST}
     # set some local variables for convenience and clarity
     local C = cache(int, ST)
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local p̄ = sol.p
 
@@ -251,7 +252,7 @@ end
 
 function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:CGVI_standard}, DT)
    local C = cache(int, DT)
-    local D = ndims(int)
+    local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local h = timestep(int)
 
