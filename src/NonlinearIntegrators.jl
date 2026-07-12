@@ -10,7 +10,6 @@ import GeometricBase: datatype, timetype, ntime
 import GeometricBase: initialtime, finaltime, timespan, timestep, periodicity, NullPeriodicity
 using GeometricSolutions: relative_maximum_error
 
-using NonlinearIntegrators
 using QuadratureRules
 using CompactBasisFunctions
 using Zygote

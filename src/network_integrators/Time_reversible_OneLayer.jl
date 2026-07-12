@@ -202,6 +202,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
+    local network_inputs = method(int).network_inputs
 
     # TODO: here we should not initialise with the solution q but with the degree of freedom x,
     # obtained e.g. from an L2 projection of q onto the basis
@@ -287,7 +288,7 @@ function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, I
         C = zeros(S, nstages + 1)
         f_weight = network_labels[d, :] .* quad_weights
 
-        for k = 1:S/2
+        for k = 1:S÷2
             #     The subproblem is key to the greedy algorithm, where the
             #     inner products |(u,g) - (f,g)| should be maximized.
             #     Part of the inner products can be computed in advance.

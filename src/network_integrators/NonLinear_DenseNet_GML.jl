@@ -115,7 +115,7 @@ struct NonLinear_DenseNet_GMLCache{ST,S₁,S,NP,R,N} <: IODEIntegratorCache{ST}
         stage_values = zeros(ST, 41, D)
         network_labels = zeros(ST, N+1, D)
 
-        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, q0, X, Q, P, V, F, ps, 
+        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, q0, X, Q, P, V, F, ps,
         g0_params, g1_params, dqdθc, dvdθc,
         stage_values,network_labels)
     end
@@ -143,7 +143,7 @@ end
     end::CacheType(ST, c.problem, c.method)
 end
 
-function GeometricIntegrators.Integrators.initial_guess!(sol, history, params,int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) 
+function GeometricIntegrators.Integrators.initial_guess!(sol, history, params,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local initial_trajectory = method(int).initial_trajectory
@@ -151,9 +151,9 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params,in
 
     # choose initial guess method based on the value of h
     initial_trajectory!(sol, history, params, int, initial_trajectory)
-    
+
     @debug "network inputs " network_inputs
-    @debug "network labels from initial guess methods " network_labels    
+    @debug "network labels from initial guess methods " network_labels
 
     initial_params!(int, initial_guess_method)
 end
@@ -193,7 +193,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
         cache(int).p̃[k] = tem_sol.p[:, k][end]
         x[D*NP+k] = cache(int).p̃[k]
     end
-end 
+end
 
 function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, InitialParams::TrainingMethod)
     local D = length(cache(int).q̃)
@@ -223,9 +223,9 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
         err = 0
         λ = GeometricMachineLearning.GlobalSection(PNN.params)
         for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs,labels,PNN,p)[1],PNN.params)[1]
+            gs = Zygote.gradient(p -> mse_loss(network_inputs,labels,PNN,p),PNN.params)[1]
             GeometricMachineLearning.optimization_step!(opt,λ, PNN.params, gs)
-            err = mse_loss(network_inputs,labels,PNN,PNN.params)[1]
+            err = mse_loss(network_inputs,labels,PNN,PNN.params)
 
             if err < 5e-8
                 @debug "dimension $k,final loss: $err by $ep epochs"
@@ -247,7 +247,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
     end
 
     @debug "network parameters" ps
-    @debug "Initial guess from network training" x 
+    @debug "Initial guess from network training" x
 
 end
 
@@ -311,7 +311,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
     end
 
     @debug "network parameters" ps
-    @debug "Initial guess from network training" x 
+    @debug "Initial guess from network training" x
 
 end
 
@@ -345,7 +345,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     local DQDθ = method(int).basis.dqdθ
     local V_func = method(int).basis.V_func
 
-    # copy x to X and bias 
+    # copy x to X and bias
     for i in 1:S
         for d in 1:D
             C.X[i][d] = x[D*(i-1)+d]
@@ -369,7 +369,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
             ps[d].L3.W[1, :] = x[(d-1)*NP+2*S₁+S*S₁+S+1:(d-1)*NP+2*S₁+S*S₁+S+S]
         end
     end
-    
+
     # compute coefficients
     for d in 1:D
         # intermidiate_ps = (L1 = ps[d].L1, L2 = ps[d].L2)
@@ -385,7 +385,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
         for j in eachindex(quad_nodes)
             g = DQDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
             dqdθc[j, :, d] = flatten_params(g)
-            
+
             gv = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))[1,1]
             dvdθc[j, :, d] = flatten_params(gv)
         end
@@ -409,7 +409,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 
     # compute V volicity at quadrature points
     for i in eachindex(V)
-        for d in eachindex(V[i])            
+        for d in eachindex(V[i])
             V[i][d] = V_func([quad_nodes[i]],NeuralNetworkParameters(ps[d]))[1] / timestep(int)
         end
     end
@@ -440,7 +440,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST},sol, params, i
     local dqdθc = cache(int, ST).dqdθc
     local dvdθc = cache(int, ST).dvdθc
     local NP = method(int).basis.NP
-    local q0 = cache(int, ST).q0 
+    local q0 = cache(int, ST).q0
 
     # compute b = - [(P-AF)]
     for k in 1:D
@@ -448,7 +448,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST},sol, params, i
             z = zero(ST)
             for j in 1:R
                 z += method(int).b[j] * F[j][k] * dqdθc[j,i,k] * timestep(int)
-                z += method(int).b[j] * P[j][k] * dvdθc[j,i,k] 
+                z += method(int).b[j] * P[j][k] * dvdθc[j,i,k]
             end
             b[(k-1)*NP+i] = (g1_params[i,k] * p̃[k] - g0_params[i,k] * p̄[k]) - z
         end
@@ -501,7 +501,7 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params,i
     stages_compute!(sol, int)
 
     #check for NaNs
-    # if sum(isnan.(cache(int).q̃[:])) > 0 
+    # if sum(isnan.(cache(int).q̃[:])) > 0
     #     error("NaN value encountered, terminating program.")
     # end
 end

@@ -283,9 +283,9 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
         λ = GeometricMachineLearning.GlobalSection(PNN.params)
         t1 = time()
         for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs, labels, NN, p)[1], PNN.params)[1]
+            gs = Zygote.gradient(p -> mse_loss(network_inputs, labels, NN, p), PNN.params)[1]
             GeometricMachineLearning.optimization_step!(opt, λ, PNN.params, gs)
-            training_errors[k, ep] = mse_loss(network_inputs, labels, NN, PNN.params)[1]
+            training_errors[k, ep] = mse_loss(network_inputs, labels, NN, PNN.params)
         end
         t2 = time()
         training_time[k] = t2 - t1
