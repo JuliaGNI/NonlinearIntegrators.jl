@@ -1,6 +1,6 @@
 name = "NonlinearIntegrators"
 uuid = "4ad56de4-0342-4c02-9694-ab2f23251d8c"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Michael Kraus <michael.kraus@ipp.mpg.de> and contributors"]
 
 [deps]

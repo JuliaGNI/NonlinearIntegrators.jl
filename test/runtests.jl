@@ -13,6 +13,10 @@ Logging.disable_logging(Logging.Warn)
         include("integrators/nvi_onelayer_integrators_tests.jl")
     end
 
+    @testset "NonLinear_OneLayer_GML reduced precision" begin
+        include("integrators/nvi_onelayer_reduced_precision_tests.jl")
+    end
+
     @testset "Time_reversible_OneLayer integrator" begin
         include("integrators/nvi_onelayer_time_reversible_integrators_tests.jl")
     end
