@@ -12,13 +12,13 @@ struct NonLinear_OneLayer_GML{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Extrapolat
     initial_guess_method::IPMT
 
     training_epochs::Int
-    problem_initial_hamitltonian::Float64
+    problem_initial_hamitltonian::T
     use_hamiltonian_loss::Bool
 
     bias_interval::SVector{2,T}
     dict_amount::Int
     function NonLinear_OneLayer_GML(basis::Basis{T}, quadrature::QuadratureRule{T};
-        nstages::Int=10, training_epochs::Int=50000, problem_initial_hamitltonian::Float64=0.0, use_hamiltonian_loss::Bool=true,
+        nstages::Int=10, training_epochs::Int=50000, problem_initial_hamitltonian=0.0, use_hamiltonian_loss::Bool=true,
         initial_trajectory::ET=IntegratorExtrapolation(),
         initial_guess_method::IPMT=OGA1d(),
         bias_interval=[-pi, pi], dict_amount=50000) where {T,ET,IPMT}
@@ -32,7 +32,7 @@ struct NonLinear_OneLayer_GML{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Extrapolat
 
         network_inputs = reshape(collect(0:1/nstages:1), 1, nstages + 1)
         new{T,NBASIS,NNODES,typeof(basis),ET,IPMT}(basis, quadrature, quad_weights, quad_nodes, nstages, network_inputs, initial_trajectory, initial_guess_method,
-            training_epochs, problem_initial_hamitltonian, use_hamiltonian_loss, bias_interval, dict_amount)
+            training_epochs, T(problem_initial_hamitltonian), use_hamiltonian_loss, bias_interval, dict_amount)
     end
 end
 nbasis(method::NonLinear_OneLayer_GML) = method.basis.S

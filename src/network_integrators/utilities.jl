@@ -67,16 +67,16 @@ function vector_mse_energy_loss(x,y,model,ps,st,problem_module,params,initial_ha
     return energy_loss, ps,()
 end
 
-function simpson_quadrature(N::Int)
+function simpson_quadrature(N::Int, ::Type{T}=Float64) where {T}
     if N % 2 != 0
         error("N must be even for Simpson's rule.")
     end
-    
+
     # Step size
-    h = 1.0 / N
-        
+    h = one(T) / N
+
     # Generate weights
-    w = zeros(Float64, N + 1)
+    w = zeros(T, N + 1)
     for i in 1:(N + 1)
         if i == 1 || i == N + 1
             w[i] = h / 3 # First and last weights
@@ -129,15 +129,15 @@ function flatten_params(params::NeuralNetworkParameters)
 end
 
 
-function box_init_plain(input_dim::Int, output_dim::Int;Random_rng = Random.seed!(1))
-    W = zeros(Float32, output_dim, input_dim)
-    b = zeros(Float32, output_dim)
+function box_init_plain(input_dim::Int, output_dim::Int, ::Type{T}=Float32;Random_rng = Random.seed!(1)) where {T}
+    W = zeros(T, output_dim, input_dim)
+    b = zeros(T, output_dim)
 
     for i in 1:output_dim
-        p = rand(Random_rng,Float32, input_dim) 
-        n = randn(Random_rng,Float32, input_dim)
+        p = rand(Random_rng,T, input_dim)
+        n = randn(Random_rng,T, input_dim)
         n ./= norm(n)
-        p_max = map((n_i) -> n_i ≥ 0 ? 1.0f0 : 0.0f0, n)
+        p_max = map((n_i) -> n_i ≥ 0 ? one(T) : zero(T), n)
         k = 1 / dot((p_max .- p), n)
         W[i, :] = k * n
         b[i] = k * dot(p, n)

@@ -243,7 +243,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
     local S = nbasis(method(int))
     local x = nlsolution(int)
 
-    tem_ode = similar(problem, [0.0, h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_ode = similar(problem, [zero(h), h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -477,12 +477,16 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
             dvdW2c[j, :, d] = gv[1:S]
         end
 
-        g0 = ∂NN_anstaz_∂params(ps_vec,S,activation,0.0,q̄[d],cache(int).q̃[d])
+        # Boundary points t=0 and t=1 must share the (plain) element type of the
+        # quadrature nodes, NOT the solver type ST: during the Newton solve ST is a
+        # ForwardDiff.Dual, and ∂NN_anstaz_∂params itself nests a ForwardDiff.gradient,
+        # so passing a Dual `t` triggers a Dual-tag ordering error.
+        g0 = ∂NN_anstaz_∂params(ps_vec,S,activation,zero(eltype(quad_nodes)),q̄[d],cache(int).q̃[d])
         dqdW1r₀[:, d] = g0[S+1:2S]
         dqdbr₀[:, d] = g0[2S+1:3S]
         dqdW2r₀[:, d] = g0[1:S]
 
-        g1 = ∂NN_anstaz_∂params(ps_vec,S,activation,1.0,q̄[d],cache(int).q̃[d])
+        g1 = ∂NN_anstaz_∂params(ps_vec,S,activation,one(eltype(quad_nodes)),q̄[d],cache(int).q̃[d])
         dqdW1r₁[:, d] = g1[S+1:2S]
         dqdbr₁[:, d] = g1[2S+1:3S]
         dqdW2r₁[:, d] = g1[1:S]
@@ -609,7 +613,7 @@ function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricInt
     sol.q .= cache(int, DT).q̃
 
     for k in 1:D
-        z = zero(1)
+        z = zero(DT)
         for j in eachindex(P, F)
             # dQ/dq_{n+1} = τ, dV/dq_{n+1} = 1/h
             z += timestep(int) * method(int).b[j] * F[j][k] * (quad_nodes[j])
@@ -678,7 +682,7 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Time_Reversible_Hardcod
             ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)] 
         end
         
-        ps_vec = zeros(3S)
+        ps_vec = zeros(eltype(x), 3S)
         ps_vec[1:S] = ps[k][2].W[:]
         ps_vec[S+1:2S] = ps[k][1].W[:]
         ps_vec[2S+1:3S] = ps[k][1].b[:]

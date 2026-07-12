@@ -157,7 +157,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
     end
     println("current time: $(sol.t), initial guess x: $(x[1:S])")
 
-    tem_ode = similar(problem, [0.0, h], h / 100, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_ode = similar(problem, [zero(h), h], h / 100, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
