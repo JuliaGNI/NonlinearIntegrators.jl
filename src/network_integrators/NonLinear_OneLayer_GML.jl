@@ -244,7 +244,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
     local S = nbasis(method(int))
     local x = nlsolution(int)
 
-    tem_ode = similar(problem, [0.0, h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_ode = similar(problem, [zero(h), h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -318,13 +318,22 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
 
+    # The OGA initial guess is a seed for the nonlinear solve, so its dictionary
+    # and least-squares fit are assembled in double precision for numerical
+    # robustness (a reduced-precision Gram matrix is rank-deficient because
+    # distinct dictionary neurons collapse onto identical low-precision values).
+    # The resulting parameters are stored into the working-precision cache below;
+    # the variational integrator equations and the nonlinear solve still run at
+    # the working precision.
     quad_weights = simpson_quadrature(nstages)# Simpson's rule for 11 quad points 0:0.1:1
 
-    B = bias_interval[1]:(bias_interval[2]-bias_interval[1])/dict_amount:bias_interval[2]
+    lo = Float64(bias_interval[1])
+    hi = Float64(bias_interval[2])
+    B = lo:(hi - lo)/dict_amount:hi
     w_list = vcat(-1 * ones(length(B), 1), ones(length(B), 1))
     b_list = vcat(collect(B), collect(B))
     A = hcat(w_list, b_list)
-    quad_nodes_mat = hcat(quad_nodes', ones(length(quad_nodes)))'
+    quad_nodes_mat = hcat(Float64.(quad_nodes'), ones(length(quad_nodes)))'
     gx_quad = activation.(A * quad_nodes_mat)
 
 
@@ -437,8 +446,8 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 
     # compute coefficients
     for d in 1:D
-        r₀[:, d] = (NN.layers[1])([0.0], ps[d][1])
-        r₁[:, d] = (NN.layers[1])([1.0], ps[d][1])
+        r₀[:, d] = (NN.layers[1])([zero(ST)], ps[d][1])
+        r₁[:, d] = (NN.layers[1])([one(ST)], ps[d][1])
         for j in eachindex(quad_nodes)
             m[j, :, d] = (NN.layers[1])([quad_nodes[j]], ps[d][1])
             a[j, :, d] = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d])).L2.W[:]
@@ -457,11 +466,11 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
             dvdbc[j, :, d] = gv.L1.b[:]
         end
 
-        g0 = DQDθ([0.0], NeuralNetworkParameters(ps[d]))
+        g0 = DQDθ([zero(ST)], NeuralNetworkParameters(ps[d]))
         dqdWr₀[:, d] = g0.L1.W[:]
         dqdbr₀[:, d] = g0.L1.b[:]
 
-        g1 = DQDθ([1.0], NeuralNetworkParameters(ps[d]))
+        g1 = DQDθ([one(ST)], NeuralNetworkParameters(ps[d]))
         dqdWr₁[:, d] = g1.L1.W[:]
         dqdbr₁[:, d] = g1.L1.b[:]
     end
