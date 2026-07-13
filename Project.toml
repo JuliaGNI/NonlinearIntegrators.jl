@@ -49,7 +49,7 @@ StaticArrays = "1"
 Statistics = "1"
 SymbolicNeuralNetworks = "0.3"
 Symbolics = "7"
-Zygote = "0.6"
+Zygote = "0.6, 0.7"
 
 [extras]
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
