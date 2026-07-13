@@ -318,64 +318,68 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
 
-    # The OGA initial guess is a seed for the nonlinear solve, so its dictionary
-    # and least-squares fit are assembled in double precision for numerical
-    # robustness (a reduced-precision Gram matrix is rank-deficient because
-    # distinct dictionary neurons collapse onto identical low-precision values).
-    # The resulting parameters are stored into the working-precision cache below;
-    # the variational integrator equations and the nonlinear solve still run at
-    # the working precision.
-    quad_weights = simpson_quadrature(nstages)# Simpson's rule for 11 quad points 0:0.1:1
+    # Working precision of the nonlinear solve. The OGA seed is assembled entirely
+    # at this precision (no Float64 island), so the whole path is GPU-portable.
+    # Robustness at reduced precision comes from (i) a QR least-squares fit on the
+    # weighted design matrix (conditioned on κ(Φ), not κ(Φ)² as the normal equations
+    # are) and (ii) dictionary normalization plus a coherence guard that keep the
+    # greedily selected atoms linearly independent. The resulting parameters feed the
+    # working-precision cache; the integrator equations and Newton solve run in T too.
+    local T = eltype(x)
 
-    lo = Float64(bias_interval[1])
-    hi = Float64(bias_interval[2])
-    B = lo:(hi - lo)/dict_amount:hi
-    w_list = vcat(-1 * ones(length(B), 1), ones(length(B), 1))
-    b_list = vcat(collect(B), collect(B))
-    A = hcat(w_list, b_list)
-    quad_nodes_mat = hcat(Float64.(quad_nodes'), ones(length(quad_nodes)))'
-    gx_quad = activation.(A * quad_nodes_mat)
+    quad_weights = simpson_quadrature(nstages, T)
 
+    # Candidate dictionary: neurons with weights ±1 and biases on a uniform grid.
+    B = bias_grid(bias_interval[1], bias_interval[2], dict_amount, T)
+    A = hcat(vcat(-ones(T, length(B)), ones(T, length(B))), vcat(B, B))
+    nodes = vec(T.(quad_nodes))
+    quad_nodes_mat = permutedims(hcat(nodes, ones(T, length(nodes))))   # (2 × M)
+    gx_quad = activation.(A * quad_nodes_mat)                           # (dict × M)
+
+    # Unit-normalized atoms (quadrature-weighted L² norm) are used only to measure
+    # coherence for the dedup guard; atoms below the precision-scaled floor are left
+    # unnormalized. Selection itself stays on the raw inner product so that the
+    # well-conditioned (Float64/Float32) atom choice is unchanged.
+    dict_norms = sqrt.(gx_quad .^ 2 * quad_weights)
+    gx_normed = gx_quad ./ ifelse.(dict_norms .< oga_norm_floor(T, maximum(dict_norms)), one(T), dict_norms)
+    coherence_cap = one(T) - sqrt(eps(T))
 
     for d in 1:D
-        W = zeros(S, 1)        # all parameters w
-        Bias = zeros(S, 1)      # all parameters b
-        C = zeros(S, nstages + 1)
-        f_weight = network_labels[d, :] .* quad_weights
+        ps[d][1].W .= zero(T)
+        ps[d][1].b .= zero(T)
+        ps[d][2].W .= zero(T)
+
+        W = zeros(T, S)         # hidden weights
+        Bias = zeros(T, S)      # hidden biases
+        selected = Int[]
+        blocked = falses(length(dict_norms))
+        label = network_labels[d, :]
 
         for k = 1:S
-            #     The subproblem is key to the greedy algorithm, where the
-            #     inner products |(u,g) - (f,g)| should be maximized.
-            #     Part of the inner products can be computed in advance.
+            # Greedy step: pick the atom most correlated with the current residual,
+            # skipping atoms too coherent with those already selected.
+            residual = label .- vec(NN(quad_nodes, ps[d]))
+            score = ifelse.(blocked, -one(T), abs.(gx_quad * (residual .* quad_weights)))
+            best = argmax(score)
+            push!(selected, best)
+            W[k] = A[best, 1]
+            Bias[k] = A[best, 2]
 
-            #select the Optimal basis
+            # Orthogonal projection: refit all selected output weights by weighted
+            # QR least squares (no Gram matrix, no Tikhonov ridge).
+            xk = weighted_lstsq(gx_quad[selected, :], quad_weights, label)
 
-            uk_quad = NN(quad_nodes, ps[d])'
-
-            uk_weight = uk_quad .* quad_weights
-
-            loss = -(1 / 2) * (gx_quad * (uk_weight - f_weight)) .^ 2
-            argmin_index = argmin(loss)
-            W[k] = A[argmin_index[1], :][1]
-            Bias[k] = A[argmin_index[1], :][2]
-
-            ak = hcat(W[k], Bias[k])
-            C[k, :] = ak * quad_nodes_mat
-            selected_g = activation.(C[1:k, :])
-
-            Gk = selected_g * (selected_g .* quad_weights')'
-            rhs = selected_g * (network_labels[d, :] .* quad_weights)
-            xk = Gk \ rhs
-
-            ps[d][1].W[:] .= W
-            ps[d][1].b[:] .= Bias
+            ps[d][1].W .= W
+            ps[d][1].b .= Bias
             ps[d][2].W[1:k] .= xk
 
-            errs = sum(network_labels[d, :] - NN(quad_nodes, ps[d])') .^ 2
-            @debug "Sum of squared errors after adding neuron " k ":" errs
-        end
-        @debug "Finish OGA for dimension" d 
+            # Block the chosen atom and its near-duplicates from future selection.
+            coh = gx_normed * (gx_normed[best, :] .* quad_weights)
+            blocked .|= abs.(coh) .> coherence_cap
 
+            @debug "Sum of squared errors after adding neuron " k sum((label .- vec(NN(quad_nodes, ps[d]))) .^ 2)
+        end
+        @debug "Finish OGA for dimension" d
     end
 
     for k in 1:D

@@ -272,92 +272,70 @@ function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, I
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
 
-    quad_weights = simpson_quadrature(nstages)# Simpson's rule for 11 quad points 0:0.1:1
+    # Working-precision, GPU-portable OGA seed (see NonLinear_OneLayer_GML for the
+    # rationale): the dictionary and the weighted least-squares fit are assembled in
+    # T, the fit uses a QR solve with a precision-scaled Tikhonov fallback, and a
+    # coherence guard keeps the selected atoms independent. Neurons are added in
+    # time-symmetric pairs (w, b) and (−w, w + b).
+    local T = eltype(x)
 
-    B = bias_interval[1]:(bias_interval[2]-bias_interval[1])/dict_amount:bias_interval[2]
-    w_list = vcat(-1 * ones(length(B), 1), ones(length(B), 1))
-    b_list = vcat(collect(B), collect(B))
-    A = hcat(w_list, b_list)
-    quad_nodes_mat = hcat(quad_nodes', ones(length(quad_nodes)))'
+    quad_weights = simpson_quadrature(nstages, T)
+
+    B = bias_grid(bias_interval[1], bias_interval[2], dict_amount, T)
+    A = hcat(vcat(-ones(T, length(B)), ones(T, length(B))), vcat(B, B))
+    nodes = vec(T.(quad_nodes))
+    quad_nodes_mat = permutedims(hcat(nodes, ones(T, length(nodes))))   # (2 × M)
     gx_quad = activation.(A * quad_nodes_mat)
 
+    dict_norms = sqrt.(gx_quad .^ 2 * quad_weights)
+    gx_normed = gx_quad ./ ifelse.(dict_norms .< oga_norm_floor(T, maximum(dict_norms)), one(T), dict_norms)
+    coherence_cap = one(T) - sqrt(eps(T))
 
     for d in 1:D
-        W = zeros(S, 1)        # all parameters w
-        Bias = zeros(S, 1)      # all parameters b
-        C = zeros(S, nstages + 1)
-        f_weight = network_labels[d, :] .* quad_weights
+        ps[d][1].W .= zero(T)
+        ps[d][1].b .= zero(T)
+        ps[d][2].W .= zero(T)
+
+        W = zeros(T, S)         # hidden weights
+        Bias = zeros(T, S)      # hidden biases
+        C = zeros(T, S, length(nodes))
+        blocked = falses(length(dict_norms))
+        label = network_labels[d, :]
 
         for k = 1:S÷2
-            #     The subproblem is key to the greedy algorithm, where the
-            #     inner products |(u,g) - (f,g)| should be maximized.
-            #     Part of the inner products can be computed in advance.
+            # Greedy step on the raw inner product with the current residual,
+            # skipping atoms too coherent with those already selected.
+            residual = label .- vec(NN(quad_nodes, ps[d]))
+            score = ifelse.(blocked, -one(T), abs.(gx_quad * (residual .* quad_weights)))
+            best = argmax(score)
 
-            #select the Optimal basis
+            w0 = A[best, 1]
+            b0 = A[best, 2]
+            W[2k-1] = w0
+            Bias[2k-1] = b0
+            W[2k] = -w0
+            Bias[2k] = w0 + b0
 
-            uk_quad = NN(quad_nodes, ps[d])'
+            C[2k-1, :] = hcat(W[2k-1], Bias[2k-1]) * quad_nodes_mat
+            C[2k, :]   = hcat(W[2k],   Bias[2k])   * quad_nodes_mat
+            selected_g = activation.(C[1:2k, :])
 
-            uk_weight = uk_quad .* quad_weights
+            # Orthogonal projection over all selected (paired) atoms via weighted QR.
+            xk = weighted_lstsq(selected_g, quad_weights, label)
 
-            loss = -(1 / 2) * (gx_quad * (uk_weight - f_weight)) .^ 2
-            argmin_index = argmin(loss)
+            ps[d][1].W .= W
+            ps[d][1].b .= Bias
+            ps[d][2].W[1:2k] .= xk
 
-            W[Int(2k-1)] = A[argmin_index[1], :][1]
-            Bias[Int(2k-1)] = A[argmin_index[1], :][2]
-
-            W[Int(2k)] = -1 * A[argmin_index[1], :][1]
-            Bias[Int(2k)] =  W[Int(2k-1)] + Bias[Int(2k-1)]
-
-            ak = hcat(W[Int(2k-1)], Bias[Int(2k-1)])
-            ak_1 = hcat(W[Int(2k)], Bias[Int(2k)])
-            C[Int(2k-1), :] = ak * quad_nodes_mat
-            C[Int(2k), :] = ak_1 * quad_nodes_mat
-            selected_g = activation.(C[1:Int(2k), :])
-            Gk = selected_g * (selected_g .* quad_weights')'
-            rhs = selected_g * (network_labels[d, :] .* quad_weights)
-            xk = Gk \ rhs
-
-            ps[d][1].W[:] .= W
-            ps[d][1].b[:] .= Bias
-            ps[d][2].W[1:Int(2k)] .= xk
+            coh = gx_normed * (gx_normed[best, :] .* quad_weights)
+            blocked .|= abs.(coh) .> coherence_cap
 
             if show_status
-                @show ps[d][2].W[:]
-                @show ps[d][1].W[:]
-                @show ps[d][1].b[:]
+                errs = sum((label .- vec(NN(quad_nodes, ps[d]))) .^ 2)
+                println("Dimension $d, pair $k, OGA residual error: $errs")
             end
-
-            # opt = Optimisers.Descent(0.00001)
-            # st_opt = Optimisers.setup(opt, ps[d])
-
-            # errs = sum(network_labels[d, :] - NN(quad_nodes, ps[d])') .^ 2
-            # show_status ? print("\n OGA error $errs before training \n ") : nothing
-            # @show ps[d]
-            # @show W
-            # @show Bias
-            # @show xk
-
-            # gs = Zygote.gradient(p -> sum(network_labels[d, :] - NN(quad_nodes, p)') .^ 2, ps[d])[1]
-            # gs[1].W[:] = Float64[x === nothing ? 0.0 : x for x in gs[1].W[:]]
-            # gs[1].b[:] = Float64[x === nothing ? 0.0 : x for x in gs[1].b[:]]
-
-            # st_opt, ps[d] = Optimisers.update(st_opt, ps[d], gs)
-
-            errs = sum(network_labels[d, :] - NN(quad_nodes, ps[d])') .^ 2
-            show_status ? print("\n OGA error $errs after training ") : nothing
-
-            # W .= ps[d][1].W[:]
-            # Bias .= ps[d][1].b[:]
-            # xk .= ps[d][2].W[1:k]
-
-            # @show ps[d]
-            # @show W
-            # @show Bias
-            # @show xk
-
-
         end
-        show_status ? print("\n Finish OGA for dimension $d ") : nothing
+        show_status ? println("Finish OGA for dimension $d") : nothing
     end
 
     for k in 1:D

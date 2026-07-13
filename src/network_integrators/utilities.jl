@@ -90,10 +90,96 @@ function simpson_quadrature(N::Int, ::Type{T}=Float64) where {T}
     return w
 end
 
+# ---- OGA numerical helpers --------------------------------------------------
+#
+# The Orthogonal Greedy Algorithm (OGA) that seeds the network integrators used to
+# be assembled in Float64 for numerical robustness. The helpers below make it
+# precision-generic (and GPU-portable) instead: the dictionary and least-squares
+# fit are built in the working type `T`, and the guard rails scale with `eps(T)`
+# rather than the hard-coded Float64 constants they replace.
+
+"""
+    bias_grid(lo, hi, n, ::Type{T}) -> Vector{T}
+
+Uniform grid of `n + 1` bias values from `lo` to `hi` in precision `T`.
+
+The coordinates are generated from an integer-indexed `range` in `Float64` and then
+cast to `T`, so a large `n` cannot overflow the step to zero in reduced precision
+(the Float16 trap where `T(n)` overflows to `Inf` and `(hi - lo)/n` evaluates to
+zero, previously throwing `ArgumentError: range step cannot be zero`). Only the grid
+*coordinates* touch `Float64`; the seed's dictionary and solve run entirely in `T`.
+"""
+function bias_grid(lo, hi, n::Integer, ::Type{T}) where {T}
+    return T.(range(Float64(lo), Float64(hi); length = n + 1))
+end
+
+"""
+    oga_norm_floor(::Type{T}, ref) -> T
+
+Amplitude-scale floor below which a dictionary-atom norm is treated as numerically
+zero (so normalization is skipped rather than dividing by noise). Scales with
+`sqrt(eps(T)) * ref`, i.e. relative to the largest atom `ref` and to the working
+precision: a norm smaller than this cannot be inverted reliably in `T`.
+
+Replaces the hard-coded absolute `1e-12` guard, which sat *below* `eps(Float32)` and
+so never fired in reduced precision.
+"""
+oga_norm_floor(::Type{T}, ref) where {T} = sqrt(eps(T)) * T(ref)
+
+"""
+    oga_tikhonov(G; C = 100) -> eltype(G)
+
+Scale- and precision-relative Tikhonov floor `C * eps(T) * tr(G)/n` for stabilizing
+a Gram / normal-equations solve `G \\ rhs` at working precision `T = eltype(G)`.
+Relative to the mean diagonal `tr(G)/n`, so the effective condition-number cap tracks
+the precision; `C` is a modest safety factor.
+
+Replaces the hard-coded absolute `1e-12` / `1e-14` ridges, which round away entirely
+below `eps(Float32)`. Provided as a fallback for a regularized normal-equations
+variant; the OGA fit itself uses [`weighted_lstsq`](@ref), which avoids forming `G`.
+"""
+function oga_tikhonov(G::AbstractMatrix{T}; C = 100) where {T}
+    return T(C) * eps(T) * tr(G) / size(G, 1)
+end
+
+"""
+    weighted_lstsq(Φ, w, y; C = 100) -> Vector
+
+Solve the (ridged) quadrature-weighted least-squares fit for the output weights `x`,
+
+    minₓ  Σⱼ wⱼ (Σᵢ xᵢ Φ[i,j] − yⱼ)²  +  λ‖x‖² ,
+
+where each row of `Φ` is a dictionary atom sampled at the quadrature nodes, `w` are
+the (positive) quadrature weights, and `y` is the fit target at those nodes.
+
+Solved by QR on the `√w`-scaled design matrix rather than the normal equations
+`Φ diag(w) Φᵀ`, so accuracy is governed by κ(Φ) instead of κ(Φ)² — the difference
+that lets the fit run in reduced precision without a rank-deficient Gram matrix.
+
+The plain QR solve is used whenever it is finite (so the Float64/Float32 atom choice
+is byte-for-byte the old Gram solution and the greedy residual is unperturbed). Only
+if it returns a non-finite result — a genuinely rank-deficient design matrix, i.e. the
+Float16 case — is the fit retried with a `√λ·I` augmentation, where the ridge
+`λ = C · eps(T) · tr(ÂᵀÂ)/natoms` is the precision-scaled Tikhonov floor (see
+[`oga_tikhonov`](@ref)) that keeps the solution bounded and the seed finite.
+"""
+function weighted_lstsq(Φ::AbstractMatrix{T}, w::AbstractVector{T}, y::AbstractVector{T}; C = 100) where {T}
+    sw = sqrt.(w)                     # weights are positive ⇒ real sqrt
+    Â  = sw .* Φ'                     # (nnodes × natoms): row j scaled by √wⱼ
+    ŷ  = sw .* y
+    x  = Â \ ŷ                        # QR least squares
+    all(isfinite, x) && return x
+
+    # Rank-deficient in this precision: Tikhonov-ridged fallback (augmented QR).
+    k = size(Â, 2)
+    λ = T(C) * eps(T) * sum(abs2, Â) / k        # C·eps·(mean squared column norm) = tr(Gk)/k
+    return vcat(Â, sqrt(λ) * Matrix{T}(I, k, k)) \ vcat(ŷ, zeros(T, k))
+end
+
 """
     initial_trajectory!(sol, history, params, int, initial_trajectory)
 
-Initial trajectory for the [`NonLinear_OneLayer_Lux`](@ref) integrator.
+Initial trajectory for the `NonLinear_OneLayer_Lux` integrator.
 """
 function initial_trajectory!(sol, history, params, ::GeometricIntegrator, initial_trajectory::Extrapolation)
     error("For extrapolation $(initial_trajectory) method is not implemented!")

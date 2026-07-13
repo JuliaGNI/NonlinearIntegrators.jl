@@ -298,82 +298,68 @@ function initial_params!(int::GeometricIntegrator{<:Time_Reversible_Hardcode}, I
     local q̃ = cache(int).q̃ # 终点估计 q_{n+1}
 
 
-    # 1. 准备积分权重和节点
-    local t_vec = quad_nodes[:] # 转为向量
-    local quad_weights = simpson_quadrature(nstages)
-    local t_factor = t_vec .* (1 .- t_vec) # Ansatz 中的 t(1-t) 因子
+    # 1. Quadrature weights and Ansatz factors (working precision T; the seed is
+    #    assembled in T rather than a Float64 island).
+    local T = eltype(x)
+    local t_vec = T.(quad_nodes[:])
+    local quad_weights = simpson_quadrature(nstages, T)
+    local t_factor = t_vec .* (one(T) .- t_vec) # t(1-t) factor in the Ansatz
 
-    # 2. 构造对称基函数字典 A = t(1-t) * [σ(wt+b) + σ(w(1-t)+b)]
-    B = bias_interval[1]:(bias_interval[2]-bias_interval[1])/dict_amount:bias_interval[2]
-    # 我们只用正权重 w=1 构造字典即可，对称性由公式保证
-    w_fixed = ones(length(B)) 
-    A_dict = hcat(w_fixed, collect(B)) 
-    
-    # 预计算整个字典在积分点上的输出 (Symmetric Dictionary)
-    # gx_quad_sym: (字典大小 x 积分点数)
-    gx_quad_sym = zeros(size(A_dict, 1), length(t_vec))
-    for i in 1:size(A_dict, 1)
+    # 2. Symmetric dictionary  g_i(t) = t(1-t)·[σ(w t + b) + σ(w(1-t) + b)]  (w = 1;
+    #    symmetry is guaranteed by the formula). Bias grid built without the Float16
+    #    range trap.
+    B = bias_grid(bias_interval[1], bias_interval[2], dict_amount, T)
+    A_dict = hcat(ones(T, length(B)), B)
+    gx_quad_sym = zeros(T, length(B), length(t_vec))
+    for i in axes(A_dict, 1)
         w, b = A_dict[i, 1], A_dict[i, 2]
-        # 对称对的输出: σ(wt + b) + σ(w(1-t) + b)
-        val = activation.(w .* t_vec .+ b) + activation.(-w .* t_vec .+ (w + b))
+        val = activation.(w .* t_vec .+ b) .+ activation.(-w .* t_vec .+ (w + b))
         gx_quad_sym[i, :] = t_factor .* val
     end
 
     for d in 1:D
-        # 3. 计算拟合目标：目标轨迹减去线性插值部分
-        # f_target = q_label(t) - [(1-t)q_n + t*q_{n+1}]
-        f_target = [network_labels[d, j] - ((1-t_vec[j])*q̄[d] + t_vec[j]*q̃[d]) for j in eachindex(t_vec)]
+        # 3. Fit target: reference trajectory minus the linear part
+        #    f_target = q_label(t) - [(1-t)q_n + t·q_{n+1}]
+        f_target = network_labels[d, :] .- ((one(T) .- t_vec) .* q̄[d] .+ t_vec .* q̃[d])
 
-        W = zeros(S)
-        Bias = zeros(S)
+        W = zeros(T, S)
+        Bias = zeros(T, S)
         selected_indices = Int[]
-        
-        # OGA 循环：每次选出一对对称神经元
-        for k = 1:Int(S/2)
-            # 计算当前残差
-            if k == 1
-                current_residual = f_target
-            else
-                current_fit = (gx_quad_sym[selected_indices, :]' * xk_low)
-                current_residual = f_target - current_fit
-            end
+        xk_low = zeros(T, 0)
 
-            # 计算投影 (Inner product with weights)
-            f_res_weighted = current_residual .* quad_weights
-            projections = (gx_quad_sym * f_res_weighted) .^ 2
-            
-            # 避开已选索引防止 Gk 奇异
+        # OGA loop: one symmetric neuron pair per iteration.
+        for k = 1:S÷2
+            current_residual = isempty(selected_indices) ? f_target :
+                f_target .- vec(gx_quad_sym[selected_indices, :]' * xk_low)
+            projections = (gx_quad_sym * (current_residual .* quad_weights)) .^ 2
+
             for idx in selected_indices
-                projections[idx] = -1.0
+                projections[idx] = -one(T) # avoid reselection
             end
 
             best_idx = argmax(projections)
             push!(selected_indices, best_idx)
 
-            # 填充参数
             W[2k-1] = A_dict[best_idx, 1]
             Bias[2k-1] = A_dict[best_idx, 2]
             W[2k] = -W[2k-1]
             Bias[2k] = W[2k-1] + Bias[2k-1]
 
-            # 4. 构造并求解 Gram 矩阵 Gk (维度为 k x k)
+            # 4. Refit the (shared) pair weights by weighted QR least squares
+            #    (replaces the (Gk + 1e-14·I) \\ rhs normal equations).
             selected_g = gx_quad_sym[selected_indices, :]
-            Gk = selected_g * (selected_g .* quad_weights')'
-            rhs = selected_g * (f_target .* quad_weights)
-            
-            # 使用带正则化的求解防止奇异
-            global xk_low = (Gk + 1e-14*I) \ rhs 
+            xk_low = weighted_lstsq(selected_g, quad_weights, f_target)
 
-            # 更新 ps 结构：每一对共享同一个输出权重以保证对称性
-            ps[d][1].W[:] .= W
-            ps[d][1].b[:] .= Bias
+            # Each pair shares one output weight to preserve time-reversal symmetry.
+            ps[d][1].W .= W
+            ps[d][1].b .= Bias
             for j in 1:k
                 ps[d][2].W[2j-1] = xk_low[j]
                 ps[d][2].W[2j] = xk_low[j]
             end
 
             if show_status
-                errs = sum((f_target - selected_g' * xk_low).^2)
+                errs = sum((f_target .- vec(selected_g' * xk_low)) .^ 2)
                 println("Dimension $d, Pair $k, Current OGA Residual Error: $errs")
             end
         end

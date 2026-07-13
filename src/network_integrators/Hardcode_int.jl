@@ -304,50 +304,46 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
     # working-precision cache and the integrator equations + Newton solve run at
     # the working precision T. (Same rationale as NonLinear_OneLayer_GML.)
 
-    # 1. Prepare quadrature weights and Ansatz factors
-    local t_vec = quad_nodes[:] # Convert to vector
-    local quad_weights = simpson_quadrature(nstages)
-    local t_factor = t_vec .* (1 .- t_vec) # Core: t(1-t) in the Ansatz
+    # 1. Prepare quadrature weights and Ansatz factors (working precision T; the
+    #    whole seed is now assembled in T rather than a Float64 island).
+    local T = eltype(x)
+    local t_vec = T.(quad_nodes[:])
+    local quad_weights = simpson_quadrature(nstages, T)
+    local t_factor = t_vec .* (one(T) .- t_vec) # Core: t(1-t) in the Ansatz
 
     # 2. Construct "weighted" basis function dictionary (Weighted Dictionary)
-    # Each row represents a basis function: g_i(t) = t(1-t) * σ(wt + b)
-    B = bias_interval[1]:(bias_interval[2]-bias_interval[1])/dict_amount:bias_interval[2]
-    # Allow positive and negative weights to cover all possible nonlinear shapes
-    w_vals = [-1.0, 1.0]
-    A_dict = hcat(repeat(w_vals, inner=length(B)), repeat(collect(B), outer=length(w_vals)))
-    
-    gx_quad = zeros(size(A_dict, 1), length(t_vec))
-    for i in 1:size(A_dict, 1)
-        w, b = A_dict[i, 1], A_dict[i, 2]
-        # Base neuron output multiplied by t(1-t)
-        gx_quad[i, :] = t_factor .* activation.(w .* t_vec .+ b)
-    end
+    # Each row represents a basis function: g_i(t) = t(1-t) * σ(wt + b), with
+    # weights ±1 over a uniform bias grid (built without the Float16 range trap).
+    B = bias_grid(bias_interval[1], bias_interval[2], dict_amount, T)
+    A_dict = hcat(vcat(-ones(T, length(B)), ones(T, length(B))), vcat(B, B))
+    nodes_mat = permutedims(hcat(t_vec, ones(T, length(t_vec))))    # (2 × M)
+    gx_quad = activation.(A_dict * nodes_mat) .* t_factor'          # (dict × M)
 
-    # Normalize dictionary to improve search stability
-    dict_norms = sqrt.( (gx_quad .^ 2) * quad_weights )
-    dict_norms[dict_norms .< 1e-12] .= 1.0
-    gx_quad_normed = gx_quad ./ dict_norms
+    # Normalize dictionary to improve search stability; the floor scales with
+    # sqrt(eps(T)) (replaces the hard-coded 1e-12, which never fired below Float32).
+    dict_norms = sqrt.((gx_quad .^ 2) * quad_weights)
+    gx_quad_normed = gx_quad ./ ifelse.(dict_norms .< oga_norm_floor(T, maximum(dict_norms)), one(T), dict_norms)
 
     for d in 1:D
         # 3. Compute fitting target: reference trajectory minus linear part
         # Since Ansatz is q_h = linear + t(1-t)NN, NN should fit the (q_label - linear) part
         q_end_guess = network_labels[d, end] # Use the endpoint estimate from initial value integrator
-        f_target = [network_labels[d, j] - ((1-t_vec[j])*q_start[d] + t_vec[j]*q_end_guess) for j in eachindex(t_vec)]
-        
+        f_target = network_labels[d, :] .- ((one(T) .- t_vec) .* q_start[d] .+ t_vec .* q_end_guess)
+
         f_res = copy(f_target)
-        W1 = zeros(S)
-        b1 = zeros(S)
-        selected_g = zeros(S, length(t_vec))
+        W1 = zeros(T, S)
+        b1 = zeros(T, S)
+        selected_g = zeros(T, S, length(t_vec))
         selected_indices = Int[]
 
         for k = 1:S
             # 4. Greedy selection: find the neuron most consistent with current residual direction
             projections = gx_quad_normed * (f_res .* quad_weights)
-            
+
             for idx in selected_indices
-                projections[idx] = 0.0 # Avoid reselection
+                projections[idx] = zero(T) # Avoid reselection
             end
-            
+
             best_idx = argmax(abs.(projections))
             push!(selected_indices, best_idx)
 
@@ -355,28 +351,21 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
             b1[k] = A_dict[best_idx, 2]
             selected_g[k, :] = gx_quad[best_idx, :]
 
-            # 5. Orthogonal projection to solve output weights W2
-            # Phi already includes the t(1-t) factor
-            Phi = selected_g[1:k, :]
-            Gk = Phi * (Phi .* quad_weights')'
-            rhs = Phi * (f_target .* quad_weights)
-            
-            W2_k = (Gk + 1e-12*I) \ rhs
+            # 5. Orthogonal projection to solve output weights W2 by weighted QR
+            #    least squares (replaces the (Gk + 1e-12·I) \\ rhs normal equations);
+            #    Phi already includes the t(1-t) factor.
+            W2_k = weighted_lstsq(selected_g[1:k, :], quad_weights, f_target)
 
             # Update residual
-            f_res = f_target - (W2_k' * Phi)[:]
+            f_res = f_target .- vec(W2_k' * selected_g[1:k, :])
 
             # Write to temporary parameter structure
-            ps[d][1].W[:] .= W1
-            ps[d][1].b[:] .= b1
+            ps[d][1].W .= W1
+            ps[d][1].b .= b1
             ps[d][2].W[1:k] .= W2_k
-
-            errs = sum(network_labels[d, :] - NN(reshape(t_vec, 1, :), ps[d])[1, :]) .^ 2
-            print("\n OGA error $errs after training ")
-
         end
-        
-        println("Finish OGA for dimension $d, residual MSE: $(sum(f_res.^2))")
+
+        show_status ? println("Finish OGA for dimension $d, residual MSE: $(sum(f_res .^ 2))") : nothing
     end
 
 
