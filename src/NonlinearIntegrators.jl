@@ -31,7 +31,7 @@ using Infiltrator
 include("methods.jl")
 export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
 export IntegratorExtrapolation
-export InitialParametersMethod, TrainingMethod, OGA1d, LSGD
+export InitialParametersMethod, TrainingMethod, OGA1d, OGA1d_Legacy, LSGD
 
 include("network_integrators/utilities.jl")
 

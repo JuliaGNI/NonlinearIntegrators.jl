@@ -1,0 +1,10 @@
+[deps]
+GeometricIntegratorsBase = "71212ab4-08a2-48eb-a02b-4cbad0e9c44a"
+GeometricProblems = "18cb22b4-ad41-5c80-9c5f-710df63fbdc9"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NonlinearIntegrators = "4ad56de4-0342-4c02-9694-ab2f23251d8c"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+QuadratureRules = "a08977f5-a20d-4b99-b11f-f5ea535e0575"
+
+[sources]
+NonlinearIntegrators = {path = ".."}

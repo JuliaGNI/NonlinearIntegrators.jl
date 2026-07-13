@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `OGA1d_Legacy` initial-guess method: the previous Float64 / normal-equations OGA
+  algorithm, kept as a selectable alternative to the default `OGA1d` for
+  `NonLinear_OneLayer_GML`. Select it with
+  `NonLinear_OneLayer_GML(...; initial_guess_method = OGA1d_Legacy())`.
+- `benchmark/oga_comparison.jl` (with its own `Project.toml` and `README.md`): an
+  end-to-end comparison of `OGA1d` vs `OGA1d_Legacy` across problems of increasing
+  complexity (time-step length and number of network neurons) at Float64/Float32/
+  Float16.
 - Shared OGA numerical helpers in `src/network_integrators/utilities.jl`:
   - `weighted_lstsq(Φ, w, y)` — quadrature-weighted least squares via QR on the
     `√w`-scaled design matrix, with a Tikhonov-ridged fallback that only engages

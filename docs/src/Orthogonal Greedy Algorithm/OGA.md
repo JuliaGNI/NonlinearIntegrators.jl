@@ -108,6 +108,27 @@ dictionary before selection would change which neurons are picked and steer the
 Newton solve into a different — empirically worse — solution basin; normalization is
 therefore used only to *measure* coherence for the guard above.
 
+## Selecting the algorithm and comparing the two
+
+The reformulated algorithm is the default (`OGA1d`). The previous algorithm is kept
+as a selectable alternative, `OGA1d_Legacy`, for `NonLinear_OneLayer_GML`:
+
+```julia
+# default: working-precision QR fit
+NonLinear_OneLayer_GML(basis, quadrature; ...)
+# previous: Float64 island + normal equations
+NonLinear_OneLayer_GML(basis, quadrature; ..., initial_guess_method = OGA1d_Legacy())
+```
+
+`benchmark/oga_comparison.jl` runs both end-to-end (OGA seed + Newton solve) on the
+harmonic oscillator across problems of increasing complexity — the time-step length
+`dt` (hence the number of steps) and the number of neurons `S` (hence the number of
+parameters) — at `Float64`, `Float32` and `Float16`. In summary: where both converge
+they reach the same accuracy (the seed is only a warm start), but the legacy Gram
+solve already goes singular for the larger network (`S = 8`) and fails across the
+board at `Float16`, whereas the QR seed stays finite and lets the solve proceed. See
+`benchmark/README.md` for how to run it.
+
 ## A didactic `Float16` example
 
 The following self-contained example reproduces, in miniature, the failure that used
