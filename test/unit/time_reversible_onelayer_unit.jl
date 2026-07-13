@@ -3,7 +3,7 @@
 # discretisation. Asserts no silent upcast plus precision-appropriate accuracy.
 @testset "Time_reversible_OneLayer ($T)" for T in TEST_TYPES
     params = HarmonicOscillator.default_parameters(T)
-    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)], T;
+    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];
         timespan = (T(0.0), T(1.0)), timestep = T(0.1), parameters = params)
 
     method = Time_reversible_OneLayer(build_onelayer_basis(T; S = 4), gauss(T, 8);

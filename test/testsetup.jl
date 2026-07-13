@@ -48,7 +48,7 @@ lobatto(::Type{T}, R = 4) where {T} = QuadratureRules.LobattoLegendreQuadrature(
 # check type propagation, not long-time accuracy.
 function ho_problem(::Type{T}; timespan = (T(0.0), T(0.2)), timestep = T(0.1)) where {T}
     params = HarmonicOscillator.default_parameters(T)
-    HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)], T;
+    HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];
         timespan = timespan, timestep = timestep, parameters = params)
 end
 

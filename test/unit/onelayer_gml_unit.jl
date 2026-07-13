@@ -10,7 +10,7 @@ build_ol_method(::Type{T}; R = 8, S = 4, k = 3, dict_amount = 400) where {T} =
 
 @testset "NonLinear_OneLayer_GML ($T)" for T in TEST_TYPES
     params = HarmonicOscillator.default_parameters(T)
-    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)], T;
+    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];
         timespan = (T(0.0), T(1.0)), timestep = T(0.1), parameters = params)
 
     res = integrate(prob, build_ol_method(T); regularization_factor = T(1e-5), max_iterations = 10000)
@@ -29,7 +29,7 @@ end
 # step cannot be zero` before the solve was reached. The dictionary range is now
 # built in Float64, so the run proceeds to the (still ill-conditioned) Float16 solve.
 @testset "Float16 OGA dictionary construction is robust (dict_amount = 70000)" begin
-    prob = HarmonicOscillator.lodeproblem([Float16(0.5)], [Float16(0.0)], Float16;
+    prob = HarmonicOscillator.lodeproblem([Float16(0.5)], [Float16(0.0)];
         timespan = (Float16(0.0), Float16(1.0)), timestep = Float16(0.1))
     method = build_ol_method(Float16; dict_amount = 70000)
 

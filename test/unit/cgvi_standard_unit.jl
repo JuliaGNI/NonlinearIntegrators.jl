@@ -5,7 +5,7 @@
 # plus tight accuracy against the analytic harmonic oscillator.
 @testset "CGVI_standard ($T)" for T in TEST_TYPES
     params = HarmonicOscillator.default_parameters(T)
-    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)], T;
+    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];
         timespan = (T(0.0), T(1.0)), timestep = T(0.1), parameters = params)
 
     qlob = lobatto(T, 4)

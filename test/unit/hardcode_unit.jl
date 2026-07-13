@@ -7,7 +7,7 @@
 
 @testset "Hardcode_int ($T)" for T in TEST_TYPES
     params = HarmonicOscillator.default_parameters(T)
-    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)], T;
+    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];
         timespan = (T(0.0), T(1.0)), timestep = T(0.1), parameters = params)
 
     method = Hardcode_int(build_onelayer_basis(T; S = 4), gauss(T, 8);
@@ -24,7 +24,7 @@ end
 
 @testset "Time_Reversible_Hardcode ($T)" for T in TEST_TYPES
     params = HarmonicOscillator.default_parameters(T)
-    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)], T;
+    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];
         timespan = (T(0.0), T(1.0)), timestep = T(0.1), parameters = params)
 
     method = Time_Reversible_Hardcode(build_onelayer_basis(T; S = 4), gauss(T, 8);
