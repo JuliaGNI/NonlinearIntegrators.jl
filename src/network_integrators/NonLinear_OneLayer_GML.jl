@@ -398,7 +398,7 @@ end
     initial_params!(int, ::OGA1d_Legacy)
 
 Legacy OGA initial guess for `NonLinear_OneLayer_GML`, kept as a selectable
-alternative to the default [`OGA1d`](@ref) for comparison. This is the
+alternative to the default `OGA1d` for comparison. This is the
 pre-refactor algorithm: the dictionary and the greedy least-squares fit are
 assembled in `Float64` (a "double-precision island"), the output weights are
 obtained from the normal equations `Gk \\ rhs`, and the result is rounded into the
