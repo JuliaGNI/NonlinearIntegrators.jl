@@ -246,7 +246,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
     local S = nbasis(method(int))
     local x = nlsolution(int)
 
-    tem_ode = similar(problem, [0.0, h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_ode = similar(problem, [zero(h), h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -437,8 +437,8 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 
     # compute coefficients
     for d in 1:D
-        r₀[:, d] = (NN.layers[1])([0.0], ps[d][1])
-        r₁[:, d] = (NN.layers[1])([1.0], ps[d][1])
+        r₀[:, d] = (NN.layers[1])([zero(ST)], ps[d][1])
+        r₁[:, d] = (NN.layers[1])([one(ST)], ps[d][1])
         for j in eachindex(quad_nodes)
             m[j, :, d] = (NN.layers[1])([quad_nodes[j]], ps[d][1])
             a[j, :, d] = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d])).L2.W[:]
@@ -457,11 +457,11 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
             dvdbc[j, :, d] = gv.L1.b[:]
         end
 
-        g0 = DQDθ([0.0], NeuralNetworkParameters(ps[d]))
+        g0 = DQDθ([zero(ST)], NeuralNetworkParameters(ps[d]))
         dqdWr₀[:, d] = g0.L1.W[:]
         dqdbr₀[:, d] = g0.L1.b[:]
 
-        g1 = DQDθ([1.0], NeuralNetworkParameters(ps[d]))
+        g1 = DQDθ([one(ST)], NeuralNetworkParameters(ps[d]))
         dqdWr₁[:, d] = g1.L1.W[:]
         dqdbr₁[:, d] = g1.L1.b[:]
     end

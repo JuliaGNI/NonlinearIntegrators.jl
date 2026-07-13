@@ -244,7 +244,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ha
     local S = nbasis(method(int))
     local x = nlsolution(int)
 
-    tem_ode = similar(problem, [0.0, h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_ode = similar(problem, [zero(h), h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -268,7 +268,7 @@ end
 
 function NN_anstaz(ps, S::Int, activation, t, q̄, q)
     # q_h(t) = (1-t)q_n + t*q_{n+1} + t(1-t)NN(t)
-    return (1.0 - t) * q̄ + t * q + t * (1.0 - t) * apply_NN(t, ps, S, activation)
+    return (one(t) - t) * q̄ + t * q + t * (one(t) - t) * apply_NN(t, ps, S, activation)
 end
 
 VNN_anstaz_zygote(ps, S, activation, t, q̄, q) = Zygote.gradient(tt -> NN_anstaz(ps, S, activation, tt, q̄, q),t)[1]
@@ -277,11 +277,11 @@ VNN_anstaz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_ansta
 ∂NN_anstaz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> NN_anstaz(p, S, activation, t, q̄, q), ps)
 ∂VNN_anstaz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> VNN_anstaz(p, S, activation, t, q̄, q), ps)
 
-∂NN_anstaz_∂q̄(ps,S,activation,t,q̄,q) = 1.0 .- t
+∂NN_anstaz_∂q̄(ps,S,activation,t,q̄,q) = one(t) .- t
 ∂NN_anstaz_∂q(ps,S,activation,t,q̄,q) = t
 
-∂VNN_anstaz_∂q̄(ps,S,activation,t,q̄,q)= -1.0
-∂VNN_anstaz_∂q(ps,S,activation,t,q̄,q) = 1.0
+∂VNN_anstaz_∂q̄(ps,S,activation,t,q̄,q)= -one(t)
+∂VNN_anstaz_∂q(ps,S,activation,t,q̄,q) = one(t)
 
 function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams::OGA1d, sol)
     local S = nbasis(method(int))
@@ -297,6 +297,12 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
     local q_start = sol.q # Starting point q_n
+
+    # NOTE: this OGA greedy fit only produces a *seed* for the nonlinear (Newton)
+    # solve. It is deliberately assembled in the default (Float64) precision for
+    # numerical robustness; the resulting parameters are stored into the
+    # working-precision cache and the integrator equations + Newton solve run at
+    # the working precision T. (Same rationale as NonLinear_OneLayer_GML.)
 
     # 1. Prepare quadrature weights and Ansatz factors
     local t_vec = quad_nodes[:] # Convert to vector
@@ -458,12 +464,16 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
             dvdW2c[j, :, d] = gv[1:S]
         end
 
-        g0 = ∂NN_anstaz_∂params(ps_vec,S,activation,0.0,q̄[d],cache(int).q̃[d])
+        # Boundary points t=0 and t=1 must share the (plain) element type of the
+        # quadrature nodes, NOT the solver type ST: during the Newton solve ST is a
+        # ForwardDiff.Dual, and ∂NN_anstaz_∂params itself nests a ForwardDiff.gradient,
+        # so passing a Dual `t` triggers a Dual-tag ordering error.
+        g0 = ∂NN_anstaz_∂params(ps_vec,S,activation,zero(eltype(quad_nodes)),q̄[d],cache(int).q̃[d])
         dqdW1r₀[:, d] = g0[S+1:2S]
         dqdbr₀[:, d] = g0[2S+1:3S]
         dqdW2r₀[:, d] = g0[1:S]
 
-        g1 = ∂NN_anstaz_∂params(ps_vec,S,activation,1.0,q̄[d],cache(int).q̃[d])
+        g1 = ∂NN_anstaz_∂params(ps_vec,S,activation,one(eltype(quad_nodes)),q̄[d],cache(int).q̃[d])
         dqdW1r₁[:, d] = g1[S+1:2S]
         dqdbr₁[:, d] = g1[2S+1:3S]
         dqdW2r₁[:, d] = g1[1:S]
@@ -656,7 +666,7 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Hardcode_int})
             ps[k][1].b[i] = x[D*(S+1+S)+D*(i-1)+k]
         end
 
-        ps_vec = zeros(3S)
+        ps_vec = zeros(eltype(x), 3S)
         ps_vec[1:S] = ps[k][2].W[:]
         ps_vec[S+1:2S] = ps[k][1].W[:]
         ps_vec[2S+1:3S] = ps[k][1].b[:]

@@ -184,7 +184,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
     local x = nlsolution(int)
     local NP = method(int).basis.NP
 
-    tem_ode = similar(problem, [0.0, h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_ode = similar(problem, [zero(h), h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -376,10 +376,10 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
         # r₀[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([0.0],intermidiate_ps)
         # r₁[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([1.0],intermidiate_ps)
         # for i in 1:S
-        g0 = DQDθ([0.0], NeuralNetworkParameters(ps[d]))
+        g0 = DQDθ([zero(ST)], NeuralNetworkParameters(ps[d]))
         g0_params[:,d] = flatten_params(g0)
 
-        g1 = DQDθ([1.0], NeuralNetworkParameters(ps[d]))
+        g1 = DQDθ([one(ST)], NeuralNetworkParameters(ps[d]))
         g1_params[:,d] = flatten_params(g1)
 
         for j in eachindex(quad_nodes)
@@ -400,11 +400,11 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 
     # compute q[t_{n+1}]
     for d in eachindex(q)
-        q[d] = NN([1.0], NeuralNetworkParameters(ps[d]))[1]
+        q[d] = NN([one(ST)], NeuralNetworkParameters(ps[d]))[1]
     end
 
     for d in eachindex(q)
-        q0[d] = NN([0.0], NeuralNetworkParameters(ps[d]))[1]
+        q0[d] = NN([zero(ST)], NeuralNetworkParameters(ps[d]))[1]
     end
 
     # compute V volicity at quadrature points
