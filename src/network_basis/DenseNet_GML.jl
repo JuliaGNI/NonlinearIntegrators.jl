@@ -35,14 +35,14 @@ struct DenseNet_GML{T,NT,BT,SNNT,QWFT,VT,VWFT} <: DenseNetBasis{T}
         SNN = SymbolicNeuralNetwork(NN)
 
 
-        dqdθ = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Gradient(SNN))[1]
+        soutput = SNN.model(SNN.input, SNN.params)
+        dqdθ = SymbolicNeuralNetworks.symbolic_pullback(soutput, SNN)[1]
         dqdθ_built_function = build_nn_function(dqdθ, SNN.params, SNN.input)
 
         VNN = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Jacobian(SNN))
         V_built_function = build_nn_function(VNN, SNN.params, SNN.input)
 
-        g = SymbolicNeuralNetworks.Gradient(VNN, SNN)
-        dvdθ = SymbolicNeuralNetworks.derivative(g)
+        dvdθ = SymbolicNeuralNetworks.symbolic_pullback(VNN, SNN)
         dvdθ_built_function = build_nn_function(dvdθ, SNN.params, SNN.input)
 
         new{T,typeof(NN),typeof(backend),typeof(SNN),typeof(dqdθ_built_function),typeof(V_built_function),typeof(dvdθ_built_function)}(activation,S,S₁,NN, backend, NP, SNN,

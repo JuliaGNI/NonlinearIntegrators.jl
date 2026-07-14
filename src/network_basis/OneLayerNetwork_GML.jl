@@ -15,12 +15,12 @@ struct OneLayerNetwork_GML{T,NT,BT,SNNT,QWFT,VWFT}<:OneLayerNetBasis{T}
             AbstractNeuralNetworks.Dense(S,1,identity,use_bias= false))
         SNN = SymbolicNeuralNetwork(NN)
 
-        dqdθ = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Gradient(SNN))[1,1]
+        soutput = SNN.model(SNN.input, SNN.params)
+        dqdθ = SymbolicNeuralNetworks.symbolic_pullback(soutput, SNN)[1,1]
         dqdθ_built_function = build_nn_function(dqdθ, SNN.params, SNN.input)
 
         jac = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Jacobian(SNN))[1,1]
-        g = SymbolicNeuralNetworks.Gradient(jac,SNN)
-        dvdθ =SymbolicNeuralNetworks.derivative(g)[1]
+        dvdθ = SymbolicNeuralNetworks.symbolic_pullback(jac, SNN)[1]
         dvdθ_built_function = build_nn_function(dvdθ, SNN.params, SNN.input)
 
         new{T,typeof(NN),typeof(backend),typeof(SNN),typeof(dqdθ_built_function),typeof(dvdθ_built_function)}(activation,S,NN,backend,SNN,
