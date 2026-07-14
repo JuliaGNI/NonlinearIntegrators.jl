@@ -143,7 +143,7 @@ struct Time_Reversible_HardcodeCache{ST,S,R,N} <: IODEIntegratorCache{ST}
         stage_values = zeros(ST, 41, D)
         network_labels = zeros(ST, N + 1, D)
 
-        new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, 
+        new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps,
             dqdW2c, dvdW2c, dqdW1c, dvdW1c, dqdbc, dvdbc,
             dqdW2r₁, dqdW2r₀, dqdW1r₁, dqdW1r₀, dqdbr₁, dqdbr₀,
             current_step, stage_values, network_labels)
@@ -370,13 +370,13 @@ function initial_params!(int::GeometricIntegrator{<:Time_Reversible_Hardcode}, I
     # 布局必须与 components! 严格一致
     for k in 1:D
         # 终点 q_{n+1}
-        x[D*S+k] = q̃[k] 
+        x[D*S+k] = q̃[k]
 
         # 输出层权重 W2
         for i in 1:S
             x[D*(i-1)+k] = ps[k][2].W[i]
         end
-        
+
         # 隐藏层 W1, b (只映射独立的部分，即 2i-1)
         for i in 1:Int(S/2)
             idx_W1 = Int(D*(S+1)+D*(i-1)+k)
@@ -397,8 +397,8 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     local C = cache(int, ST)
 
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
-    local q̄ = sol.q    
-    
+    local q̄ = sol.q
+
     local q = cache(int, ST).q̃
     local p = cache(int, ST).p̃
     local Q = cache(int, ST).Q
@@ -426,11 +426,11 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 
     local activation = method(int).basis.activation
 
-    # copy x to q 
+    # copy x to q
     for k in eachindex(q)
         q[k] = x[D*S+k]
     end
-        
+
     for k in 1:D
         for i in 1:S
             ps[k][2].W[i] = x[D*(i-1)+k]
@@ -439,7 +439,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
             ps[k][1].W[Int(2i-1)] = x[Int(D*(S+1)+D*(i-1)+k)]
             ps[k][1].b[Int(2i-1)] = x[Int(D*(S+1+S/2)+D*(i-1)+k)]
             ps[k][1].W[Int(2i)] = -1 * ps[k][1].W[Int(2i-1)]
-            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)] 
+            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)]
         end
     end
 
@@ -458,8 +458,8 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
             dqdbc[j, :, d] = g[2S+1:3S]
 
             gv = ∂VNN_anstaz_∂params(ps_vec,S,activation,quad_nodes[j],q̄[d],cache(int).q̃[d])
-            dvdW1c[j, :, d] = gv[S+1:2S] 
-            dvdbc[j, :, d] = gv[2S+1:3S] 
+            dvdW1c[j, :, d] = gv[S+1:2S]
+            dvdbc[j, :, d] = gv[2S+1:3S]
             dvdW2c[j, :, d] = gv[1:S]
         end
 
@@ -529,7 +529,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
 
     local show_status = method(int).show_status
-    
+
     # compute b = - [(P-AF)], the residual in actual action, vatiation with respect to Q_{n,i}
     for i in 1:S
         for k in 1:D
@@ -665,9 +665,9 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Time_Reversible_Hardcod
             ps[k][1].W[Int(2i-1)] = x[Int(D*(S+1)+D*(i-1)+k)]
             ps[k][1].b[Int(2i-1)] = x[Int(D*(S+1+S/2)+D*(i-1)+k)]
             ps[k][1].W[Int(2i)] = -1 * ps[k][1].W[Int(2i-1)]
-            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)] 
+            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)]
         end
-        
+
         ps_vec = zeros(eltype(x), 3S)
         ps_vec[1:S] = ps[k][2].W[:]
         ps_vec[S+1:2S] = ps[k][1].W[:]
@@ -709,6 +709,7 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     for n in n₁:n₂
         println("Start integrate at time step n = $(n)")
         # integrate one step and copy solution from cache to solution
+        reset!(solstep, timesteps(sol)[n])
         integrate!(solstep, int)
         copy!(sol, current(solstep), n)
 
@@ -729,4 +730,3 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
 
     return sol, internal_values
 end
-

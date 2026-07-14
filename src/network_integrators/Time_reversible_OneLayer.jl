@@ -342,7 +342,7 @@ function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, I
         for i in 1:S
             x[D*(i-1)+k] = ps[k][2].W[i]
         end
-        
+
         for i in 1:Int(S/2)
             x[Int(D*(S+1)+D*(i-1)+k)] = ps[k][1].W[Int(2i-1)]
             x[Int(D*(S+1+S/2)+D*(i-1)+k)] = ps[k][1].b[Int(2i-1)]
@@ -400,7 +400,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     for k in eachindex(p)
         p[k] = x[D*S+k]
     end
-        
+
     for k in 1:D
         for i in 1:S
             ps[k][2].W[i] = x[D*(i-1)+k]
@@ -409,7 +409,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
             ps[k][1].W[Int(2i-1)] = x[Int(D*(S+1)+D*(i-1)+k)]
             ps[k][1].b[Int(2i-1)] = x[Int(D*(S+1+S/2)+D*(i-1)+k)]
             ps[k][1].W[Int(2i)] = -1 * ps[k][1].W[Int(2i-1)]
-            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)] 
+            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)]
         end
     end
 
@@ -624,7 +624,7 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Time_reversible_OneLaye
             ps[k][1].W[Int(2i-1)] = x[Int(D*(S+1)+D*(i-1)+k)]
             ps[k][1].b[Int(2i-1)] = x[Int(D*(S+1+S/2)+D*(i-1)+k)]
             ps[k][1].W[Int(2i)] = -1 * ps[k][1].W[Int(2i-1)]
-            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)] 
+            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)]
         end
         stage_values[:, k] = NN(network_inputs, ps[k])[:]
         if show_status
@@ -659,6 +659,7 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     for n in n₁:n₂
         println("Start integrate at time step n = $(n)")
         # integrate one step and copy solution from cache to solution
+        reset!(solstep, timesteps(sol)[n])
         integrate!(solstep, int)
         copy!(sol, current(solstep), n)
 
@@ -679,4 +680,3 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
 
     return sol, internal_values
 end
-

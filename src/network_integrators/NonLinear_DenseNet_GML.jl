@@ -550,6 +550,7 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     # loop over time steps
     for n in n₁:n₂
         # integrate one step and copy solution from cache to solution
+        reset!(solstep, timesteps(sol)[n])
         integrate!(solstep, int)
         copy!(sol, current(solstep), n)
 

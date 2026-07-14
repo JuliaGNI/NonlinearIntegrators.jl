@@ -103,7 +103,7 @@ struct Hardcode_intCache{ST,S,R,N} <: IODEIntegratorCache{ST}
 
     function Hardcode_intCache{ST,S,R,N}(ics) where {ST,S,R,N}
         D = length(vec(ics.q))
-        x = zeros(ST, D * (1 + 3 * S)) 
+        x = zeros(ST, D * (1 + 3 * S))
 
         q̄ = zeros(ST, D)
         p̄ = zeros(ST, D)
@@ -143,7 +143,7 @@ struct Hardcode_intCache{ST,S,R,N} <: IODEIntegratorCache{ST}
         stage_values = zeros(ST, 41, D)
         network_labels = zeros(ST, N + 1, D)
 
-        new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, 
+        new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps,
             dqdW2c, dvdW2c, dqdW1c, dvdW1c, dqdbc, dvdbc,
             dqdW2r₁, dqdW2r₀, dqdW1r₁, dqdW1r₀, dqdbr₁, dqdbr₀,
             current_step, stage_values, network_labels)
@@ -373,9 +373,9 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams
         for i in 1:S
             x[D*(i-1)+k] = ps[k][2].W[i]
         end
-        
+
         x[D*S+k] = cache(int).q̃[k]
-        
+
         for i in 1:S
             x[D*(S+1)+D*(i-1)+k] = ps[k][1].W[i]
             x[D*(S+1+S)+D*(i-1)+k] = ps[k][1].b[i]
@@ -391,8 +391,8 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     local C = cache(int, ST)
 
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
-    local q̄ = sol.q    
-    
+    local q̄ = sol.q
+
     local q = cache(int, ST).q̃
     local p = cache(int, ST).p̃
     local Q = cache(int, ST).Q
@@ -420,11 +420,11 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 
     local activation = method(int).basis.activation
 
-    # copy x to q 
+    # copy x to q
     for k in eachindex(q)
         q[k] = x[D*S+k]
     end
-        
+
     for k in 1:D
         for i in 1:S
             ps[k][2].W[i] = x[D*(i-1)+k]
@@ -448,8 +448,8 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
             dqdbc[j, :, d] = g[2S+1:3S]
 
             gv = ∂VNN_anstaz_∂params(ps_vec,S,activation,quad_nodes[j],q̄[d],cache(int).q̃[d])
-            dvdW1c[j, :, d] = gv[S+1:2S] 
-            dvdbc[j, :, d] = gv[2S+1:3S] 
+            dvdW1c[j, :, d] = gv[S+1:2S]
+            dvdbc[j, :, d] = gv[2S+1:3S]
             dvdW2c[j, :, d] = gv[1:S]
         end
 
@@ -519,7 +519,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
 
     local show_status = method(int).show_status
-    
+
     # compute b = - [(P-AF)], the residual in actual action, vatiation with respect to Q_{n,i}
     for i in 1:S
         for k in 1:D
@@ -696,6 +696,7 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     for n in n₁:n₂
         println("Start integrate at time step n = $(n)")
         # integrate one step and copy solution from cache to solution
+        reset!(solstep, timesteps(sol)[n])
         integrate!(solstep, int)
         copy!(sol, current(solstep), n)
 
@@ -716,4 +717,3 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
 
     return sol, internal_values
 end
-

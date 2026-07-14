@@ -103,7 +103,7 @@ struct NonLinear_OneLayer_GMLCache{ST,S,R,N,NEpochs} <: IODEIntegratorCache{ST}
     training_time::Vector{ST}
     solving_time::Vector{ST}
     integrating_time::Vector{ST}
-    
+
     function NonLinear_OneLayer_GMLCache{ST,S,R,N,NEpochs}(ics) where {ST,S,R,N,NEpochs}
         D = length(vec(ics.q))
         x = zeros(ST, D * (S + 1 + 2 * S)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
@@ -190,7 +190,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
     initial_trajectory!(sol, history, params, int, initial_trajectory)
 
     @debug "network inputs " network_inputs
-    @debug "network labels from initial guess methods " network_labels'    
+    @debug "network labels from initial guess methods " network_labels'
 
     initial_params!(int, initial_guess_method)
 end
@@ -318,7 +318,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
             x[D*(S+1+S)+D*(i-1)+k] = PNN.params[1].b[i]
         end
     end
-    @debug "Initial guess from network training" x 
+    @debug "Initial guess from network training" x
 end
 
 
@@ -655,7 +655,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     local dqdWr₀ = cache(int, ST).dqdWr₀
     local dqdbr₁ = cache(int, ST).dqdbr₁
     local dqdbr₀ = cache(int, ST).dqdbr₀
-    
+
     # compute b = - [(P-AF)], the residual in actual action, vatiation with respect to Q_{n,i}
     for i in 1:S
         for k in 1:D
@@ -700,7 +700,7 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     end
     # @debug " Residual vector b: " b
     # @debug " Norm of Residual vector b: " norm(b)
-    
+
 end
 
 # Compute stages of Variational Partitioned Runge-Kutta methods.
@@ -797,10 +797,11 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
     for n in n₁:n₂
         @debug "Start integrate at time step: " n
         # integrate one step and copy solution from cache to solution
+        reset!(solstep, timesteps(sol)[n])
         t1 = time()
         integrate!(solstep, int)
-        copy!(sol, current(solstep), n)
         t2 = time()
+        copy!(sol, current(solstep), n)
         cache(int).integrating_time[1] = t2 - t1
 
         havenan = false
@@ -817,7 +818,7 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
             internal_values[n] = deepcopy(cache(int).stage_values)
         end
         if hasproperty(cache(int),:mse_err)
-            mse_err_list[n] = deepcopy(cache(int).mse_err)  
+            mse_err_list[n] = deepcopy(cache(int).mse_err)
         end
         if hasproperty(cache(int),:abs_err)
             abs_err_list[n] = deepcopy(cache(int).abs_err)
@@ -836,13 +837,12 @@ function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int
         end
     end
 
-    return (sol = sol, 
-    internal_values = internal_values, 
-    mse_err_list = mse_err_list, 
-    abs_err_list = abs_err_list, 
+    return (sol = sol,
+    internal_values = internal_values,
+    mse_err_list = mse_err_list,
+    abs_err_list = abs_err_list,
     err_values = err_values,
     training_time_list = training_time_list,
     integration_time_list = integration_time_list,
     solving_time_list = solving_time_list)
 end
-

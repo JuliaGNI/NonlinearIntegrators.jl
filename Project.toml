@@ -27,6 +27,10 @@ SymbolicNeuralNetworks = "aed23131-dcd0-47ca-8090-d21e605652e3"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
+[sources]
+GeometricIntegrators = {path = "../GeometricIntegrators"}
+GeometricIntegratorsBase = {path = "../GeometricIntegratorsBase"}
+
 [compat]
 AbstractNeuralNetworks = "0.6"
 BSplineKit = "0.19"
@@ -35,7 +39,7 @@ ContinuumArrays = "0.20"
 ForwardDiff = "1"
 GeometricBase = "0.14"
 GeometricIntegrators = "0.16"
-GeometricIntegratorsBase = "0.2, 0.3"
+GeometricIntegratorsBase = "0.4"
 GeometricMachineLearning = "0.4"
 GeometricProblems = "0.7"
 GeometricSolutions = "0.6"
