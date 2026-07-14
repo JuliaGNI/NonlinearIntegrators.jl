@@ -210,22 +210,20 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
             t=sol.t + (network_inputs[i]-1) * timestep(int),
             q=cache(int).q̃,
             p=cache(int).p̃,
-            v=cache(int).ṽ,
-            f=cache(int).f̃,
+            q̇=cache(int).ṽ,
+            ṗ=cache(int).f̃,
         )
         solutionstep!(soltmp, history, problem(int), iguess(int))
-        println(" Hermite Extrapolation trajectory at time ", soltmp.t, " : \n", cache(int).q̃[1])
         for k in 1:D
             network_labels[i, k] = cache(int).q̃[k]
         end
     end
-    println(" Hermite Extrapolation initial trajectory: \n", network_labels')
     soltmp = (
         t=sol.t,
         q=cache(int).q̃,
         p=cache(int).p̃,
-        v=cache(int).ṽ,
-        f=cache(int).f̃,
+        q̇=cache(int).ṽ,
+        ṗ=cache(int).f̃,
     )
     solutionstep!(soltmp, history, problem(int), iguess(int))
 
@@ -252,6 +250,25 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
         cache(int).q̃[k] = tem_sol.q[:, k][end]
         cache(int).p̃[k] = tem_sol.p[:, k][end]
         x[D*S+k] = cache(int).p̃[k]
+    end
+end
+
+# "No initial guess": rather than extrapolating a trajectory, use the previous
+# solution as a constant seed. Every stage label is set to the previous qₙ (so the
+# subsequent OGA/parameter fit targets a flat trajectory) and the momentum degree of
+# freedom is seeded with the previous pₙ. This is the cheapest possible warm start and
+# is useful as a baseline against the midpoint/Hermite extrapolations.
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initial_trajectory::NoExtrapolation)
+    local network_labels = cache(int).network_labels
+    local D = length(cache(int).q̃)
+    local S = nbasis(method(int))
+    local x = nlsolution(int)
+
+    for k in 1:D
+        network_labels[:, k] .= sol.q[k]
+        cache(int).q̃[k] = sol.q[k]
+        cache(int).p̃[k] = sol.p[k]
+        x[D*S+k] = sol.p[k]
     end
 end
 
