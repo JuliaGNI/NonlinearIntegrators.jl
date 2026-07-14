@@ -135,6 +135,11 @@ the `DogLeg` solver, the `midpoint` initial guess, and the precision-scaled regu
 `λ = 16√eps(T)`. It illustrates the kind of output the suite produces; the numbers below
 are from one representative run and are not a fixed reference.
 
+The figures shown below are **not committed**: they are regenerated at documentation-build
+time by a fresh `quick` run over the four problems (driven from `docs/make.jl`), so they
+track the current package. The narrative and tables in this section are kept as an
+illustrative reference and may not match the freshly generated figures exactly.
+
 Of the 72 cases, 48 converged. Convergence is dominated by precision: half precision is
 by far the least robust.
 
