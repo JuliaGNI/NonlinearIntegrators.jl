@@ -22,6 +22,7 @@ makedocs(
     pages=[
         "Home" => "index.md",
         "Orthogonal Greedy Algorithm" => "Orthogonal Greedy Algorithm/OGA.md",
+        "Benchmarks" => "Benchmarks/benchmarks.md",
     ],
 )
 
