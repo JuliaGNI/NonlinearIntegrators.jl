@@ -24,7 +24,7 @@ GeometricIntegratorsBase.default_options(method::NonLinear_OneLayer_GML) = (
     # f_abstol = f_abs * eps(),
     max_iterations = 10000,
     linesearch=GeometricIntegratorsBase.default_linesearch(method),
-    regularization_factor = 1e-5, 
+    regularization_factor = 1e-5,
 )
 # SimpleSolvers.Backtracking() # The default linear search method is Backtracking()
 # # GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic()
@@ -32,8 +32,8 @@ GeometricIntegratorsBase.default_options(method::NonLinear_OneLayer_GML) = (
 # SimpleSolvers.Static()
 
 # R_list = [8,16,4]#
-# S_list = [4,6,8]# 
-# k_list = [2,3,4]# 
+# S_list = [4,6,8]#
+# k_list = [2,3,4]#
 
 S = 4
 R = 4
@@ -65,7 +65,7 @@ HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.
                     relu = x->max(0.0,x) ^ k_relu
                     OLnetwork = OneLayerNetwork_GML{Float64}(relu,S)
                     NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
-                
+
                     #HarmonicOscillator
                     HO_NLOLsol = integrate(HO_lode, NLOLCGVNI_Gml)
                     HO_qerror = relative_maximum_error(HO_NLOLsol.sol.q,HO_ref.q)
@@ -94,7 +94,7 @@ HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.
                     # plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
                     # plot!(int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Truth", linestyle=:dash, linecolor=:black)
                     # scatter!(collect(0:int_step:int_timespan), collect(HO_NLOLsol.sol.q[:, 1]), label="Discrete solution")
-                    # savefig("result_figures/nn_harmonic_oscillator_solution.png")
+                    # savefig("results/nn_harmonic_oscillator_solution.png")
 
                 #     end
                 # end

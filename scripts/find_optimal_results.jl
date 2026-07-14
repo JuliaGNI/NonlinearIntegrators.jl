@@ -5,7 +5,7 @@ for R in [8,16,32]
     for iter in [1000,10000]
         for fab in ["1.78e-15","4.44e-16"]
             for fsuc in ["1.78e-15","4.44e-16"]
-                filename = "parallel_result_figures/Backtracking2_R$(R)_h5.00_iter$(iter)_fabs$(fab)_fsuc$(fsuc)_TT200.jld2"
+                filename = "parallel_results/Backtracking2_R$(R)_h5.00_iter$(iter)_fabs$(fab)_fsuc$(fsuc)_TT200.jld2"
                 res = load(filename)
                 if res["PerturbedPendulum_hams_err"] <err
                     err = res["PerturbedPendulum_hams_err"]
@@ -25,7 +25,7 @@ end
 
 function hamiltonian(q1,q2,p1,p2)
     λ = 1.0
-    0.5 * (p1^2 + p2^2) + 0.5 * (q1^2 + q2^2) + λ * (q1^2 * q2 - q2^3 / 3) 
+    0.5 * (p1^2 + p2^2) + 0.5 * (q1^2 + q2^2) + λ * (q1^2 * q2 - q2^3 / 3)
 end
 
 initial_ham = hamiltonian(HHq1[1], HHq2[1], HHp1[1], HHp2[1])
@@ -39,7 +39,7 @@ for R in [8,16,32]
     for iter in [1000,10000]
         for fab in ["1.78e-15","4.44e-16"]
             for fsuc in ["1.78e-15","4.44e-16"]
-                filename = "parallel_result_figures/Backtracking2_R$(R)_h$(h)0_iter$(iter)_fabs$(fab)_fsuc$(fsuc)_TT200.jld2"
+                filename = "parallel_results/Backtracking2_R$(R)_h$(h)0_iter$(iter)_fabs$(fab)_fsuc$(fsuc)_TT200.jld2"
                 res = load(filename)
                 HHq1 = res["HenonHeiles_PR_sol_q1"][1:Int(time_span/h)+1]
                 HHq2 = res["HenonHeiles_PR_sol_q2"][1:Int(time_span/h)+1]
@@ -61,5 +61,3 @@ for R in [8,16,32]
         end
     end
 end
-
-

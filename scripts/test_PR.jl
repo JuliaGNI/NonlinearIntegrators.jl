@@ -10,7 +10,7 @@ using SimpleSolvers
 using JLD2
 
 # function PR_plot_1d(PR_sol, internal_sol, pref,relative_ham_err, h_step, TT, title_name)
-#     p = plot(layout=@layout([a; b; c]), label="", size=(700, 700)) 
+#     p = plot(layout=@layout([a; b; c]), label="", size=(700, 700))
 
 #     plot!(p[1],collect(0:h_step/40:TT),collect(pref.q[:,1]), label="Reference Solution",xaxis="time", yaxis="q₁")
 #     plot!(p[1],h_step/40:h_step/40:TT, vcat(hcat(internal_sol...)[2:end,:]...),label = "VISE Solution")
@@ -20,7 +20,7 @@ using JLD2
 #     scatter!(p[2],collect(0:h_step:TT),collect(PR_sol.p[:,1]), label="VISE Discrete Solution")
 
 #     plot!(p[3], 0:h_step:TT, relative_ham_err, label = "VISE Solution", xaxis="time", yaxis="Relative Hamiltonian error")
-#     savefig("result_figures/$(title_name).pdf")
+#     savefig("results/$(title_name).pdf")
 # end
 
 # function PR_plot_2d(PR_sol, internal_sol, pref,relative_ham_err, h_step, TT, title_name)
@@ -50,7 +50,7 @@ using JLD2
 #     plot!(p[4], 0:h_step/40:TT, collect(pref.p[:, 2]), label="Reference Solution")
 
 #     plot!(p[5], 0:h_step:TT, relative_ham_err, label="SINDy Solution", xaxis="time", yaxis="Relative Hamiltonian error")
-#     savefig(p, "result_figures/$(title_name).pdf")
+#     savefig(p, "results/$(title_name).pdf")
 # end
 
 # t0 = time()
@@ -74,7 +74,7 @@ using JLD2
 #     h_step = parse(Float64,ARGS[1])
 #     record_results = Dict()
 #     # Harmonic Oscillator
-#     begin 
+#     begin
 #         @variables W[1:3] ttt
 #         q_expr = W[1] *sin(W[2]* ttt + W[3])
 
@@ -90,8 +90,8 @@ using JLD2
 
 #         # R = 32
 #         QGau4 = QuadratureRules.GaussLegendreQuadrature(R)
-#         PR_Int = PR_Integrator(PRB, QGau4,[[-0.5000433352162222,0.705350078478666,-1.5678140333370576]]) # Pass the init W into the integrator instead of basis                                               
-#         # PR_Int = PR_Integrator(PRB, QGau4,[[-0.500,sqrt(0.5),-pi/2]])                           
+#         PR_Int = PR_Integrator(PRB, QGau4,[[-0.5000433352162222,0.705350078478666,-1.5678140333370576]]) # Pass the init W into the integrator instead of basis
+#         # PR_Int = PR_Integrator(PRB, QGau4,[[-0.500,sqrt(0.5),-pi/2]])
 
 #         println("Start to run Harmonic Oscillator Problem with PR_Integrator! R = $(R), h = $(h_step)")
 #         t1 = time()
@@ -106,7 +106,7 @@ using JLD2
 #         # pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timespan = (0,TT),timestep = h_step/40))
 #         # PR_plot_1d(PR_sol, internal_sol, HO_plot, relative_hams_err, h_step, TT, "HarmonicOscillator,h$(h_step)_T$(TT)_R$(R)")
 #         # println("Finish integrating Harmonic Oscillator Problem with PR_Integrator!, Figure Saved!")
-        
+
 #         HO_imp_sol = integrate(HO_lode, ImplicitMidpoint())
 #         HO_imp_ham = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_imp_sol.q[:]), collect(HO_imp_sol.p[:]))]
 #         HO_relative_imp_ham_err = abs.((HO_imp_ham .- initial_hamiltonian) / initial_hamiltonian)
@@ -117,7 +117,7 @@ using JLD2
 
 #         QGau = GaussLegendreQuadrature(R)
 #         BGau = Lagrange(QuadratureRules.nodes(QGau))
-#         HO_cgvi_sol = integrate(HO_lode, CGVI(BGau, QGau)) 
+#         HO_cgvi_sol = integrate(HO_lode, CGVI(BGau, QGau))
 #         HO_cgvi_ham = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_cgvi_sol.q[:]), collect(HO_cgvi_sol.p[:]))]
 #         HO_relative_cgvi_ham_err = abs.((HO_cgvi_ham .- initial_hamiltonian) / initial_hamiltonian)
 
@@ -153,7 +153,7 @@ using JLD2
 
 #         # QGau = GaussLegendreQuadrature(8)
 #         # BGau = Lagrange(QuadratureRules.nodes(QGau))
-#         # cgvi_sol2 = integrate(HO_lode2, CGVI(BGau, QGau)) 
+#         # cgvi_sol2 = integrate(HO_lode2, CGVI(BGau, QGau))
 #         # cgvi_ham2 = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(cgvi_sol2.q[:]), collect(cgvi_sol2.p[:]))]
 #         # relative_cgvi_ham_err2 = abs.((cgvi_ham2 .- initial_hamiltonian) / initial_hamiltonian)
 #         # println("\n CGVI with balance_h:")
@@ -240,7 +240,7 @@ using JLD2
 #         record_results[("Pendulum_internal_sol")] = pendulum_internal_sol
 #         record_results[("Pendulum_x_list")] = pendulum_x_list
 #         record_results[("Pendulum_qerror")] = relative_maximum_error(pendulum_PR_sol.q,pd_ref_sol.q)
-#         record_results[("Pendulum_hams_err")] = maximum(pendulum_relative_hams_err) 
+#         record_results[("Pendulum_hams_err")] = maximum(pendulum_relative_hams_err)
 
 #         record_results[("Pendulum_imp_hams_err")] = maximum(pd_relative_imp_ham_err)
 #         record_results[("Pendulum_imp_qerror")] = relative_maximum_error(pd_imp_sol.q,pd_ref_sol.q)
@@ -321,7 +321,7 @@ using JLD2
 #         record_results[("PerturbedPendulum_hams_err")] = maximum(pp_relative_hams_err)
 
 #         record_results[("PerturbedPendulum_imp_hams_err")] = maximum(pp_relative_imp_ham_err)
-#         record_results[("PerturbedPendulum_imp_qerror")] = relative_maximum_error(pp_imp_sol.q,pp_ref_sol.q)    
+#         record_results[("PerturbedPendulum_imp_qerror")] = relative_maximum_error(pp_imp_sol.q,pp_ref_sol.q)
 
 #         record_results[("PerturbedPendulum_cgvi_hams_err")] = maximum(pp_relative_cgvi_ham_err)
 #         record_results[("PerturbedPendulum_cgvi_qerror")] = relative_maximum_error(pp_cgvi_sol.q,pp_ref_sol.q)
@@ -333,7 +333,7 @@ using JLD2
 
 
 #     #### Henon Heiles
-#     begin     
+#     begin
 #         println("Start to run Henon Heiles Problem with PR_Integrator!")
 
 #         # TT = 100.0
@@ -357,7 +357,7 @@ using JLD2
 
 #         PRB = PR_Basis{Float64}([q₁_expr,q₂_expr], [W1,W2], ttt,2)
 
-#         PR_Int = PR_Integrator(PRB, QGau,[[0.14831,1.0,-0.64812,- 0.018712],[0.14298,- 0.97215,0.7615,-0.0013983]]) # Pass the init W into the integrator instead of basis                                               
+#         PR_Int = PR_Integrator(PRB, QGau,[[0.14831,1.0,-0.64812,- 0.018712],[0.14298,- 0.97215,0.7615,-0.0013983]]) # Pass the init W into the integrator instead of basis
 #         HH_PR_sol,HH_internal_sol,HH_x_list = integrate(HHlode, PR_Int)
 #         @show relative_maximum_error(HH_PR_sol.q,HH_ref_sol.q)
 
@@ -408,7 +408,7 @@ using JLD2
 #         record_results[("HenonHeiles_hams_err")] = maximum(HH_relative_hams_err)
 
 #         record_results[("HenonHeiles_imp_hams_err")] = maximum(HH_relative_imp_ham_err)
-#         record_results[("HenonHeiles_imp_qerror")] = relative_maximum_error(HH_imp_sol.q,HH_ref_sol.q)  
+#         record_results[("HenonHeiles_imp_qerror")] = relative_maximum_error(HH_imp_sol.q,HH_ref_sol.q)
 
 #         record_results[("HenonHeiles_cgvi_hams_err")] = maximum(HH_relative_cgvi_ham_err)
 #         record_results[("HenonHeiles_cgvi_qerror")] = relative_maximum_error(HH_cgvi_sol.q,HH_ref_sol.q)
@@ -425,7 +425,7 @@ using JLD2
 
 
 #     filename2 = @sprintf(
-#         "parallel_result_figures/Backtracking2_R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.jld2",
+#         "parallel_results/Backtracking2_R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.jld2",
 #         R, h_step, max_iterations, f_abstol, f_suctol,TT)
 #     save(filename2,record_results)
 
@@ -472,10 +472,10 @@ using JLD2
 #         Label(fig[1:1, 0], "Harmonic Oscillator", rotation = pi/2,
 #             fontsize = label_font_size,tellheight = false)
 
-#         # Legend(fig[2, 1:3], q1_axis,orientation = :horizontal,labelsize = 30, framevisible = false,nbanks = 2)    
-#         # save("result_figures/HO.pdf", fig)
+#         # Legend(fig[2, 1:3], q1_axis,orientation = :horizontal,labelsize = 30, framevisible = false,nbanks = 2)
+#         # save("results/HO.pdf", fig)
 #         # fig
-        
+
 #         # legend_fig = Legend(fig[1,1:3],)
 #         q1_axis = Axis(fig[2, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = label_size, ylabelsize = label_size,yticklabelsize = tick_size,xticklabelsize = tick_size)
 #         q2_axis = Axis(fig[2, 2],xlabel = "Time", ylabel = "p₁", xlabelsize = label_size, ylabelsize = label_size,yticklabelsize = tick_size,xticklabelsize = tick_size)
@@ -507,12 +507,12 @@ using JLD2
 #         scatter!(ham_axis, t_coarse, pendulum_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
 #         scatter!(ham_axis, t_coarse, pd_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
 #         scatter!(ham_axis, t_coarse, pd_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
-        
+
 #         Label(fig[2, 0], "Pendulum", rotation = pi/2,
 #             fontsize = label_font_size,tellheight = false)
-#         # Legend(fig[3, 1:3], q1_axis,orientation = :horizontal,labelsize = 30, 
-#         #     framevisible = false,nbanks = 2)    
-#         # save("result_figures/hopd.pdf", fig)
+#         # Legend(fig[3, 1:3], q1_axis,orientation = :horizontal,labelsize = 30,
+#         #     framevisible = false,nbanks = 2)
+#         # save("results/hopd.pdf", fig)
 #         # fig
 
 
@@ -551,7 +551,7 @@ using JLD2
 #         Label(fig[3, 0], "Perturbed Pendulum", rotation = pi/2,
 #             fontsize = label_font_size,tellheight = false)
 
-#         # HenonHeiles_Potential 
+#         # HenonHeiles_Potential
 #         # legend_fig = Legend(fig[1,1:3],)
 #         q1_axis = Axis(fig[4, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = label_size, ylabelsize = label_size,yticklabelsize = tick_size,xticklabelsize = tick_size,limits = (nothing, (-0.15, 0.15)))
 #         p1_axis = Axis(fig[4, 2],xlabel = "Time", ylabel = "p₁", xlabelsize = label_size, ylabelsize = label_size,yticklabelsize = tick_size,xticklabelsize = tick_size,limits = (nothing, (-0.15, 0.15)))
@@ -613,14 +613,14 @@ using JLD2
 #         Label(fig[4:5, 0], "Hénon-Heiles Potential", rotation = pi/2,
 #             fontsize = label_font_size,tellheight = false)
 
-#         Legend(fig[6, 1:3], q1_axis,orientation = :horizontal,labelsize = label_font_size, 
-#             framevisible = false,nbanks = 2)    
-#         # save("result_figures/full.pdf", fig)
-        
+#         Legend(fig[6, 1:3], q1_axis,orientation = :horizontal,labelsize = label_font_size,
+#             framevisible = false,nbanks = 2)
+#         # save("results/full.pdf", fig)
+
 #         # fig
 
 #         filename = @sprintf(
-#         "parallel_result_figures/Backtracking2_R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.pdf",
+#         "parallel_results/Backtracking2_R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.pdf",
 #         R, h_step, max_iterations, f_abstol, f_suctol,TT)
 #         save(filename, fig)
 
@@ -630,7 +630,7 @@ using JLD2
 #     println("Total time taken: ", t5 - t0, " seconds")
 #     println("All results saved to ", filename)
 # end
-# begin 
+# begin
 #     TT = 100.0
 #     h_step = 0.3
 #     pendulum_lode = GeometricProblems.Pendulum.lodeproblem(timespan = (0,TT),timestep = h_step)
@@ -657,9 +657,9 @@ using JLD2
 #     Legend(pd_ref_fig[3, 1], [lin1,lin2,sca1],["Pendulum Reference Solution",
 #             "Linear Transport Equation Initial Condition",
 #             "Observation Points"],
-#     orientation = :horizontal,labelsize = 30, 
-#             framevisible = false,nbanks = 3)  
-#     save("result_figures/pd_lp_illu.svg", pd_ref_fig)
+#     orientation = :horizontal,labelsize = 30,
+#             framevisible = false,nbanks = 3)
+#     save("results/pd_lp_illu.svg", pd_ref_fig)
 #     pd_ref_fig
 
 # end
@@ -667,11 +667,11 @@ using JLD2
 # begin
 #     function pendulum_p_prediction(t,params)
 #         #q_expr = W[1] *cos(W[2]* ttt + W[3])
-#         - params[1] * params[2]* sin(params[2] * t + params[3]) 
+#         - params[1] * params[2]* sin(params[2] * t + params[3])
 #     end
 
 #     function pendulum_q_prediction(t,params)
-#         params[1] * cos(params[2] * t + params[3])   
+#         params[1] * cos(params[2] * t + params[3])
 #     end
 
 
@@ -712,7 +712,7 @@ using JLD2
 #     t7 = collect(6:h:7)
 #     q7 = [pendulum_q_prediction(ti, x_list[7]) for ti in t7]
 #     p7 = [pendulum_p_prediction(ti, x_list[7]) for ti in t7]
-#     lin7 = lines!(pq_axis, q7, p7, label="VISE Solution")   
+#     lin7 = lines!(pq_axis, q7, p7, label="VISE Solution")
 
 #     t8 = collect(7:h:8)
 #     q8 = [pendulum_q_prediction(ti, x_list[8]) for ti in t8]
@@ -762,7 +762,7 @@ using JLD2
 #     t1 = collect(0:0.01:0.1)
 #     t2 = collect(0.1:0.01:0.2)
 #     t3 = collect(0.2:0.01:0.3)
-#     t4 = collect(0.3:0.01:0.4)  
+#     t4 = collect(0.3:0.01:0.4)
 #     t5 = collect(0.4:0.01:0.5)
 
 #     lt_params1= [1.9998958731356202,0.3130332665012085,3.8434752175319824,-0.5000260330714674,0.009429492502348818,]
@@ -799,7 +799,7 @@ using JLD2
 #         for (j, tt) in enumerate(t1)
 #             u_sol_ls1[i,j] = lt_u_SindySol(xx, tt, lt_params1)
 #         end
-#     end 
+#     end
 
 #     u_sol_ls2 =zeros(length(border_x), length(t2));
 #     for (i, xx) in enumerate(border_x)
@@ -847,10 +847,10 @@ using JLD2
 #     Legend(ill_fig2[3, 1], [line_ref,lin1,hl1],["Pendulum Reference Solution",
 #             "Pendulum VISE Solution",
 #             "Discrete Time Step"],
-#     orientation = :horizontal,labelsize = 30, 
-#             framevisible = false,nbanks = 3)  
+#     orientation = :horizontal,labelsize = 30,
+#             framevisible = false,nbanks = 3)
 
-#     save("result_figures/ill_pendulum_lp_right.pdf", ill_fig2)
+#     save("results/ill_pendulum_lp_right.pdf", ill_fig2)
 # end
 
 

@@ -22,8 +22,8 @@ reg_factor = eval(Meta.parse(ARGS[2]))
 GeometricIntegratorsBase.default_options(method::Time_reversible_OneLayer) = (
     max_iterations = 10000,
     regularization_factor = reg_factor,
-    linesearch=GeometricIntegratorsBase.default_linesearch(method), 
-    # linesearch=SimpleSolvers.Static(), 
+    linesearch=GeometricIntegratorsBase.default_linesearch(method),
+    # linesearch=SimpleSolvers.Static(),
 )
 # SimpleSolvers.Backtracking() # The default linear search method is Backtracking()
 # # GeometricIntegrators.Integrators.default_linesearch(method::PR_Integrator) =SimpleSolvers.Quadratic()
@@ -31,8 +31,8 @@ GeometricIntegratorsBase.default_options(method::Time_reversible_OneLayer) = (
 # SimpleSolvers.Static()
 
 R_list = [4,8,16,]#
-S_list = [4,6,8]# 
-k_list = [3,2,4]# 
+S_list = [4,6,8]#
+k_list = [3,2,4]#
 
 tick_size = 22
 label_size = 22
@@ -62,7 +62,7 @@ for R in R_list
                         relu = x->max(0.0,x) ^ k_relu
                         OLnetwork = OneLayerNetwork_GML{Float64}(relu,S)
                         NLOLCGVNI_Gml = Time_reversible_OneLayer(OLnetwork, QGau, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
-                    
+
                         #HarmonicOscillator
                         HO_NLOLsol,internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
                         HO_qerror = relative_maximum_error(HO_NLOLsol.q,HO_ref.q)
@@ -84,11 +84,11 @@ for R in R_list
                         # plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
                         # plot!(int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Truth", linestyle=:dash, linecolor=:black)
                         # scatter!(collect(0:int_step:int_timespan), collect(HO_NLOLsol.q[:, 1]), label="Discrete solution")
-                        # savefig("result_figures/nn_harmonic_oscillator_solution.png")
+                        # savefig("results/nn_harmonic_oscillator_solution.png")
 
                         fig = Figure(size = (1000, 650))
                         # Label(fig[0, 1], "Step Size h = $h", fontsize = 28, tellwidth = false)
-                        
+
                         sol_q = collect(HO_NLOLsol.q[:, 1])
                         total_length = length(sol_q)
                         half_length = Int((length(sol_q) -1 ) ÷ 2)
@@ -164,7 +164,7 @@ end
 #                 open(log_file, "w") do io
 #                     redirect_stdio(stdout=log_file, stderr=log_file) do
 #                         record_results = Dict()
-                    
+
 #                         relu = x->max(0.0,x) ^ k_relu
 #                         OLnetwork = OneLayerNetwork_GML{Float64}(relu,S)
 #                         NLOLCGVNI_Gml = Time_reversible_OneLayer(OLnetwork, QGau, show_status = true, bias_interval = [-pi,pi], dict_amount = 400000)

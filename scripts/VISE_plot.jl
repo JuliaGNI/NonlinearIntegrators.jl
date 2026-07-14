@@ -233,7 +233,7 @@ Label(fig[4, 3], "time", fontsize=label_font_size, tellwidth=false)
 Legend(fig[5, 1:3], q1_axis, orientation=:horizontal, labelsize=label_font_size,
     framevisible=false, nbanks=2)
 
-save("result_figures/HOh125_without_initial_expression.pdf", fig)
+save("results/HOh125_without_initial_expression.pdf", fig)
 
 
 
@@ -243,7 +243,7 @@ PPD_h5 = load("/Users/zeyuanli/Desktop/untitled folder 2/ppd/Backtracking2_R16_h
 
 
 function PDD_init_q(t;params = [-0.51941, -0.47405, 2.8713])
-    params[1] * cos(params[2] * t + params[3])   
+    params[1] * cos(params[2] * t + params[3])
 end
 
 function PDD_init_p(t,q;params = [-0.51941, -0.47405, 2.8713])
@@ -269,7 +269,7 @@ begin # h= 1.0
     init_expr_q_list = [PDD_init_q(t) for t in t_coarse]
     init_expr_p_list = [PDD_init_p(ti,qi) for (ti,qi) in zip(t_coarse, init_expr_q_list)]
     init_expr_hams = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, PPD_lode.parameters) for (q, p) in zip(init_expr_q_list, init_expr_p_list)]
-    init_expr_relative_hams_err = abs.((init_expr_hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error   
+    init_expr_relative_hams_err = abs.((init_expr_hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error
 
     q1_axis = Axis(PPD_fig[1, 1], xlabelsize=label_size, ylabelsize=label_size, yticklabelsize=tick_size, xticklabelsize=tick_size)
     p1_axis = Axis(PPD_fig[1, 2], xlabelsize=label_size, ylabelsize=label_size, yticklabelsize=tick_size, xticklabelsize=tick_size)
@@ -295,7 +295,7 @@ begin # h= 1.0
 
     hams = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, PPD_lode.parameters) for (q, p) in zip(PR_sol_q_PPD_h1, PR_sol_p_PPD_h1)]
     initial_hamiltonian = hams[1]
-    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error   
+    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error
     PPD_imp_ham = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, PPD_lode.parameters) for (q, p) in zip(collect(PPD_imp_sol.q[:]), collect(PPD_imp_sol.p[:]))]
     PPD_relative_imp_ham_err = abs.((PPD_imp_ham .- initial_hamiltonian) / initial_hamiltonian)
     PPD_cgvi_ham = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, PPD_lode.parameters) for (q, p) in zip(collect(PPD_cgvi_sol.q[:]), collect(PPD_cgvi_sol.p[:]))]
@@ -326,7 +326,7 @@ begin # h = 2.0
     init_expr_p_list = [PDD_init_p(ti,qi) for (ti,qi) in zip(t_coarse, init_expr_q_list)]
 
     init_expr_hams = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, PPD_lode.parameters) for (q, p) in zip(init_expr_q_list, init_expr_p_list)]
-    init_expr_relative_hams_err = abs.((init_expr_hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error   
+    init_expr_relative_hams_err = abs.((init_expr_hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error
 
     QGau = GaussLegendreQuadrature(16)
     BGau = Lagrange(QuadratureRules.nodes(QGau))
@@ -359,7 +359,7 @@ begin # h = 2.0
 
     hams = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, PPD_lode.parameters) for (q, p) in zip(PR_sol_q_PPD_h2, PR_sol_p_PPD_h2)]
     initial_hamiltonian = hams[1]
-    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error   
+    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error
     PPD_imp_ham = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, PPD_lode.parameters) for (q, p) in zip(collect(PPD_imp_sol.q[:]), collect(PPD_imp_sol.p[:]))]
     PPD_relative_imp_ham_err = abs.((PPD_imp_ham .- initial_hamiltonian) / initial_hamiltonian)
 
@@ -395,7 +395,7 @@ begin # h = 5.0
     init_expr_p_list = [PDD_init_p(ti,qi) for (ti,qi) in zip(t_coarse, init_expr_q_list)]
 
     init_expr_hams = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, PPD_lode.parameters) for (q, p) in zip(init_expr_q_list, init_expr_p_list)]
-    init_expr_relative_hams_err = abs.((init_expr_hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error   
+    init_expr_relative_hams_err = abs.((init_expr_hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error
 
     q5_axis = Axis(PPD_fig[3, 1], xlabelsize=label_size, ylabelsize=label_size, yticklabelsize=tick_size, xticklabelsize=tick_size)
     p5_axis = Axis(PPD_fig[3, 2], xlabelsize=label_size, ylabelsize=label_size, yticklabelsize=tick_size, xticklabelsize=tick_size)
@@ -420,7 +420,7 @@ begin # h = 5.0
 
     hams = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, PPD_lode.parameters) for (q, p) in zip(PR_sol_q_PPD_h5, PR_sol_p_PPD_h5)]
     initial_hamiltonian = hams[1]
-    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error   
+    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error
     PPD_imp_ham = [GeometricProblems.PerturbedPendulum.hamiltonian(0, q, p, PPD_lode.parameters) for (q, p) in zip(collect(PPD_imp_sol.q[:]), collect(PPD_imp_sol.p[:]))]
     PPD_relative_imp_ham_err = abs.((PPD_imp_ham .- initial_hamiltonian) / initial_hamiltonian)
 
@@ -448,7 +448,7 @@ Label(PPD_fig[4, 3], "time", fontsize=label_font_size, tellwidth=false)
 Legend(PPD_fig[5, 1:3], q1_axis, orientation=:horizontal, labelsize=label_font_size,
     framevisible=false, nbanks=2)
 
-save("result_figures/PPDh125_with_initial_expression.pdf", PPD_fig)
+save("results/PPDh125_with_initial_expression.pdf", PPD_fig)
 
 max_relative_hams_err = maximum(init_expr_relative_hams_err) # 0.0438997042568547
 min_relative_hams_err = minimum(init_expr_relative_hams_err) # 0.0001801883588217746
@@ -460,7 +460,7 @@ HHP_h5 = load("/Users/zeyuanli/Desktop/untitled folder 2/Backtracking2_R16_h5.00
 
 function HHP_hamiltonian(q1,q2,p1,p2)
     λ = 1.0
-    0.5 * (p1^2 + p2^2) + 0.5 * (q1^2 + q2^2) + λ * (q1^2 * q2 - q2^3 / 3) 
+    0.5 * (p1^2 + p2^2) + 0.5 * (q1^2 + q2^2) + λ * (q1^2 * q2 - q2^3 / 3)
 end
 
 q₁_expr(t) = 0.14831 * cos(-0.64812 + t) - 0.018712
@@ -540,7 +540,7 @@ begin # h= 1.0
     init_expr_relative_hams_err = abs.((init_expr_hams .- initial_hamiltonian) / initial_hamiltonian)
 
     hams = [HHP_hamiltonian(q1, q2, p1, p2) for (q1, q2, p1, p2) in zip(PR_sol_q1, PR_sol_q2, PR_sol_p1, PR_sol_p2)]
-    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error   
+    relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)# Plot 3: Relative Hamiltonian error
     HHP_imp_ham = [HHP_hamiltonian(q1, q2, p1, p2) for (q1, q2, p1, p2) in zip(collect(HHP_imp_sol.q[:, 1]), collect(HHP_imp_sol.q[:, 2]), collect(HHP_imp_sol.p[:, 1]), collect(HHP_imp_sol.p[:, 2]))]
     HHP_relative_imp_ham_err = abs.((HHP_imp_ham .- initial_hamiltonian) / initial_hamiltonian)
     HHP_cgvi_ham = [HHP_hamiltonian(q1, q2, p1, p2) for (q1, q2, p1, p2) in zip(collect(HHP_cgvi_sol.q[:, 1]), collect(HHP_cgvi_sol.q[:, 2]), collect(HHP_cgvi_sol.p[:, 1]), collect(HHP_cgvi_sol.p[:, 2]))]
@@ -585,7 +585,7 @@ begin # h = 2.0
     for i in 1:Int(TT/h_step)
         internal_q1[i] = HHP_h2_internal_sol[i][:,1]
         internal_q2[i] = HHP_h2_internal_sol[i][:,2]
-    end 
+    end
 
     lines!(q1_axis, t_dense, collect(HHP_plot.q[:, 1]), label="Reference Solution", color=:black, linestyle=:dash, linewidth=linewidth)
     lines!(q1_axis, t_vise_dense, vcat(hcat(internal_q1...)[2:end, :]...), label="VISE Continuous Solution", color=:orange)
@@ -595,7 +595,7 @@ begin # h = 2.0
     scatter!(q1_axis, t_coarse, init_expr_q1_list, label="Initial Expression", color=:pink)
     PR_sol_q1 = HHP_h2["HenonHeiles_PR_sol_q1"][1:Int(TT/h_step)+1]
     scatter!(q1_axis, t_coarse, PR_sol_q1, label="VISE Discrete Solution", color=:blue)
-    vlines!(q1_axis, [10.0], linestyle=:dashdot, color=:purple, label="Training Region")    
+    vlines!(q1_axis, [10.0], linestyle=:dashdot, color=:purple, label="Training Region")
     lines!(q2_axis, t_dense, collect(HHP_plot.q[:, 2]), label="Reference Solution", color=:black, linestyle=:dash, linewidth=linewidth)
 
     lines!(q2_axis, t_vise_dense, vcat(hcat(internal_q2...)[2:end, :]...), label="VISE Continuous Solution", color=:orange)
@@ -620,7 +620,7 @@ begin # h = 2.0
     scatter!(p2_axis, t_coarse, PR_sol_p2, label="VISE Discrete Solution ", color=:blue)
 
     ref_hams = HHP_hamiltonian.(collect(HHP_plot.q[:, 1]), collect(HHP_plot.q[:, 2]), collect(HHP_plot.p[:, 1]), collect(HHP_plot.p[:, 2]))
-    initial_hamiltonian = ref_hams[1]   
+    initial_hamiltonian = ref_hams[1]
     init_expr_hams = [HHP_hamiltonian(q₁_expr(t), q₂_expr(t), p₁_expr(t), p₂_expr(t)) for t in 0:h_step:TT]
     init_expr_relative_hams_err = abs.((init_expr_hams .- initial_hamiltonian) / initial_hamiltonian)
     hams = [HHP_hamiltonian(q1, q2, p1, p2) for (q1, q2, p1, p2) in zip(PR_sol_q1, PR_sol_q2, PR_sol_p1, PR_sol_p2)]
@@ -628,7 +628,7 @@ begin # h = 2.0
     HHP_imp_ham = [HHP_hamiltonian(q1, q2, p1, p2) for (q1, q2, p1, p2) in zip(collect(HHP_imp_sol.q[:, 1]), collect(HHP_imp_sol.q[:, 2]), collect(HHP_imp_sol.p[:, 1]), collect(HHP_imp_sol.p[:, 2]))]
     HHP_relative_imp_ham_err = abs.((HHP_imp_ham .- initial_hamiltonian) / initial_hamiltonian)
     HHP_cgvi_ham = [HHP_hamiltonian(q1, q2, p1, p2) for (q1, q2, p1, p2) in zip(collect(HHP_cgvi_sol.q[:, 1]), collect(HHP_cgvi_sol.q[:, 2]), collect(HHP_cgvi_sol.p[:, 1]), collect(HHP_cgvi_sol.p[:, 2]))]
-    HHP_relative_cgvi_ham_err = abs.((HHP_cgvi_ham .- initial_hamiltonian) / initial_hamiltonian)   
+    HHP_relative_cgvi_ham_err = abs.((HHP_cgvi_ham .- initial_hamiltonian) / initial_hamiltonian)
 
     lines!(ham_axis, t_coarse, relative_hams_err, label="VISE Discrete Solution ", color=:blue)
     lines!(ham_axis, t_coarse, HHP_relative_imp_ham_err, label="Implicit Midpoint Solution ", color=:red)
@@ -669,7 +669,7 @@ begin # h = 5.0
     for i in 1:Int(TT/h_step)
         internal_q1[i] = HHP_h5_internal_sol[i][:,1]
         internal_q2[i] = HHP_h5_internal_sol[i][:,2]
-    end 
+    end
 
     lines!(q1_axis, t_dense, collect(HHP_plot.q[:, 1]), label="Reference Solution", color=:black, linestyle=:dash, linewidth=linewidth)
     lines!(q1_axis, t_vise_dense, vcat(hcat(internal_q1...)[2:end, :]...), label="VISE Continuous Solution", color=:orange)
@@ -679,9 +679,9 @@ begin # h = 5.0
     scatter!(q1_axis, t_coarse, init_expr_q1_list, label="Initial Expression", color=:pink)
     PR_sol_q1 = HHP_h5["HenonHeiles_PR_sol_q1"][1:Int(TT/h_step)+1]
     scatter!(q1_axis, t_coarse, PR_sol_q1, label="VISE Discrete Solution", color=:blue)
-    vlines!(q1_axis, [10.0], linestyle=:dashdot, color=:purple, label="Training Region")    
+    vlines!(q1_axis, [10.0], linestyle=:dashdot, color=:purple, label="Training Region")
     lines!(q2_axis, t_dense, collect(HHP_plot.q[:, 2]), label="Reference Solution", color=:black, linestyle=:dash, linewidth=linewidth)
-    lines!(q2_axis, t_vise_dense, vcat(hcat(internal_q2...)[2:end, :]...), label="VISE Continuous Solution", color=:orange) 
+    lines!(q2_axis, t_vise_dense, vcat(hcat(internal_q2...)[2:end, :]...), label="VISE Continuous Solution", color=:orange)
 
     scatter!(q2_axis, t_coarse, collect(HHP_cgvi_sol.q[:, 2]), label="Galerkin Integrator Solution ", color=:green)
     scatter!(q2_axis, t_coarse, collect(HHP_imp_sol.q[:, 2]), label="Implicit Midpoint Solution ", color=:red)
@@ -689,13 +689,13 @@ begin # h = 5.0
     scatter!(q2_axis, t_coarse, init_expr_q2_list, label="Initial Expression", color=:pink)
     PR_sol_q2 = HHP_h5["HenonHeiles_PR_sol_q2"][1:Int(TT/h_step)+1]
     scatter!(q2_axis, t_coarse, PR_sol_q2, label="VISE Discrete Solution ", color=:blue)
-    vlines!(q2_axis, [10.0], linestyle=:dashdot, color=:purple, label="Training Region")    
+    vlines!(q2_axis, [10.0], linestyle=:dashdot, color=:purple, label="Training Region")
 
     lines!(p1_axis, t_dense, collect(HHP_plot.p[:, 1]), label="Reference Solution", color=:black, linestyle=:dash, linewidth=linewidth)
     scatter!(p1_axis, t_coarse, collect(HHP_cgvi_sol.p[:, 1]), label="Galerkin Integrator Solution ", color=:green)
     scatter!(p1_axis, t_coarse, collect(HHP_imp_sol.p[:, 1]), label="Implicit Midpoint Solution ", color=:red)
     PR_sol_p1 = HHP_h5["HenonHeiles_PR_sol_p1"][1:Int(TT/h_step)+1]
-    scatter!(p1_axis, t_coarse, PR_sol_p1, label="VISE Discrete Solution ", color=:blue)    
+    scatter!(p1_axis, t_coarse, PR_sol_p1, label="VISE Discrete Solution ", color=:blue)
 
     lines!(p2_axis, t_dense, collect(HHP_plot.p[:, 2]), label="Reference Solution", color=:black, linestyle=:dash, linewidth=linewidth)
     scatter!(p2_axis, t_coarse, collect(HHP_cgvi_sol.p[:, 2]), label="Galerkin Integrator Solution ", color=:green)
@@ -743,7 +743,7 @@ Label(HHP_fig[4, 5], "time", fontsize=label_font_size, tellwidth=false)
 Legend(HHP_fig[5, 1:5], q1_axis, orientation=:horizontal, labelsize=label_font_size,
     framevisible=false, nbanks=2)
 
-save("result_figures/HHP_h125_with_initial_expression.pdf", HHP_fig)
+save("results/HHP_h125_with_initial_expression.pdf", HHP_fig)
 
 
 
@@ -765,13 +765,13 @@ Label(first_page_figure[2, 1], "time", fontsize=ft_size, tellwidth=false)
 Legend(first_page_figure[3, 1], q1_axis, orientation=:horizontal, labelsize=lb_size,
     framevisible=false, nbanks=2)
 first_page_figure
-save("result_figures/PPD_first_page.pdf", first_page_figure)
+save("results/PPD_first_page.pdf", first_page_figure)
 
 
 
 x_list = PPD_h5["PerturbedPendulum_x_list"]
 function pendulum_q_prediction(t,params)
-    params[1] * cos(params[2] * t + params[3])   
+    params[1] * cos(params[2] * t + params[3])
 end
 
 function pendulum_p_prediction(t,params,q)
@@ -807,22 +807,22 @@ Label(PPD_phase_figure[1, 0], "p₁", fontsize=ft_size, tellheight=false)
 
 Legend(PPD_phase_figure[3, 1], [sca1,sca2,line1],["VISE Discrete Solution",
         "Reference Discrete Solution","VISE Continuous Solution"],
-orientation = :horizontal,labelsize = lb_size, 
-        framevisible = false,nbanks = 3)  
+orientation = :horizontal,labelsize = lb_size,
+        framevisible = false,nbanks = 3)
 
-save("result_figures/PPD_phase_space.pdf", PPD_phase_figure)
+save("results/PPD_phase_space.pdf", PPD_phase_figure)
 
 
 record_results = load("/Users/zeyuanli/Desktop/untitled folder 2/Backtracking2_R16_h5.00_iter1000_fabs4.44e-16_fsuc1.78e-15_TT200.jld2")
 
-@show record_results[("HenonHeiles_qerror")] 
-@show record_results[("HenonHeiles_hams_err")] 
+@show record_results[("HenonHeiles_qerror")]
+@show record_results[("HenonHeiles_hams_err")]
 
 @show record_results[("HenonHeiles_imp_qerror")]
 @show record_results[("HenonHeiles_imp_hams_err")]
 
 @show record_results[("HenonHeiles_cgvi_qerror")]
-@show record_results[("HenonHeiles_cgvi_hams_err")] 
+@show record_results[("HenonHeiles_cgvi_hams_err")]
 
 @show record_results[("HenonHeiles_cgvi_qerror4")]
 @show record_results[("HenonHeiles_cgvi_hams_err4")]
