@@ -27,11 +27,20 @@ const DICT_AMOUNT = 4000
 # Type-generic ReLU^k (never `max(0.0, x)`, which would upcast — see test/testsetup.jl).
 relu_k(k::Int) = x -> max(zero(x), x)^k
 
+# Type-generic ELU (α = 1) and tanh-approximation GELU. Kept float-generic (no bare
+# Float64 literals) so Float16/Float32 sweeps do not upcast — same rule as relu_k.
+# ELU is written branch-free with max/min (not a `?:` ternary) so the symbolic
+# gradient build can trace it, exactly like relu_k's `max`.
+elu(x)  = max(zero(x), x) + min(zero(x), exp(x) - one(x))
+gelu(x) = x / 2 * (one(x) + tanh(sqrt(oftype(x, 2 / pi)) *
+                                 (x + oftype(x, 0.044715) * x^3)))
+
 # ---- axis definitions -------------------------------------------------------
 
 const ACTIVATIONS_FULL  = [("relu2", relu_k(2)), ("relu3", relu_k(3)),
-                           ("relu4", relu_k(4)), ("tanh", tanh)]
-const ACTIVATIONS_QUICK = [("relu3", relu_k(3)), ("tanh", tanh)]
+                           ("relu4", relu_k(4)), ("elu", elu),
+                           ("gelu", gelu), ("tanh", tanh)]
+const ACTIVATIONS_QUICK = [("elu", elu), ("tanh", tanh)]
 
 # A solver strategy: a labelled `NonlinearSolverMethod` plus an optional linesearch
 # factory (built at the working type `T`). `DogLeg` takes no linesearch.
