@@ -40,7 +40,7 @@ gelu(x) = x / 2 * (one(x) + tanh(sqrt(oftype(x, 2 / pi)) *
 const ACTIVATIONS_FULL  = [("relu2", relu_k(2)), ("relu3", relu_k(3)),
                            ("relu4", relu_k(4)), ("elu", elu),
                            ("gelu", gelu), ("tanh", tanh)]
-const ACTIVATIONS_QUICK = [("elu", elu), ("tanh", tanh)]
+const ACTIVATIONS_QUICK = [("gelu", gelu), ("tanh", tanh)]
 
 # A solver strategy: a labelled `NonlinearSolverMethod` plus an optional linesearch
 # factory (built at the working type `T`). `DogLeg` takes no linesearch.
