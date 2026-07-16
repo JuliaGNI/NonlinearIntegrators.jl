@@ -6,14 +6,14 @@ struct PR_Integrator{T,NNODES,basisType<:Basis{T}} <: LODEMethod
     c::SVector{NNODES,T}
 
     init_w::Vector{Vector{T}}
-    nstages::Int
+    extrapolation_substep::Int
 
     function PR_Integrator(basis::Basis{T}, quadrature, init_w::Vector{Vector{T}};
-        nstages::Int=10) where {T}
+        extrapolation_substep::Int=10) where {T}
         quad_weights = quadrature.weights
         quad_nodes = quadrature.nodes
         NNODES = QuadratureRules.nnodes(quadrature)
-        new{T,NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, init_w, nstages)
+        new{T,NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, init_w, extrapolation_substep)
     end
 end
 
@@ -27,7 +27,7 @@ issymmetric(::Union{PR_Integrator,Type{<:PR_Integrator}}) = missing
 issymplectic(::Union{PR_Integrator,Type{<:PR_Integrator}}) = missing
 
 default_solver(::PR_Integrator) = Newton()
-nstages(method::PR_Integrator) = method.nstages
+extrapolation_substep(method::PR_Integrator) = method.extrapolation_substep
 default_iguess_integrator(::PR_Integrator) = ImplicitMidpoint()
 
 struct PR_IntegratorCache{ST,R} <: IODEIntegratorCache{ST}
@@ -337,11 +337,11 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
     GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
     println("solution after solving,", nlsolution(int))
 
-    stages_compute!(sol, int)
+    record_finer_solution!(sol, int)
 end
 
 
-function stages_compute!(sol, int::GeometricIntegrator{<:PR_Integrator})
+function record_finer_solution!(sol, int::GeometricIntegrator{<:PR_Integrator})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     local q_expr = method(int).basis.q_expr

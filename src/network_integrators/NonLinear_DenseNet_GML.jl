@@ -1,53 +1,23 @@
-struct NonLinear_DenseNet_GML{T, NNODES, basisType <: Basis{T},ET<:IntegratorExtrapolation,IPMT<:InitialParametersMethod} <: DenseNetMethod
-    basis::basisType
-    quadrature::QuadratureRule{T,NNODES}
-
-    b::SVector{NNODES,T}
-    c::SVector{NNODES,T}
-
-    nstages::Int
-    network_inputs::Matrix{T}
-    training_epochs::Int
-
-    initial_trajectory::ET
-    initial_guess_method::IPMT
+struct NonLinear_DenseNet_GML{T, NNODES, basisType <: Basis{T},
+                               ET <: Extrapolation,
+                               IPMT <: InitialParametersMethod} <: DenseNetMethod
+    common :: NetworkIntegratorCore{T, NNODES, basisType, ET, IPMT}
 
     function NonLinear_DenseNet_GML(basis::Basis{T}, quadrature::QuadratureRule{T};
-        nstages::Int = 10,training_epochs::Int=50000,
-        initial_trajectory::ET=IntegratorExtrapolation(),
-        initial_guess_method::IPMT=LSGD()) where {T, ET, IPMT}
-        # get number of quadrature nodes and number of basis functions
-        NNODES = QuadratureRules.nnodes(quadrature)
-
-        # get quadrature nodes and weights
-        quad_weights = QuadratureRules.weights(quadrature)
-        quad_nodes = QuadratureRules.nodes(quadrature)
-        network_inputs = reshape(collect(0:1/nstages:1),1,nstages+1)
-
-        new{T,NNODES, typeof(basis),ET,IPMT}(basis, quadrature, quad_weights, quad_nodes,nstages, network_inputs, training_epochs,
-            initial_trajectory, initial_guess_method)
+        extrapolation_substep :: Int  = 10,
+        training_epochs       :: Int  = 50000,
+        initial_trajectory_method :: ET   = IntegratorExtrapolation(),
+        initial_guess_method  :: IPMT = LSGD()) where {T, ET, IPMT}
+        common = NetworkIntegratorCore(basis, quadrature;
+            extrapolation_substep=extrapolation_substep,
+            training_epochs=training_epochs,
+            initial_trajectory_method=initial_trajectory_method,
+            initial_guess_method=initial_guess_method)
+        new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(common)
     end
 end
 
-CompactBasisFunctions.basis(method::NonLinear_DenseNet_GML) = method.basis
-quadrature(method::NonLinear_DenseNet_GML) = method.quadrature
-CompactBasisFunctions.nbasis(method::NonLinear_DenseNet_GML) = method.basis.S
-nnodes(method::NonLinear_DenseNet_GML) = QuadratureRules.nnodes(method.quadrature)
-activation(method::NonLinear_DenseNet_GML) = method.basis.activation
-nstages(method::NonLinear_DenseNet_GML) = method.nstages
-
-isexplicit(::Union{NonLinear_DenseNet_GML, Type{<:NonLinear_DenseNet_GML}}) = false
-isimplicit(::Union{NonLinear_DenseNet_GML, Type{<:NonLinear_DenseNet_GML}}) = true
-issymmetric(::Union{NonLinear_DenseNet_GML, Type{<:NonLinear_DenseNet_GML}}) = missing
-issymplectic(::Union{NonLinear_DenseNet_GML, Type{<:NonLinear_DenseNet_GML}}) = true
-
-
-default_solver(::NonLinear_DenseNet_GML) = Newton()
-# default_iguess(::NonLinear_DenseNet_GML) = HermiteExtrapolation()# HarmonicOscillator
-default_iguess(::NonLinear_DenseNet_GML) = MidpointExtrapolation()#CoupledHarmonicOscillator
-default_iguess_integrator(::NonLinear_DenseNet_GML) = ImplicitMidpoint()
-
-struct NonLinear_DenseNet_GMLCache{ST,S₁,S,NP,R,N} <: IODEIntegratorCache{ST}
+struct NonLinear_DenseNet_GMLCache{ST,S₁,S,NP,R,N} <: NetworkIntegratorCache{ST}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -121,70 +91,65 @@ struct NonLinear_DenseNet_GMLCache{ST,S₁,S,NP,R,N} <: IODEIntegratorCache{ST}
     end
 end
 
-function GeometricIntegrators.Integrators.reset!(cache::NonLinear_DenseNet_GMLCache, t, q, p)
-    copyto!(cache.q̄, q)
-    copyto!(cache.p̄, p)
-end
-
-GeometricIntegrators.Integrators.nlsolution(cache::NonLinear_DenseNet_GMLCache) = cache.x
-
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML; kwargs...) where {ST}
-    NonLinear_DenseNet_GMLCache{ST, method.basis.S₁,method.basis.S,method.basis.NP, nnodes(method),nstages(method)}(initial_conditions(problem); kwargs...)
+    NonLinear_DenseNet_GMLCache{ST, method.basis.S₁, method.basis.S, method.basis.NP,
+        nnodes(method), extrapolation_substep(method)}(initial_conditions(problem); kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML) = NonLinear_DenseNet_GMLCache{ST, method.basis.S₁,method.basis.S,method.basis.NP, nnodes(method),nstages(method)}
-
-@inline function Base.getindex(c::NonLinear_DenseNet_GMLCache, ST::DataType)
-    key = hash(Threads.threadid(), hash(ST))
-    if haskey(c.caches, key)
-        c.caches[key]
-    else
-        c.caches[key] = Cache{ST}(c.problem, c.method)
-    end::CacheType(ST, c.problem, c.method)
-end
-
-function GeometricIntegrators.Integrators.initial_guess!(sol, history, params,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
-    local network_inputs = method(int).network_inputs
-    local network_labels = cache(int).network_labels
-    local initial_trajectory = method(int).initial_trajectory
-    local initial_guess_method = method(int).initial_guess_method
-
-    # choose initial guess method based on the value of h
-    initial_trajectory!(sol, history, params, int, initial_trajectory)
-
-    @debug "network inputs " network_inputs
-    @debug "network labels from initial guess methods " network_labels
-
-    initial_params!(int, initial_guess_method)
-end
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML) =
+    NonLinear_DenseNet_GMLCache{ST, method.basis.S₁, method.basis.S, method.basis.NP,
+        nnodes(method), extrapolation_substep(method)}
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, initial_trajectory::HermiteExtrapolation)
+    local D = length(cache(int).q̃)
+    local S = nbasis(method(int))
+    local x = nlsolution(int)
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
-    local D = length(cache(int).q̃)
-    local h = timestep(int)
+    local NP = method(int).basis.NP
+
+    # TODO: here we should not initialise with the solution q but with the degree of freedom x,
+    # obtained e.g. from an L2 projection of q onto the basis
 
     for i in eachindex(network_inputs)
-        initialguess!(solstep(int).t̄+network_inputs[i]*h, cache(int).q̃, cache(int).p̃, solstep(int), int.problem, int.iguess)
+        soltmp = (
+            t=sol.t + (network_inputs[i]-1) * timestep(int),
+            q=cache(int).q̃,
+            p=cache(int).p̃,
+            q̇=cache(int).ṽ,
+            ṗ=cache(int).f̃,
+        )
+        solutionstep!(soltmp, history, problem(int), iguess(int))
         for k in 1:D
-            network_labels[i,k] = cache(int).q̃[k]
+            network_labels[i, k] = cache(int).q̃[k]
         end
     end
-    network_labels[1,:] = solstep(int).q #safe check for MidpointExtrapolation
+    soltmp = (
+        t=sol.t,
+        q=cache(int).q̃,
+        p=cache(int).p̃,
+        q̇=cache(int).ṽ,
+        ṗ=cache(int).f̃,
+    )
+    solutionstep!(soltmp, history, problem(int), iguess(int))
+
+    for k in 1:D
+        x[D*NP+k] = cache(int).p̃[k]
+    end
 end
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, initial_trajectory::IntegratorExtrapolation)
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
     local h = timestep(int)
-    local nstages = method(int).nstages
+    local extrapolation_substep = method(int).extrapolation_substep
     local D = length(cache(int).q̃)
     local problem = int.problem
     local S = method(int).basis.S
     local x = nlsolution(int)
     local NP = method(int).basis.NP
 
-    tem_ode = similar(problem, [zero(h), h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_ode = similar(problem, [zero(h), h], h / extrapolation_substep, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -195,7 +160,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
     end
 end
 
-function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, InitialParams::TrainingMethod)
+function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, InitialParams::TrainingMethod, sol)
     local D = length(cache(int).q̃)
     local S = int.method.basis.S
     local S₁ = int.method.basis.S₁
@@ -203,7 +168,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
     local x = nlsolution(int)
     local NN = method(int).basis.NN
     local ps = cache(int).ps
-    local nstages = method(int).nstages
+    local extrapolation_substep = method(int).extrapolation_substep
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
@@ -215,7 +180,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
     for k in 1:D
         @debug "For dimension" k network_labels[:, k]
 
-        labels = reshape(network_labels[:,k],1,nstages+1)
+        labels = reshape(network_labels[:,k],1,extrapolation_substep+1)
 
         PNN = GeometricMachineLearning.NeuralNetwork(NN)
         # opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
@@ -251,7 +216,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
 
 end
 
-function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, InitialParams::LSGD)
+function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, InitialParams::LSGD, sol)
     local D = length(cache(int).q̃)
     local S = int.method.basis.S
     local S₁ = int.method.basis.S₁
@@ -259,7 +224,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
     local x = nlsolution(int)
     local NN = method(int).basis.NN
     local ps = cache(int).ps
-    local nstages = method(int).nstages
+    local extrapolation_substep = method(int).extrapolation_substep
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
@@ -270,7 +235,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
     for k in 1:D
         @debug "network labels for dimension $k" network_labels[:,k]
 
-        labels = reshape(network_labels[:,k],1,nstages+1)
+        labels = reshape(network_labels[:,k],1,extrapolation_substep+1)
 
         PNN = NeuralNetwork(NN)
         PNN.params.L1.W[:], PNN.params.L1.b[:] = box_init_plain(1, S₁)
@@ -460,53 +425,11 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST},sol, params, i
 
 end
 
-function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST},sol, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {ST}
-    @assert axes(x) == axes(b)
 
-    # compute stages from nonlinear solver solution x
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
 
-    # compute residual vector
-    GeometricIntegrators.Integrators.residual!(b, sol, params, int)
-end
 
-function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, DT)
-    sol.q .= cache(int, DT).q̃
-    sol.p .= cache(int, DT).p̃
-end
 
-function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {DT}
-    # compute vector field at internal stages
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
-
-    # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, int, DT)
-end
-
-function GeometricIntegrators.Integrators.integrate_step!(sol, history, params,int::GeometricIntegrator{<:NonLinear_DenseNet_GML, <:AbstractProblemIODE})
-    # call nonlinear solver
-    # solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
-    solve!(nlsolution(int),solver(int), solverstate(int), (sol, params, int))
-
-    # print solver status
-    # print_solver_status(int.solver.status, int.solver.params)
-
-    # check if solution contains NaNs or error bounds are violated
-    # check_solver_status(int.solver.status, int.solver.params)
-
-    # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
-
-    #compute the trajectory after solving by newton method
-    stages_compute!(sol, int)
-
-    #check for NaNs
-    # if sum(isnan.(cache(int).q̃[:])) > 0
-    #     error("NaN value encountered, terminating program.")
-    # end
-end
-
-function stages_compute!(sol,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
+function record_finer_solution!(sol,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     local D = length(cache(int).q̃)
@@ -538,26 +461,3 @@ function stages_compute!(sol,int::GeometricIntegrator{<:NonLinear_DenseNet_GML})
 
 end
 
-function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, n₁::Int, n₂::Int)
-    # check time steps range for consistency
-    @assert n₁ ≥ 1
-    @assert n₂ ≥ n₁
-    @assert n₂ ≤ ntime(sol)
-
-    # copy initial condition from solution to solutionstep and initialize
-    solstep = solutionstep(int, sol[n₁-1])
-    internal_values = Vector{Matrix}(undef,n₂ - n₁ + 1)
-    # loop over time steps
-    for n in n₁:n₂
-        # integrate one step and copy solution from cache to solution
-        reset!(solstep, timesteps(sol)[n])
-        integrate!(solstep, int)
-        copy!(sol, current(solstep), n)
-
-        if hasproperty(cache(int),:stage_values)
-            internal_values[n] = deepcopy(cache(int).stage_values)
-        end
-    end
-
-    return sol, internal_values
-end

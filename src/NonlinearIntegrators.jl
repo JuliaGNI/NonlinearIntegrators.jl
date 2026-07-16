@@ -35,6 +35,10 @@ export InitialParametersMethod, TrainingMethod, OGA1d, OGA1d_Legacy, LSGD
 
 include("network_integrators/utilities.jl")
 
+include("network_integrators/NetworkIntegratorCore.jl")
+
+include("network_basis/NetworkBasisCore.jl")
+
 include("network_basis/NetworkBasis.jl")
 export NetworkBasis, DenseNetBasis, OneLayerNetBasis
 

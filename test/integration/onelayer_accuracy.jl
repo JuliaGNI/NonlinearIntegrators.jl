@@ -6,13 +6,16 @@
 # only slows the seed build without improving accuracy). Solver options are passed
 # through integrate(...).
 @testset "NonLinear_OneLayer_GML OGA accuracy (Float64)" begin
+    @debug "NonLinear_OneLayer_GML accuracy: Float64, S=4, R=8, dict_amount=4000"
     HO_lode = lodeproblem()
     HO_ref  = exact_solution(podeproblem())
 
     net = build_onelayer_basis(Float64; S = 4)
     method = NonLinear_OneLayer_GML(net, gauss(Float64, 8); bias_interval = [-pi, pi], dict_amount = 4000)
 
-    res = integrate(HO_lode, method; regularization_factor = 1e-5, max_iterations = 10000)
+    sol, _ = integrate(HO_lode, method; regularization_factor = 1e-5, max_iterations = 10000)
 
-    @test relative_maximum_error(res.sol.q, HO_ref.q) < 1e-12
+    rel_err = relative_maximum_error(sol.q, HO_ref.q)
+    @debug "NonLinear_OneLayer_GML accuracy (Float64)" relative_max_error=rel_err
+    @test rel_err < 1e-12
 end

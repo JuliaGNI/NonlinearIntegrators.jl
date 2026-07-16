@@ -1,69 +1,35 @@
-struct Time_reversible_OneLayer{T,NBASIS,NNODES,basisType<:Basis{T},ET<:IntegratorExtrapolation,IPMT<:InitialParametersMethod} <: OneLayerMethod
-    basis::basisType
-    quadrature::QuadratureRule{T,NNODES}
+struct Time_reversible_OneLayer{T, NNODES, basisType <: Basis{T},
+                                ET <: Extrapolation,
+                                IPMT <: InitialParametersMethod} <: OneLayerMethod
+    common        :: NetworkIntegratorCore{T, NNODES, basisType, ET, IPMT}
+    bias_interval :: SVector{2, T}
+    dict_amount   :: Int
 
-    b::SVector{NNODES,T}
-    c::SVector{NNODES,T}
-
-    nstages::Int
-    show_status::Bool
-    network_inputs::Matrix{T}
-
-    initial_trajectory::ET
-    initial_guess_method::IPMT
-
-    training_epochs::Int
-    use_hamiltonian_loss::Bool
-
-    bias_interval::Vector{T}
-    dict_amount::Int
     function Time_reversible_OneLayer(basis::Basis{T}, quadrature::QuadratureRule{T};
-        nstages::Int=10, show_status::Bool=true, training_epochs::Int=50000, use_hamiltonian_loss::Bool=true,
-        initial_trajectory::ET=IntegratorExtrapolation(),
-        initial_guess_method::IPMT=OGA1d(),
-        bias_interval=[-pi, pi], dict_amount=50000) where {T,ET,IPMT}
-        # get number of quadrature nodes and number of basis functions
-        # initial_trajectory_list = subtypes(Extrapolation)
-        # @assert initial_trajectory in initial_trajectory_list "initial_trajectory should be one of $(initial_trajectory_list)"
-
-        # initial_guess_methods_list = subtypes(InitialParametersMethod)
-        # @assert initial_guess_method in initial_guess_methods_list "initial_guess_methods should be one of $(initial_guess_methods_list)"
-
-        NNODES = QuadratureRules.nnodes(quadrature)
-        NBASIS = basis.S
-
-        # get quadrature nodes and weights
-        quad_weights = QuadratureRules.weights(quadrature)
-        quad_nodes = QuadratureRules.nodes(quadrature)
-
-        network_inputs = reshape(collect(0:1/nstages:1), 1, nstages + 1)
-        new{T,NBASIS,NNODES,typeof(basis),ET,IPMT}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, initial_trajectory, initial_guess_method,
-            training_epochs, use_hamiltonian_loss, bias_interval, dict_amount)
+        extrapolation_substep      :: Int  = 10,
+        training_epochs           :: Int  = 50000,
+        show_status               :: Bool = true,
+        initial_trajectory_method :: ET   = IntegratorExtrapolation(),
+        initial_guess_method      :: IPMT = OGA1d(),
+        bias_interval = [-pi, pi],
+        dict_amount   :: Int = 50000) where {T, ET, IPMT}
+        common = NetworkIntegratorCore(basis, quadrature;
+            extrapolation_substep=extrapolation_substep,
+            training_epochs=training_epochs,
+            show_status=show_status,
+            initial_trajectory_method=initial_trajectory_method,
+            initial_guess_method=initial_guess_method)
+        new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(
+            common, SVector{2,T}(bias_interval), dict_amount)
     end
 end
-nbasis(method::Time_reversible_OneLayer) = method.basis.S
-CompactBasisFunctions.basis(method::Time_reversible_OneLayer) = method.basis
-quadrature(method::Time_reversible_OneLayer) = method.quadrature
-CompactBasisFunctions.nbasis(method::Time_reversible_OneLayer) = method.basis.S
-nnodes(method::Time_reversible_OneLayer) = QuadratureRules.nnodes(method.quadrature)
-activation(method::Time_reversible_OneLayer) = method.basis.activation
-nstages(method::Time_reversible_OneLayer) = method.nstages
-show_status(method::Time_reversible_OneLayer) = method.show_status
-training_epochs(method::Time_reversible_OneLayer) = method.training_epochs
 
-isexplicit(::Union{Time_reversible_OneLayer,Type{<:Time_reversible_OneLayer}}) = false
-isimplicit(::Union{Time_reversible_OneLayer,Type{<:Time_reversible_OneLayer}}) = true
-issymmetric(::Union{Time_reversible_OneLayer,Type{<:Time_reversible_OneLayer}}) = missing
-issymplectic(::Union{Time_reversible_OneLayer,Type{<:Time_reversible_OneLayer}}) = missing
+GeometricIntegratorsBase.issymmetric(::Union{Time_reversible_OneLayer, Type{<:Time_reversible_OneLayer}}) = true
 
-default_solver(::Time_reversible_OneLayer) = Newton()
-default_iguess(::Time_reversible_OneLayer) = IntegratorExtrapolation()#CoupledHarmonicOscillator
+default_iguess(::Time_reversible_OneLayer) = IntegratorExtrapolation()
 default_iparams(::Time_reversible_OneLayer) = OGA1d()
-# default_iguess_integrator(::Time_reversible_OneLayer) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
 
-default_iguess_integrator(::Time_reversible_OneLayer) = ImplicitMidpoint()
-
-struct Time_reversible_OneLayerCache{ST,S,R,N} <: IODEIntegratorCache{ST}
+struct Time_reversible_OneLayerCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -152,51 +118,13 @@ struct Time_reversible_OneLayerCache{ST,S,R,N} <: IODEIntegratorCache{ST}
     end
 end
 
-GeometricIntegrators.Integrators.nlsolution(cache::Time_reversible_OneLayerCache) = cache.x
-
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Time_reversible_OneLayer; kwargs...) where {ST}
-    Time_reversible_OneLayerCache{ST,nbasis(method),nnodes(method),nstages(method)}(initial_conditions(problem); kwargs...)
+    Time_reversible_OneLayerCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem); kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_reversible_OneLayer) = Time_reversible_OneLayerCache{ST,nbasis(method),nnodes(method),nstages(method)}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_reversible_OneLayer) =
+    Time_reversible_OneLayerCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}
 
-@inline function Base.getindex(c::Time_reversible_OneLayerCache, ST::DataType)
-    key = hash(Threads.threadid(), hash(ST))
-    if haskey(c.caches, key)
-        c.caches[key]
-    else
-        c.caches[key] = Cache{ST}(c.problem, c.method)
-    end::CacheType(ST, c.problem, c.method)
-end
-
-function GeometricIntegrators.Integrators.reset!(cache::Time_reversible_OneLayerCache, t, q, p)
-    copyto!(cache.q̄, q)
-    copyto!(cache.p̄, p)
-end
-
-function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, int::GeometricIntegrator{<:Time_reversible_OneLayer})
-    local network_inputs = method(int).network_inputs
-    local network_labels = cache(int).network_labels
-    local show_status = method(int).show_status
-    local current_step = cache(int).current_step
-    local initial_trajectory = method(int).initial_trajectory
-    local initial_guess_method = method(int).initial_guess_method
-
-    show_status ? print("\n current time step: $current_step") : nothing
-    current_step[1] += 1
-
-    initial_trajectory!(sol, history, params, int, initial_trajectory)
-
-    if show_status
-        print("\n network inputs \n")
-        print(network_inputs)
-
-        print("\n network labels from initial guess methods \n")
-        print(network_labels')
-    end
-
-    initial_params!(int, initial_guess_method)
-end
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}, initial_trajectory::HermiteExtrapolation)
     local D = length(cache(int).q̃)
@@ -240,13 +168,13 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
     local h = int.problem.timestep
-    local nstages = method(int).nstages
+    local extrapolation_substep = method(int).extrapolation_substep
     local D = length(cache(int).q̃)
     local problem = int.problem
     local S = nbasis(method(int))
     local x = nlsolution(int)
 
-    tem_ode = similar(problem, [zero(h), h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_ode = similar(problem, [zero(h), h], h / extrapolation_substep, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -258,7 +186,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
 end
 
 
-function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, InitialParams::OGA1d)
+function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, InitialParams::OGA1d, sol)
     local S = nbasis(method(int))
     local D = length(cache(int).q̃)
     local quad_nodes = method(int).network_inputs
@@ -268,7 +196,7 @@ function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, I
     local activation = method(int).basis.activation
     local x = nlsolution(int)
     local show_status = method(int).show_status
-    local nstages = method(int).nstages
+    local extrapolation_substep = method(int).extrapolation_substep
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
 
@@ -279,7 +207,7 @@ function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, I
     # time-symmetric pairs (w, b) and (−w, w + b).
     local T = eltype(x)
 
-    quad_weights = simpson_quadrature(nstages, T)
+    quad_weights = simpson_quadrature(extrapolation_substep, T)
 
     B = bias_grid(bias_interval[1], bias_interval[2], dict_amount, T)
     A = hcat(vcat(-ones(T, length(B)), ones(T, length(B))), vcat(B, B))
@@ -554,17 +482,6 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
 end
 
-# Compute stages of Variational Partitioned Runge-Kutta methods.
-function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}) where {ST}
-    # check that x and b are compatible
-    @assert axes(x) == axes(b)
-
-    # compute stages from nonlinear solver solution x
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
-
-    # compute residual vector
-    GeometricIntegrators.Integrators.residual!(b, sol, params, int)
-end
 
 
 function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}, DT)
@@ -572,34 +489,9 @@ function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricInt
     sol.p .= cache(int, DT).p̃
 end
 
-function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:Time_reversible_OneLayer}) where {DT}
-    # compute vector field at internal stages
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
 
-    # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, int, DT)
-end
 
-function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:Time_reversible_OneLayer,<:AbstractProblemIODE})
-    # call nonlinear solver
-    # solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
-    solve!(nlsolution(int),solver(int),  (sol, params, int))
-
-    # print solver status
-    # print_solver_status(int.solver.status, int.solver.params)
-
-    # check if solution contains NaNs or error bounds are violated
-    # check_solver_status(int.solver.status, int.solver.params)
-
-    # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
-
-    #compute the trajectory after solving by newton method
-    stages_compute!(sol, int)
-
-end
-
-function stages_compute!(sol, int::GeometricIntegrator{<:Time_reversible_OneLayer})
+function record_finer_solution!(sol, int::GeometricIntegrator{<:Time_reversible_OneLayer})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     # local network_inputs = method(int).network_inputs
@@ -646,37 +538,3 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Time_reversible_OneLaye
 end
 
 
-function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:Time_reversible_OneLayer}, n₁::Int, n₂::Int)
-    # check time steps range for consistency
-    @assert n₁ ≥ 1
-    @assert n₂ ≥ n₁
-    @assert n₂ ≤ ntime(sol)
-
-    # copy initial condition from solution to solutionstep and initialize
-    solstep = solutionstep(int, sol[n₁-1])
-    internal_values = Vector{Matrix}(undef,n₂ - n₁ + 1)
-    # loop over time steps
-    for n in n₁:n₂
-        println("Start integrate at time step n = $(n)")
-        # integrate one step and copy solution from cache to solution
-        reset!(solstep, timesteps(sol)[n])
-        integrate!(solstep, int)
-        copy!(sol, current(solstep), n)
-
-        havenan = false
-        for s in current(solstep)
-            havenan = havenan || any(isnan, s)
-        end
-
-        if havenan
-            @warn "Solver encountered NaNs in solution at timestep n=$(n)."
-            break
-        end
-
-        if hasproperty(cache(int),:stage_values)
-            internal_values[n] = deepcopy(cache(int).stage_values)
-        end
-    end
-
-    return sol, internal_values
-end

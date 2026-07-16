@@ -4,7 +4,8 @@ using Logging
 # The network-based integrators run many nonlinear solves, often with very tight
 # solver tolerances, which emit a large volume of line-search / iteration warnings.
 # Silence everything below error level so the test output stays readable; failures
-# are still reported through the @test machinery.
+# are still reported through the @test machinery. Set JULIA_DEBUG=NonlinearIntegrators
+# or lower the disable_logging level to see @debug output from the test files.
 Logging.disable_logging(Logging.Warn)
 
 # Shared constants (TEST_TYPES), builders and the no-upcast assertion.
