@@ -1,3 +1,24 @@
+"""
+    DenseNet_GML{T} <: DenseNetBasis{T}
+
+Three-layer dense-network basis for `NonLinear_DenseNet_GML`. Architecture:
+`Dense(1, S₁, σ) → Dense(S₁, S, σ) → Dense(S, 1)`. Symbolic derivatives are
+compiled at construction time.
+
+# Constructor
+
+    DenseNet_GML{T}(activation, S₁, S; backend = CPU())
+
+- `activation`: elementwise activation (e.g. `tanh`)
+- `S₁::Int`: first hidden layer width
+- `S::Int`: second hidden layer width (= number of basis functions)
+
+# Example
+
+```julia
+basis = DenseNet_GML{Float64}(tanh, 8, 8)
+```
+"""
 struct DenseNet_GML{T, NT, BT, SNNT, QWFT, VT, VWFT} <: DenseNetBasis{T}
     S      :: Int
     S₁     :: Int

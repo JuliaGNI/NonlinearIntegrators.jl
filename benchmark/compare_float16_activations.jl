@@ -85,7 +85,7 @@ open(CSVPATH, "w") do io
             basis  = OneLayerNetwork_GML{T}(act, S)
             method = NonLinear_OneLayer_GML(basis, QuadratureRules.GaussLegendreQuadrature(T, R);
                         bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
-                        initial_trajectory = IG.extrap)
+                        initial_trajectory_method = IG.extrap)
             for dt in DTS
                 prob   = build_prob(T, (T(0), T(10 * dt)), T(dt))
                 params = prob.parameters

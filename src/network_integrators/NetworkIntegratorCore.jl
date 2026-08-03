@@ -11,6 +11,7 @@ struct NetworkIntegratorCore{T, NNODES, basisType <: Basis{T},
     initial_guess_method      :: IPMT
     training_epochs           :: Int
     show_status               :: Bool
+    record_grid_points        :: Int
 
     function NetworkIntegratorCore(
         basis :: Basis{T}, quadrature :: QuadratureRule{T};
@@ -19,6 +20,7 @@ struct NetworkIntegratorCore{T, NNODES, basisType <: Basis{T},
         show_status               :: Bool = true,
         initial_trajectory_method :: ET   = IntegratorExtrapolation(),
         initial_guess_method      :: IPMT = OGA1d(),
+        record_grid_points        :: Int  = 41,
     ) where {T, ET <: Extrapolation, IPMT <: InitialParametersMethod}
         NNODES = QuadratureRules.nnodes(quadrature)
         b = SVector{NNODES, T}(QuadratureRules.weights(quadrature))
@@ -27,7 +29,8 @@ struct NetworkIntegratorCore{T, NNODES, basisType <: Basis{T},
             collect(zero(T):one(T)/extrapolation_substep:one(T)), 1, extrapolation_substep + 1)
         new{T, NNODES, typeof(basis), ET, IPMT}(
             basis, quadrature, b, c, extrapolation_substep, network_inputs,
-            initial_trajectory_method, initial_guess_method, training_epochs, show_status)
+            initial_trajectory_method, initial_guess_method, training_epochs, show_status,
+            record_grid_points)
     end
 end
 
@@ -35,7 +38,7 @@ end
 @inline function Base.getproperty(m::NetworkIntegratorMethod, s::Symbol)
     s in (:basis, :quadrature, :b, :c, :extrapolation_substep,
           :network_inputs, :initial_trajectory_method, :initial_guess_method,
-          :training_epochs, :show_status) &&
+          :training_epochs, :show_status, :record_grid_points) &&
         return getfield(getfield(m, :common), s)
     # Backward-compatible alias for initial_trajectory field name
     s === :initial_trajectory   && return getfield(getfield(m, :common), :initial_trajectory_method)

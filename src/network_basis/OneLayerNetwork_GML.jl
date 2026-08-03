@@ -1,5 +1,26 @@
 using AbstractNeuralNetworks
 
+"""
+    OneLayerNetwork_GML{T} <: OneLayerNetBasis{T}
+
+Single-hidden-layer network basis for the GML (Galerkin Machine Learning) integrators.
+The network maps a scalar time input to a scalar position: `Dense(1, S, σ) → Dense(S, 1)`.
+Symbolic derivatives (`dqdθ`, `V_func`, `dvdθ`) are compiled once at construction time
+via `SymbolicNeuralNetworks.jl`.
+
+# Constructor
+
+    OneLayerNetwork_GML{T}(activation, S; backend = CPU())
+
+- `activation`: any elementwise activation function (e.g. `tanh`, `relu_k(3)`)
+- `S::Int`: number of hidden neurons (= number of basis functions)
+
+# Example
+
+```julia
+basis = OneLayerNetwork_GML{Float64}(tanh, 8)
+```
+"""
 struct OneLayerNetwork_GML{T, NT, BT, SNNT, QWFT, VT, VWFT} <: OneLayerNetBasis{T}
     S      :: Int
     common :: NetworkBasisCore{NT, BT, SNNT, QWFT, VT, VWFT}

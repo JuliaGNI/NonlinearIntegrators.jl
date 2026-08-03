@@ -1,3 +1,33 @@
+"""
+    NonLinear_DenseNet_GML <: DenseNetMethod
+
+Continuous Galerkin Variational Integrator using a `DenseNet_GML` basis (three
+hidden layers). The network ansatz `q(t) = NN(t; θ)` uses a deeper architecture
+than `NonLinear_OneLayer_GML`, at the cost of a larger parameter space per step.
+
+# Constructor
+
+    NonLinear_DenseNet_GML(basis, quadrature; kwargs...)
+
+**Required:**
+- `basis::DenseNetBasis{T}` — e.g. `DenseNet_GML{T}(activation, S₁, S)`
+- `quadrature::QuadratureRule{T}`
+
+**Keyword arguments:**
+- `initial_trajectory_method` — `IntegratorExtrapolation()` (default), `HermiteExtrapolation()`, or `NoExtrapolation()`
+- `initial_guess_method` — `LSGD()` (default) or `TrainingMethod()`
+- `extrapolation_substep::Int = 10`
+- `training_epochs::Int = 50000`
+- `record_grid_points::Int = 41`
+
+# Example
+
+```julia
+basis  = DenseNet_GML{Float64}(tanh, 8, 8)
+quad   = GaussLegendreQuadrature(Float64, 8)
+method = NonLinear_DenseNet_GML(basis, quad; training_epochs = 1000)
+```
+"""
 struct NonLinear_DenseNet_GML{T, NNODES, basisType <: Basis{T},
                                ET <: Extrapolation,
                                IPMT <: InitialParametersMethod} <: DenseNetMethod
@@ -48,7 +78,7 @@ struct NonLinear_DenseNet_GMLCache{ST,S₁,S,NP,R,N} <: NetworkIntegratorCache{S
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    function NonLinear_DenseNet_GMLCache{ST,S₁,S,NP,R,N}(ics) where {ST,S₁,S,NP,R,N}
+    function NonLinear_DenseNet_GMLCache{ST,S₁,S,NP,R,N}(ics; record_grid_points::Int = 41) where {ST,S₁,S,NP,R,N}
         D = length(vec(ics.q))
         x = zeros(ST,D*(NP+1))
 
@@ -82,7 +112,7 @@ struct NonLinear_DenseNet_GMLCache{ST,S₁,S,NP,R,N} <: NetworkIntegratorCache{S
         dqdθc = zeros(ST, R, NP, D)
         dvdθc = zeros(ST, R, NP, D)
 
-        stage_values = zeros(ST, 41, D)
+        stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N+1, D)
 
         return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, q0, X, Q, P, V, F, ps,
@@ -93,7 +123,8 @@ end
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML; kwargs...) where {ST}
     NonLinear_DenseNet_GMLCache{ST, method.basis.S₁, method.basis.S, method.basis.NP,
-        nnodes(method), extrapolation_substep(method)}(initial_conditions(problem); kwargs...)
+        nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
+        record_grid_points = method.record_grid_points, kwargs...)
 end
 
 @inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML) =
@@ -439,7 +470,9 @@ function record_finer_solution!(sol,int::GeometricIntegrator{<:NonLinear_DenseNe
     local S₁ = method(int).basis.S₁
     local NP = method(int).basis.NP
 
-    network_inputs = reshape(collect(0:1/40:1),1,41)
+    local N_plot = method(int).record_grid_points
+    local T = eltype(x)
+    network_inputs = reshape(collect(range(zero(T), one(T), N_plot)), 1, N_plot)
 
     @debug "solution x after solving by Newton" x
 

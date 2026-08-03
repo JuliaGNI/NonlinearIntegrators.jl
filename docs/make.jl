@@ -70,6 +70,7 @@ makedocs(
     pages=[
         "Home" => "index.md",
         "Orthogonal Greedy Algorithm" => "Orthogonal Greedy Algorithm/OGA.md",
+        "Variational Integrator with Symbolic Expression" => "Variational Integrator with Symbolic Expression/VISE.md",
         "Benchmarks" => "Benchmarks/benchmarks.md",
     ],
 )

@@ -1,3 +1,18 @@
+"""
+    Hardcode_int <: OneLayerMethod
+
+One-layer variational integrator that computes network derivatives with `ForwardDiff`
+instead of the pre-compiled symbolic derivatives used by `NonLinear_OneLayer_GML`.
+The ansatz and optimisation are otherwise identical to `NonLinear_OneLayer_GML`.
+
+# Constructor
+
+    Hardcode_int(basis, quadrature; kwargs...)
+
+Keyword arguments are the same as `NonLinear_OneLayer_GML`:
+`initial_trajectory_method`, `initial_guess_method`, `extrapolation_substep`,
+`training_epochs`, `show_status`, `bias_interval`, `dict_amount`, `record_grid_points`.
+"""
 struct Hardcode_int{T, NNODES, basisType <: Basis{T},
                     ET <: Extrapolation,
                     IPMT <: InitialParametersMethod} <: OneLayerMethod
@@ -61,11 +76,10 @@ struct Hardcode_intCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     dqdbr₁::Matrix{ST}
     dqdbr₀::Matrix{ST}
 
-    current_step::Vector{ST}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    function Hardcode_intCache{ST,S,R,N}(ics) where {ST,S,R,N}
+    function Hardcode_intCache{ST,S,R,N}(ics; record_grid_points::Int = 41) where {ST,S,R,N}
         D = length(vec(ics.q))
         x = zeros(ST, D * (1 + 3 * S))
 
@@ -103,19 +117,19 @@ struct Hardcode_intCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
         dqdbr₁ = zeros(ST, S, D)
         dqdbr₀ = zeros(ST, S, D)
 
-        current_step = zeros(ST, 1)
-        stage_values = zeros(ST, 41, D)
+        stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N + 1, D)
 
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps,
             dqdW2c, dvdW2c, dqdW1c, dvdW1c, dqdbc, dvdbc,
             dqdW2r₁, dqdW2r₀, dqdW1r₁, dqdW1r₀, dqdbr₁, dqdbr₀,
-            current_step, stage_values, network_labels)
+            stage_values, network_labels)
     end
 end
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Hardcode_int; kwargs...) where {ST}
-    Hardcode_intCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem); kwargs...)
+    Hardcode_intCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
+        record_grid_points = method.record_grid_points, kwargs...)
 end
 
 @inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Hardcode_int) =
@@ -527,11 +541,13 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:Hardcode_int})
     local NN = method(int).basis.NN
     local ps = cache(int).ps
     local show_status = method(int).show_status
-    local q̄ = sol.q  # 起点 q_n
-    local q = cache(int).q̃ # 终点估计 q_{n+1}
+    local q̄ = sol.q  # start point q_n
+    local q = cache(int).q̃ # endpoint estimate q_{n+1}
     local activation = method(int).basis.activation
 
-    network_inputs = reshape(collect(0:1/40:1),1,41)
+    local N_plot = method(int).record_grid_points
+    local T = eltype(x)
+    network_inputs = reshape(collect(range(zero(T), one(T), N_plot)), 1, N_plot)
 
     if show_status
         print("\n solution x after solving by Newton \n")

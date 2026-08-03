@@ -28,10 +28,6 @@ function hamiltonian(q1,q2,p1,p2)
     0.5 * (p1^2 + p2^2) + 0.5 * (q1^2 + q2^2) + λ * (q1^2 * q2 - q2^3 / 3)
 end
 
-initial_ham = hamiltonian(HHq1[1], HHq2[1], HHp1[1], HHp2[1])
-ham = hamiltonian.(HHq1, HHq2, HHp1, HHp2)
-
-
 err = 100
 time_span = 60.0
 h = 1.0

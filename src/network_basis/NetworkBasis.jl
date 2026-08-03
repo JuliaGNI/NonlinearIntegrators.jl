@@ -1,8 +1,30 @@
 using CompactBasisFunctions: Basis
 
+"""
+    NetworkBasis{T} <: Basis{T}
+
+Abstract supertype for all neural-network basis types in this package. The type
+parameter `T` is the floating-point element type (e.g. `Float64`, `Float32`).
+Common fields (`NN`, `activation`, `SNN`, `dqdθ`, `V_func`, `dvdθ`) live in a
+`NetworkBasisCore` sub-struct and are forwarded through `getproperty`, so call
+sites can write `basis.NN`, `basis.activation`, etc.
+"""
 abstract type NetworkBasis{T} <: Basis{T} end
 
+"""
+    DenseNetBasis{T} <: NetworkBasis{T}
+
+Abstract supertype for three-layer dense-network bases. The concrete implementation
+is `DenseNet_GML{T}`.
+"""
 abstract type DenseNetBasis{T} <: NetworkBasis{T} end
+
+"""
+    OneLayerNetBasis{T} <: NetworkBasis{T}
+
+Abstract supertype for single-hidden-layer network bases. The concrete implementation
+is `OneLayerNetwork_GML{T}`.
+"""
 abstract type OneLayerNetBasis{T} <: NetworkBasis{T} end
 
 # Forward common-core field access so call sites like basis.NN, basis.activation, etc. keep working.

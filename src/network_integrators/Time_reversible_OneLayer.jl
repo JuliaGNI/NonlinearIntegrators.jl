@@ -1,3 +1,19 @@
+"""
+    Time_reversible_OneLayer <: OneLayerMethod
+
+Time-symmetric variant of `NonLinear_OneLayer_GML`. The variational integrator is
+constructed so that reversing the time direction recovers the original trajectory,
+giving `issymmetric(method) == true`. Uses a symmetric quadrature / ansatz
+structure while keeping the same `OneLayerNetwork_GML` basis.
+
+# Constructor
+
+    Time_reversible_OneLayer(basis, quadrature; kwargs...)
+
+Keyword arguments are the same as `NonLinear_OneLayer_GML`. Only `OGA1d` and
+`OGA1d_Legacy` are meaningful as `initial_guess_method`; `TrainingMethod` is
+not specialised for this integrator.
+"""
 struct Time_reversible_OneLayer{T, NNODES, basisType <: Basis{T},
                                 ET <: Extrapolation,
                                 IPMT <: InitialParametersMethod} <: OneLayerMethod
@@ -65,11 +81,10 @@ struct Time_reversible_OneLayerCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     dqdbr₁::Matrix{ST}
     dqdbr₀::Matrix{ST}
 
-    current_step::Vector{ST}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    function Time_reversible_OneLayerCache{ST,S,R,N}(ics) where {ST,S,R,N}
+    function Time_reversible_OneLayerCache{ST,S,R,N}(ics; record_grid_points::Int = 41) where {ST,S,R,N}
         D = length(vec(ics.q))
         x = zeros(ST, D * (1 + 2 * S)) # Last layer Weight S (no bias for now) + P + hidden layer W S/2 + hidden layer bias S/2
 
@@ -108,18 +123,18 @@ struct Time_reversible_OneLayerCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
         dqdbr₁ = zeros(ST, S, D)
         dqdbr₀ = zeros(ST, S, D)
 
-        current_step = zeros(ST, 1)
-        stage_values = zeros(ST, 41, D)
+        stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N + 1, D)
 
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a,
             dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
-            current_step, stage_values, network_labels)
+            stage_values, network_labels)
     end
 end
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Time_reversible_OneLayer; kwargs...) where {ST}
-    Time_reversible_OneLayerCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem); kwargs...)
+    Time_reversible_OneLayerCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
+        record_grid_points = method.record_grid_points, kwargs...)
 end
 
 @inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_reversible_OneLayer) =
@@ -501,7 +516,9 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:Time_reversible_
     local ps = cache(int).ps
     local show_status = method(int).show_status
 
-    network_inputs = reshape(collect(0:1/40:1),1,41)
+    local N_plot = method(int).record_grid_points
+    local T = eltype(x)
+    network_inputs = reshape(collect(range(zero(T), one(T), N_plot)), 1, N_plot)
 
     if show_status
         print("\n solution x after solving by Newton \n")

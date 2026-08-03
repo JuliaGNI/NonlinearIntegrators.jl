@@ -1,3 +1,37 @@
+"""
+    NonLinear_OneLayer_GML <: OneLayerMethod
+
+Continuous Galerkin Variational Integrator using a `OneLayerNetwork_GML` basis.
+The network ansatz `q(t) = NN(t; θ)` is a single-hidden-layer network; the
+optimal parameters `θ` are found by Newton's method applied to the discrete
+Euler-Lagrange equations at each time step.
+
+# Constructor
+
+    NonLinear_OneLayer_GML(basis, quadrature; kwargs...)
+
+**Required:**
+- `basis::OneLayerNetBasis{T}` — e.g. `OneLayerNetwork_GML{T}(activation, S)`
+- `quadrature::QuadratureRule{T}` — e.g. `GaussLegendreQuadrature(T, R)`
+
+**Keyword arguments:**
+- `initial_trajectory_method` — `IntegratorExtrapolation()` (default), `HermiteExtrapolation()`, or `NoExtrapolation()`
+- `initial_guess_method` — `OGA1d()` (default) or `OGA1d_Legacy()`
+- `extrapolation_substep::Int = 10` — sub-steps for the `IntegratorExtrapolation` warm start
+- `training_epochs::Int = 50000` — gradient-descent epochs when `initial_guess_method = TrainingMethod()`
+- `bias_interval` — bias search range for OGA dictionary, default `[-π, π]`
+- `dict_amount::Int = 50000` — number of atoms in the OGA dictionary
+- `record_grid_points::Int = 41` — number of grid points per step stored in `stage_values`
+
+# Example
+
+```julia
+using NonlinearIntegrators, QuadratureRules
+basis = OneLayerNetwork_GML{Float64}(tanh, 8)
+quad  = GaussLegendreQuadrature(Float64, 8)
+method = NonLinear_OneLayer_GML(basis, quad; bias_interval = [-π, π], dict_amount = 400)
+```
+"""
 struct NonLinear_OneLayer_GML{T, NNODES, basisType <: Basis{T},
                                ET <: Extrapolation,
                                IPMT <: InitialParametersMethod} <: OneLayerMethod
@@ -22,7 +56,7 @@ struct NonLinear_OneLayer_GML{T, NNODES, basisType <: Basis{T},
     end
 end
 
-struct NonLinear_OneLayer_GMLCache{ST,S,R,N,NEpochs} <: NetworkIntegratorCache{ST}
+struct NonLinear_OneLayer_GMLCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -61,14 +95,7 @@ struct NonLinear_OneLayer_GMLCache{ST,S,R,N,NEpochs} <: NetworkIntegratorCache{S
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    training_errors::Matrix{ST}
-    mse_err::Vector{ST}
-    abs_err::Vector{ST}
-    training_time::Vector{ST}
-    solving_time::Vector{ST}
-    integrating_time::Vector{ST}
-
-    function NonLinear_OneLayer_GMLCache{ST,S,R,N,NEpochs}(ics) where {ST,S,R,N,NEpochs}
+    function NonLinear_OneLayer_GMLCache{ST,S,R,N}(ics; record_grid_points::Int = 41) where {ST,S,R,N}
         D = length(vec(ics.q))
         x = zeros(ST, D * (S + 1 + 2 * S)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
 
@@ -107,7 +134,7 @@ struct NonLinear_OneLayer_GMLCache{ST,S,R,N,NEpochs} <: NetworkIntegratorCache{S
         dqdbr₁ = zeros(ST, S, D)
         dqdbr₀ = zeros(ST, S, D)
 
-        stage_values = zeros(ST, 41, D)
+        stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N + 1, D)
 
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a,
@@ -118,12 +145,13 @@ end
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML; kwargs...) where {ST}
     NonLinear_OneLayer_GMLCache{ST, nbasis(method), nnodes(method),
-        extrapolation_substep(method), method.training_epochs}(initial_conditions(problem); kwargs...)
+        extrapolation_substep(method),}(initial_conditions(problem);
+        record_grid_points = method.record_grid_points, kwargs...)
 end
 
 @inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML) =
     NonLinear_OneLayer_GMLCache{ST, nbasis(method), nnodes(method),
-        extrapolation_substep(method), method.training_epochs}
+        extrapolation_substep(method),}
 
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initial_trajectory::GeometricIntegratorsBase.HermiteExtrapolation)
@@ -214,10 +242,6 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
-    local training_errors = cache(int).training_errors
-    local mse_err = cache(int).mse_err
-    local abs_err = cache(int).abs_err
-    local training_time = cache(int).training_time
 
     Random.seed!(42)
 
@@ -229,19 +253,11 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
         # opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
         opt = GeometricMachineLearning.Optimizer(GeometricMachineLearning.AdamOptimizerWithDecay(nepochs, 1e-3, 5e-5), PNN.params)
         λ = GeometricMachineLearning.GlobalSection(PNN.params)
-        t1 = time()
         for ep in 1:nepochs
             gs = Zygote.gradient(p -> mse_loss(network_inputs, labels, NN, p), PNN.params)[1]
             GeometricMachineLearning.optimization_step!(opt, λ, PNN.params, gs)
-            training_errors[k, ep] = mse_loss(network_inputs, labels, NN, PNN.params)
         end
-        t2 = time()
-        training_time[k] = t2 - t1
-
-        mse_err[k] = training_errors[k, end]
-        abs_err[k] = sum(labels - NN(network_inputs, PNN.params)) .^ 2
-        @debug "dimension" k "final loss:" mse_err[k] "in" nepochs "epochs"
-        @debug "Sum of squared errors for dimension" k ":" abs_err[k]
+        @debug "dimension" k "final loss:" mse_loss(network_inputs, labels, NN, PNN.params) "in" nepochs "epochs"
 
         for i in 1:S
             x[D*(i-1)+k] = PNN.params[2].W[i]
@@ -647,7 +663,9 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:NonLinear_OneLay
     local NN = method(int).basis.NN
     local ps = cache(int).ps
 
-    network_inputs = reshape(collect(0:1/40:1),1,41)
+    local N_plot = method(int).record_grid_points
+    local T = eltype(x)
+    network_inputs = reshape(collect(range(zero(T), one(T), N_plot)), 1, N_plot)
 
     @debug "solution x after solving by Newton" x
 

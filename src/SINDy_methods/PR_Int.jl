@@ -117,25 +117,12 @@ end
 
 @inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::PR_Integrator) = PR_IntegratorCache{ST,nnodes(method)}
 
-@inline function Base.getindex(c::PR_IntegratorCache, ST::DataType)
-    key = hash(Threads.threadid(), hash(ST))
-    if haskey(c.caches, key)
-        c.caches[key]
-    else
-        c.caches[key] = Cache{ST}(c.problem, c.method)
-    end::CacheType(ST, c.problem, c.method)
-end
-
 function GeometricIntegrators.Integrators.internal_variables(method::PR_Integrator, problem::AbstractProblemIODE)
     # intermidiate_x = [zeros(Int, length(x)) for x in method(int).init_w]
     S = sum(method.basis.W_sizes)
 
     intermidiate_x = zeros(S)
     (int_x=intermidiate_x,)
-end
-
-function copy_internal_variables(solstep::SolutionStep, cache::PR_IntegratorCache)
-    haskey(internal(solstep), :int_x) && copyto!(internal(solstep).int_x, cache.int_x)
 end
 
 function GeometricIntegrators.Integrators.reset!(cache::PR_IntegratorCache, t, q, p)

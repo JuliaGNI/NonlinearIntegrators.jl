@@ -236,7 +236,7 @@ function run_sweep(; problem_name, build_prob, hamiltonian, mode, Rs = nothing, 
                 for R in Rs, ig in cfg.igs
                     method = NonLinear_OneLayer_GML(basis, QuadratureRules.GaussLegendreQuadrature(T, R);
                                 bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
-                                initial_trajectory = ig.extrap)
+                                initial_trajectory_method = ig.extrap)
                     for dt in cfg.dts
                         prob   = get!(() -> build_prob(T, (T(0), T(10 * dt)), T(dt)), probcache, (T, dt))
                         params = prob.parameters

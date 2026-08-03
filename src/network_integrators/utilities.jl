@@ -158,3 +158,15 @@ function lsgd_loss(network_inputs,labels,NN,ps)
     return sqrt(mean((labels .- NN_output).^2))
 end
 
+"""
+    mse_loss(x, y, NN, ps; λ=0.0, μ=0.00001)
+
+Mean absolute error of `NN(x, ps)` against target `y`, with optional boundary penalty
+`λ * |NN(x[1], ps) - y[1]|²`. Used as the training objective for `TrainingMethod`.
+"""
+function mse_loss(x, y::AbstractArray{T}, NN, ps; λ=0.0, μ=0.00001) where T
+    y_pred = NN(x, ps)
+    loss = mean(abs, y_pred - y) + λ * abs2(y_pred[1] - y[1])
+    return loss
+end
+

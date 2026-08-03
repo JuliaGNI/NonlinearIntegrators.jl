@@ -1,3 +1,19 @@
+"""
+    Time_Reversible_Hardcode <: OneLayerMethod
+
+Time-symmetric variant of `Hardcode_int`: computes network derivatives with
+`ForwardDiff` (no symbolic pre-compilation) and enforces the palindromic
+time-reversal symmetry (`issymmetric(method) == true`). Combines the
+forward-differentiation approach of `Hardcode_int` with the symmetry structure
+of `Time_reversible_OneLayer`.
+
+# Constructor
+
+    Time_Reversible_Hardcode(basis, quadrature; kwargs...)
+
+Keyword arguments are the same as `Hardcode_int`. Only `OGA1d` is the supported
+`initial_guess_method`.
+"""
 struct Time_Reversible_Hardcode{T, NNODES, basisType <: Basis{T},
                                 ET <: Extrapolation,
                                 IPMT <: InitialParametersMethod} <: OneLayerMethod
@@ -63,11 +79,10 @@ struct Time_Reversible_HardcodeCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     dqdbr₁::Matrix{ST}
     dqdbr₀::Matrix{ST}
 
-    current_step::Vector{ST}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    function Time_Reversible_HardcodeCache{ST,S,R,N}(ics) where {ST,S,R,N}
+    function Time_Reversible_HardcodeCache{ST,S,R,N}(ics; record_grid_points::Int = 41) where {ST,S,R,N}
         D = length(vec(ics.q))
         x = zeros(ST, D * (1 + 2 * S)) # Last layer Weight S (no bias for now) + q + hidden layer W S/2 + hidden layer bias S/2
 
@@ -105,19 +120,19 @@ struct Time_Reversible_HardcodeCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
         dqdbr₁ = zeros(ST, S, D)
         dqdbr₀ = zeros(ST, S, D)
 
-        current_step = zeros(ST, 1)
-        stage_values = zeros(ST, 41, D)
+        stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N + 1, D)
 
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps,
             dqdW2c, dvdW2c, dqdW1c, dvdW1c, dqdbc, dvdbc,
             dqdW2r₁, dqdW2r₀, dqdW1r₁, dqdW1r₀, dqdbr₁, dqdbr₀,
-            current_step, stage_values, network_labels)
+            stage_values, network_labels)
     end
 end
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Time_Reversible_Hardcode; kwargs...) where {ST}
-    Time_Reversible_HardcodeCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem); kwargs...)
+    Time_Reversible_HardcodeCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
+        record_grid_points = method.record_grid_points, kwargs...)
 end
 
 @inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_Reversible_Hardcode) =
@@ -127,6 +142,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
+    local network_inputs = method(int).network_inputs
 
     # TODO: here we should not initialise with the solution q but with the degree of freedom x,
     # obtained e.g. from an L2 projection of q onto the basis
@@ -221,8 +237,8 @@ function initial_params!(int::GeometricIntegrator{<:Time_Reversible_Hardcode}, I
     local extrapolation_substep = method(int).extrapolation_substep
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
-    local q̄ = sol.q  # 起点 q_n
-    local q̃ = cache(int).q̃ # 终点估计 q_{n+1}
+    local q̄ = sol.q  # start point q_n
+    local q̃ = cache(int).q̃ # endpoint estimate q_{n+1}
 
 
     # 1. Quadrature weights and Ansatz factors (working precision T; the seed is
@@ -293,18 +309,18 @@ function initial_params!(int::GeometricIntegrator{<:Time_Reversible_Hardcode}, I
         show_status ? println("Finish OGA for dimension $d") : nothing
     end
 
-    # 5. 将结果映射回非线性求解器的初始向量 x
-    # 布局必须与 components! 严格一致
+    # 5. Map results back to the nonlinear solver's initial vector x.
+    # Layout must match components! exactly.
     for k in 1:D
-        # 终点 q_{n+1}
+        # endpoint q_{n+1}
         x[D*S+k] = q̃[k]
 
-        # 输出层权重 W2
+        # output layer weights W2
         for i in 1:S
             x[D*(i-1)+k] = ps[k][2].W[i]
         end
 
-        # 隐藏层 W1, b (只映射独立的部分，即 2i-1)
+        # hidden layer W1, b (only map independent part, i.e. 2i-1)
         for i in 1:Int(S/2)
             idx_W1 = Int(D*(S+1)+D*(i-1)+k)
             idx_b  = Int(D*(S+1+S/2)+D*(i-1)+k)
@@ -537,11 +553,13 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:Time_Reversible_
     local NN = method(int).basis.NN
     local ps = cache(int).ps
     local show_status = method(int).show_status
-    local q̄ = sol.q  # 起点 q_n
-    local q = cache(int).q̃ # 终点估计 q_{n+1}
+    local q̄ = sol.q  # start point q_n
+    local q = cache(int).q̃ # endpoint estimate q_{n+1}
     local activation = method(int).basis.activation
 
-    network_inputs = reshape(collect(0:1/40:1),1,41)
+    local N_plot = method(int).record_grid_points
+    local T = eltype(x)
+    network_inputs = reshape(collect(range(zero(T), one(T), N_plot)), 1, N_plot)
 
     if show_status
         print("\n solution x after solving by Newton \n")

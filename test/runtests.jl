@@ -30,6 +30,9 @@ include("testsetup.jl")
         include("unit/cgvi_standard_unit.jl")
         include("unit/time_reversible_onelayer_unit.jl")
         include("unit/hardcode_unit.jl")
+        include("unit/time_reversible_hardcode_unit.jl")
+        include("unit/densenet_gml_unit.jl")
+        include("unit/dispatch_variants_unit.jl")
     end
 
     @testset "integration" begin
