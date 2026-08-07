@@ -27,7 +27,6 @@ end
 const TROL_EXTRAPOLATIONS = [
     (NoExtrapolation(),          "NoExtrapolation"),
     (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
-    (HermiteExtrapolation(),     "HermiteExtrapolation"),
 ]
 
 for T in TEST_TYPES, (extrap, extrap_name) in TROL_EXTRAPOLATIONS

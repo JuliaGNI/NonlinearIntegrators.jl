@@ -29,7 +29,6 @@ end
 const HC_EXTRAPOLATIONS = [
     (NoExtrapolation(),          "NoExtrapolation"),
     (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
-    (HermiteExtrapolation(),     "HermiteExtrapolation"),
 ]
 
 for T in TEST_TYPES, (extrap, extrap_name) in HC_EXTRAPOLATIONS

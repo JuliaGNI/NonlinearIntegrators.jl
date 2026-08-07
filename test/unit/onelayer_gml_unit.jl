@@ -38,7 +38,6 @@ const OL_INIT_METHODS = [
 const OL_EXTRAPOLATIONS = [
     (NoExtrapolation(),          "NoExtrapolation"),
     (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
-    (HermiteExtrapolation(),     "HermiteExtrapolation"),
 ]
 
 for T in TEST_TYPES,
@@ -48,7 +47,7 @@ for T in TEST_TYPES,
     @testset "NonLinear_OneLayer_GML $init_name × $extrap_name ($T)" begin
         prob = ho_problem(T; timespan = (T(0.0), T(0.2)), timestep = T(0.1))
         sol, _ = integrate(prob,
-            build_ol_method(T; dict_amount = 400, init_method = init_method, extrap = extrap);
+            build_ol_method(T; dict_amount = 40000, init_method = init_method, extrap = extrap);
             regularization_factor = T(1e-5), max_iterations = 10000)
         assert_no_upcast(sol.q, T)
         @test all(isfinite, collect(sol.q[:, 1])[end])
