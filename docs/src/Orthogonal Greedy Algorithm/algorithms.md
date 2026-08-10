@@ -227,6 +227,18 @@ atoms that would have been usable — end-to-end it helps at 16 bits and can hur
 
 ## Fits
 
+!!! tip "The fit is free, so choose it for robustness alone"
+    The selected system is *tiny*: ``\hat{A}`` is ``M \times k`` with ``M \approx 11``
+    quadrature nodes and ``k \le S \le 8`` neurons, and the Gram matrix it replaces would be
+    ``k \times k``. The only operation that scales with anything large is the greedy
+    selection scan over the dictionary, which is a matrix–vector product plus an `argmax`
+    and is already precision-robust.
+
+    So the fit contributes essentially nothing to the runtime, at any of the five
+    factorisations, and there is no performance argument for preferring a cheaper one. Pick
+    on numerical behaviour: the measurements in [Studies](@ref) put the rank-revealing fits
+    ahead at `Float64`, which is not what a cost-first reading would have suggested.
+
 All five receive the ``\sqrt{w}``-scaled design matrix ``\hat{A}`` (``M \times k``) and
 target ``\hat{y}``, so they minimise the same objective and differ only in the
 factorisation. [`oga_solve`](@ref NonlinearIntegrators.oga_solve) wraps every one of them

@@ -126,9 +126,25 @@ precision sweep: if it is not scaled to `eps(T)`, it is measuring the tolerance.
 
 ## Not yet device-ready
 
-The subsystem is precision-generic, which was the prerequisite for GPU portability, but it is
-not portable yet. The dominant per-step operations are vectorised — the selection scan and the
-coherence guard are each one `mul!` against the dictionary, plus an `argmax` — but building the
-dictionary's design matrix and placing the selected neurons are still scalar loops, which would
-force scalar indexing on a device array. Getting there needs the dictionary build expressed as
-a broadcast or a kernel.
+Precision genericity was the prerequisite for GPU portability — `Float32` is the device-native
+type, and a `Float64` island in the seed would have forced a host round-trip every time step —
+but the subsystem is not portable yet.
+
+What is already in the right shape: the dominant per-step operations are the selection scan and
+the coherence guard, each one `mul!` against the dictionary plus an `argmax`, i.e. a matrix–vector
+product and a reduction. Those map to a device directly. [`IncrementalQR`](@ref) also batches
+cleanly over the solution components, since each component's factorisation is independent.
+
+What blocks it: building the dictionary's design matrix and placing the selected neurons are
+still scalar loops, which would force scalar indexing on a device array. Getting there needs the
+dictionary build expressed as a broadcast or a kernel.
+
+One trade-off to expect when it happens. The hand-rolled
+[`NonlinearIntegrators.pivoted_qr_lstsq`](@ref) and
+[`NonlinearIntegrators.jacobi_svd`](@ref) exist because LAPACK has no `Float16` path; on a
+device at `Float32` the vendor libraries are available instead and would be preferable —
+unpivoted QR through cuSOLVER's `geqrf`, and a Jacobi SVD through `gesvdj`. Note that
+cuSOLVER's *pivoted* QR support is thinner than its unpivoted support, so on a device
+[`IncrementalQR`](@ref) or [`TruncatedSVD`](@ref) is the more natural choice than
+[`PivotedQR`](@ref). None of that changes the fit's cost, which is negligible either way (see
+the note at the top of the [Algorithms](@ref) page).

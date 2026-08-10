@@ -41,9 +41,9 @@ precision × regularization factor × activation, in two stages:
 
 - `relu` — `ReLUᵏ` for `k = 1…4`, where the `{±1} × (bias grid)` dictionary is
   theoretically complete, so anything that goes wrong is numerical. This is the
-  `oga_1d.md` question.
+  reduced-precision question.
 - `smooth` — ELU, GELU and tanh against the 2-D and angular dictionaries built for
-  them. This is the `oga_2d.md` question.
+  them. This is the activation question.
 
 λ is swept as multiples of `√eps(T)` — `2^k √eps(T)` for `k = 1…6` at
 `Float16`/`Float32` and `k = 2, 4, …, 12` at `Float64` — plus a `λ = 0` control, so the

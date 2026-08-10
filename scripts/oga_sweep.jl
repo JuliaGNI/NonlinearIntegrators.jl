@@ -6,9 +6,9 @@
 #
 # Two stages, matching the two questions:
 #
-#   B1 — the reduced-precision question (`oga_1d.md`): ReLUᵏ for k = 1…4, where the ±1
+#   B1 — the reduced-precision question: ReLUᵏ for k = 1…4, where the ±1
 #        dictionary is theoretically complete, so anything that goes wrong is numerical.
-#   B2 — the activation question (`oga_2d.md`): ELU, GELU and tanh, which are not positively
+#   B2 — the activation question: ELU, GELU and tanh, which are not positively
 #        homogeneous, against the 2-D and angular dictionaries built for them.
 #
 # The λ ladder is swept as multiples of `√eps(T)` (see `oga_activations.jl`): scaling the

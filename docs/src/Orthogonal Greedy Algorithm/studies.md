@@ -31,8 +31,9 @@ tier that actually separates the variants.
 factor × activation, in two stages matching the two questions:
 
 - `relu` — `ReLUᵏ` for `k = 1…4`, where the `{±1}` dictionary is theoretically complete, so
-  anything that goes wrong is numerical;
-- `smooth` — ELU, GELU and tanh against the 2-D and angular dictionaries built for them.
+  anything that goes wrong is numerical (the reduced-precision question);
+- `smooth` — ELU, GELU and tanh against the 2-D and angular dictionaries built for them (the
+  activation question).
 
 **Tier B′ — the hardest problem** (`oga_double_pendulum.jl`) repeats a reduced grid on the
 double pendulum at a *single* λ, read from the harmonic-oscillator sweep's CSV — the factor that
@@ -187,7 +188,7 @@ Three things to read out of it.
 power. It fails by *throwing* (`SingularException` from the Gram solve), so unlike the counts
 around it this zero is not an artefact of the residual tolerance: no choice of target rescues
 it. It is also the *worst* variant at `Float32` and `Float64` (18 and 15, against 25–26 and
-17–23). This is the `oga_1d.md` question answered.
+17–23). This answers the reduced-precision question.
 
 **The rank-revealing fits are the most robust, and by a clear margin at `Float64`.**
 `oga1d-tsvd` reaches 23/28 there against the default's 17 and the reference's 15;
@@ -229,7 +230,7 @@ choice; it is the one that converges most often.
 
 ### Tier B — smooth activations
 
-This is the `oga_2d.md` question. Converged runs out of 21 per precision, for ELU, GELU and
+This is the smooth-activation question. Converged runs out of 21 per precision, for ELU, GELU and
 tanh:
 
 | seed | dictionary | `Float16` | `Float32` | `Float64` |
@@ -270,6 +271,31 @@ What it does show:
   (`2.1e-02`–`2.7e-02`). The robustness/accuracy trade-off is consistent across both problems.
 - The chosen factors, taken from the harmonic-oscillator sweep, were `2√eps(T)` at `Float16`,
   `4√eps(T)` at `Float32` and `4096√eps(T)` at `Float64`.
+
+## Where measurement disagreed with the design
+
+The remedies implemented here were laid out in advance, in rough order of expected impact:
+switch the fit to weighted QR and add normalisation plus a coherence guard first; add a
+truncated SVD "only if you find a residual case that still degrades"; and reserve the
+incremental QR "for when the per-step re-solve shows up in profiling".
+
+Two parts of that guidance did not survive contact with the numbers.
+
+**The rank-revealing fits were not a last resort.** They are the most robust variants at
+`Float64` — `TruncatedSVD` at 23/28 against the QR default's 17 — so the ordering that put
+them behind the main fix was wrong. The cost reasoning that motivated deferring them was also
+beside the point: as the note at the top of [Algorithms](@ref) records, the fit is free at this
+problem size, so there was never a performance reason to prefer a cheaper factorisation.
+
+**Normalising the dictionary before selection was expected to be a straightforward
+improvement.** It is not: it changes which atoms are chosen, and at `Float64` with `ReLUᵏ` that
+steers the Newton solve into a worse basin. That is why [`RawProjection`](@ref) remains the
+default and normalised selection is an explicit opt-in, and why `OGA1d`'s selected atoms are
+pinned by a regression test rather than left free to drift.
+
+The parts that held: the ``\kappa^2`` diagnosis and the QR reformulation, the precision-scaled
+guard rails replacing the absolute constants, and the incremental QR being both cheaper and
+more stable.
 
 ## Caveats
 
