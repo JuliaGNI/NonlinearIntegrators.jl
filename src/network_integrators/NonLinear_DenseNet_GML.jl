@@ -155,7 +155,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params,in
     @debug "network inputs " network_inputs
     @debug "network labels from initial guess methods " network_labels
 
-    initial_params!(int, initial_guess_method)
+    initial_params!(int, initial_guess_method, sol)
 end
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, initial_trajectory::HermiteExtrapolation)
@@ -195,7 +195,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
     end
 end
 
-function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, InitialParams::TrainingMethod)
+function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, InitialParams::TrainingMethod, sol)
     local D = length(cache(int).q̃)
     local S = int.method.basis.S
     local S₁ = int.method.basis.S₁
@@ -251,7 +251,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
 
 end
 
-function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, InitialParams::LSGD)
+function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, InitialParams::LSGD, sol)
     local D = length(cache(int).q̃)
     local S = int.method.basis.S
     local S₁ = int.method.basis.S₁
