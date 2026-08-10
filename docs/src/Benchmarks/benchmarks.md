@@ -13,9 +13,14 @@ The suite has three goals:
 2. identify issues in the package that are detrimental to performance;
 3. identify robust solver strategies.
 
-There is also a separate, narrower `benchmark/oga_comparison.jl` that compares the two
-OGA initial-guess variants; see the *Orthogonal Greedy Algorithm* page and
-`benchmark/README.md`.
+Three further studies target the OGA initial guess specifically:
+`scripts/oga_fit_study.jl` measures seed quality on its own (no integrator, no Newton
+solve), `scripts/oga_sweep.jl` runs the end-to-end harmonic-oscillator sweep over seed
+variant × precision × regularization factor × activation, and
+`scripts/oga_double_pendulum.jl` repeats a reduced grid on the hardest problem. They live
+under `scripts/` rather than here because they study one component rather than the
+integrator suite, and they are not part of the documentation build. See the *Orthogonal
+Greedy Algorithm* section and `scripts/README.md`.
 
 ## What is swept
 

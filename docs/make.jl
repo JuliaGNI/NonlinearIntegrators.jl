@@ -69,7 +69,14 @@ makedocs(
     ),
     pages=[
         "Home" => "index.md",
-        "Orthogonal Greedy Algorithm" => "Orthogonal Greedy Algorithm/OGA.md",
+        "Orthogonal Greedy Algorithm" => [
+            "Overview" => "Orthogonal Greedy Algorithm/OGA.md",
+            "Theory" => "Orthogonal Greedy Algorithm/theory.md",
+            "Algorithms" => "Orthogonal Greedy Algorithm/algorithms.md",
+            "Usage" => "Orthogonal Greedy Algorithm/usage.md",
+            "Precision" => "Orthogonal Greedy Algorithm/precision.md",
+            "Studies" => "Orthogonal Greedy Algorithm/studies.md",
+        ],
         "Benchmarks" => "Benchmarks/benchmarks.md",
     ],
 )
