@@ -26,7 +26,7 @@ function read_results(paths::AbstractVector{<:AbstractString})
         for ln in lines[2:end]
             isempty(strip(ln)) && continue
             f = split(ln, ",")
-            length(f) == 17 || continue
+            length(f) == 16 || continue
             push!(rows, (problem = String(f[1]), T = String(f[2]), dt = _parsef(f[3]),
                          steps = round(Int, _parsef(f[4])), R = round(Int, _parsef(f[5])),
                          S = round(Int, _parsef(f[6])), activation = String(f[7]),
@@ -34,7 +34,7 @@ function read_results(paths::AbstractVector{<:AbstractString})
                          initial_guess = String(f[10]), lambda = _parsef(f[11]),
                          status = String(f[12]), ref_err = _parsef(f[13]),
                          ham_drift = _parsef(f[14]), iterations = _parsef(f[15]),
-                         solve_secs = _parsef(f[16]), total_secs = _parsef(f[17])))
+                         total_secs = _parsef(f[16])))
         end
     end
     return rows
@@ -65,7 +65,7 @@ function group_stats(rows)
      med_ref  = _median_finite([r.ref_err   for r in okrows]),
      med_ham  = _median_finite([r.ham_drift for r in okrows]),
      med_iter = _median_finite([r.iterations for r in okrows]),
-     med_secs = _median_finite([r.solve_secs for r in okrows]))
+     med_secs = _median_finite([r.total_secs for r in okrows]))
 end
 
 fmt_pct(x)  = @sprintf("%.0f%%", 100x)
@@ -168,7 +168,7 @@ function _stats_table(io, rows, keyfn, colname)
     cells = [[string(k), string(s.n), string(s.ok), fmt_pct(s.frac),
               fmt_sci(s.med_ref), fmt_sci(s.med_ham), fmt_iter(s.med_iter), fmt_secs(s.med_secs)]
              for (k, v) in groups for s in (group_stats(v),)]
-    _table(io, [colname, "n", "ok", "success", "med ref_err", "med ham_drift", "med iter", "med solve_s"], cells)
+    _table(io, [colname, "n", "ok", "success", "med ref_err", "med ham_drift", "med iter", "med total_s"], cells)
 end
 
 # Best (lowest ref_err among converged) configuration per problem.
@@ -229,7 +229,7 @@ function write_report(rows; title, mode, outdir, prefix)
     have_energy = plot_metric_vs_dt(rows, :ham_drift, "Relative Hamiltonian drift",
                                     "Energy drift vs timestep",    joinpath(outdir, p_energy);
                                     colorby = colorby, colortitle = colortitle)
-    have_time   = plot_metric_vs_dt(rows, :solve_secs, "Solve time [s]",
+    have_time   = plot_metric_vs_dt(rows, :total_secs, "Run time [s]",
                                     "Run time vs timestep",        joinpath(outdir, p_time);
                                     colorby = colorby, colortitle = colortitle)
     have_iter   = plot_metric_vs_dt(rows, :iterations, "Nonlinear iterations (final step)",
@@ -245,7 +245,7 @@ function write_report(rows; title, mode, outdir, prefix)
         println(io, "- Each case integrates **10 steps**. `ref_err` is the relative max-norm error")
         println(io, "  of the final state vs a `Gauss(8)` / Float64 reference at the smallest timestep;")
         println(io, "  `ham_drift` is the max relative Hamiltonian drift; `iter` is the nonlinear-solver")
-        println(io, "  iteration count of the final step; `solve_s` is the summed nonlinear-solve time.\n")
+        println(io, "  iteration count of the final step; `total_s` is the wall-clock time of the run.\n")
 
         println(io, "## Status breakdown\n")
         statuses = sort(collect(Set(r.status for r in rows)))

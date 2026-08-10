@@ -40,12 +40,23 @@ function generate_benchmark_figures()
                    "onelayer_gml_benchmark_runtime_vs_dt.png",
                    "onelayer_gml_benchmark_iterations_vs_dt.png"])
 
-    # A plot the reporting step skipped (no data) leaves no file; guard so a missing
-    # figure does not abort the build.
+    # A plot the reporting step skipped (no data) leaves no file, so copy what is there.
     for fig in figs
         src = joinpath(resdir, fig)
         isfile(src) && cp(src, joinpath(figdir, fig); force=true)
     end
+
+    # The reporting step skips any plot with no converged cases, which used to surface
+    # half an hour later as a batch of Documenter `invalid local link/image` errors.
+    # Check the figures the page actually references and fail here instead, naming them.
+    page = read(joinpath(@__DIR__, "src", "Benchmarks", "benchmarks.md"), String)
+    referenced = unique(m[1] for m in eachmatch(r"\]\(figures/([\w.\-]+\.png)\)", page))
+    absent = filter(f -> !isfile(joinpath(figdir, f)), referenced)
+    isempty(absent) || error("""
+        Benchmarks page references $(length(absent)) figure(s) the sweep did not produce:
+          $(join(absent, "\n  "))
+        The reporting step only plots converged (`ok`) cases, so this usually means the
+        benchmark harness itself failed — check the per-case `status` column above.""")
     return nothing
 end
 

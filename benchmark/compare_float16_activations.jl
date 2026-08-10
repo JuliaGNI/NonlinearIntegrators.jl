@@ -75,7 +75,7 @@ println("="^80)
 @printf("%-20s %-5s %-5s | %-10s %-12s\n", "problem", "dt", "act", "status", "ref_err")
 println("-"^60)
 
-# --- sweep, writing the standard 17-column CSV --------------------------------
+# --- sweep, writing the standard 16-column CSV --------------------------------
 open(CSVPATH, "w") do io
     println(io, CSV_HEADER)
     flush(io)
@@ -97,7 +97,7 @@ open(CSVPATH, "w") do io
                 row = join((name, string(T), csvnum(dt), "10", csvnum(R), csvnum(S),
                             actlabel, STRAT.solver, STRAT.linesearch, IG.label, csvnum(Float64(λ)),
                             r.status, csvnum(r.ref_err), csvnum(r.ham_drift), csvint(r.iters),
-                            csvnum(r.solve_secs), csvnum(r.total_secs)), ",")
+                            csvnum(r.total_secs)), ",")
                 println(io, row)
                 flush(io)
             end

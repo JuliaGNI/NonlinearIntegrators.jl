@@ -77,8 +77,7 @@ For each case the suite records:
   sweep (over the same 10-step horizon);
 - **`ham_drift`** — the maximum relative drift of the Hamiltonian over the run;
 - **`iterations`** — the nonlinear-solver iteration count of the final step;
-- **`solve_secs` / `total_secs`** — the summed nonlinear-solve time and the wall-clock
-  time of the run.
+- **`total_secs`** — the wall-clock time of the run.
 
 ## Running
 
@@ -115,7 +114,7 @@ The CSV has one row per case with the columns
 
 ```
 problem, T, dt, steps, R, S, activation, solver, linesearch, initial_guess,
-lambda, status, ref_err, ham_drift, iterations, solve_secs, total_secs
+lambda, status, ref_err, ham_drift, iterations, total_secs
 ```
 
 The markdown report contains a status breakdown, convergence/robustness tables (by solver

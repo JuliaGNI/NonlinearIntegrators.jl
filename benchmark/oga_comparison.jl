@@ -45,8 +45,10 @@ function run_case(::Type{T}, guess; S::Int, R::Int, timestep) where {T}
 
     try
         solve()                                    # warm-up (compile) — discarded
-        t = @elapsed res = solve()
-        qend = Float64(collect(res.sol.q[:, 1])[end])
+        t0 = time()
+        sol, _ = solve()
+        t = time() - t0
+        qend = Float64(collect(sol.q[:, 1])[end])
         err = abs(qend - ref)
         return (status = isfinite(err) ? "ok" : "nonfinite", err = err, secs = t)
     catch e
