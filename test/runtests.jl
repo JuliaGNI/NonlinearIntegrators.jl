@@ -25,6 +25,7 @@ include("testsetup.jl")
     end
 
     @testset "unit" begin
+        include("unit/oga_kernels.jl")
         include("unit/onelayer_gml_unit.jl")
         include("unit/cgvi_standard_unit.jl")
         include("unit/time_reversible_onelayer_unit.jl")

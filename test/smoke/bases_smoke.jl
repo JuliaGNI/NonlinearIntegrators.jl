@@ -30,6 +30,19 @@ end
 @testset "option-tag singletons" begin
     @test IntegratorExtrapolation() isa IntegratorExtrapolation
     @test TrainingMethod() isa InitialParametersMethod
-    @test OGA1d() isa InitialParametersMethod
     @test LSGD() isa InitialParametersMethod
+end
+
+@testset "OGA seeds" begin
+    for seed in (OGA1d(), OGA1dNormalized(), OGA1dStable(), OGA2d(), OGASphere(),
+                 OGA1dNormalEquations())
+        @test seed isa InitialParametersMethod
+    end
+    # The presets are named corners of one composable type, so a hand-built configuration
+    # is just as valid a seed. Being isbits keeps the method struct's type parameter
+    # concrete.
+    custom = OGA(BiasGrid1d(), OrthogonalProjection(), TruncatedSVD())
+    @test custom isa InitialParametersMethod
+    @test isbits(custom)
+    @test oga_label(OGA1d()) == "grid1d/raw/qr"
 end
