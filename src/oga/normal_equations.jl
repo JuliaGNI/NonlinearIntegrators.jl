@@ -36,7 +36,9 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML},
     local network_labels = cache(int).network_labels'
     local activation = method(int).basis.activation
     local x = nlsolution(int)
-    local nstages = method(int).nstages
+    # Kept as a local named `nstages`: renaming it to `extrapolation_substep` would shadow
+    # the accessor function of that name for the rest of the body.
+    local nstages = extrapolation_substep(method(int))
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
 

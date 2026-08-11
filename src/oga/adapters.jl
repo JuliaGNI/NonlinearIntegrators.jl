@@ -35,7 +35,7 @@ function oga_seed(int::GeometricIntegrator, oga::OGA, symmetry::OGASymmetry,
     local D = length(cache(int).q̃)
     local T = eltype(nlsolution(int))
     local nodes = vec(T.(method(int).network_inputs))
-    local quad_weights = simpson_quadrature(method(int).nstages, T)
+    local quad_weights = simpson_quadrature(extrapolation_substep(method(int)), T)
     local σ = method(int).basis.activation
     local bias_interval = method(int).bias_interval
     local dict_amount = method(int).dict_amount
@@ -45,7 +45,7 @@ function oga_seed(int::GeometricIntegrator, oga::OGA, symmetry::OGASymmetry,
                     modulation = modulation, symmetry = symmetry) for d in 1:D]
 end
 
-# Keep the parameter cache consistent with the seed. `components!` and `stages_compute!`
+# Keep the parameter cache consistent with the seed. `components!` and `record_finer_solution!`
 # both repopulate `ps` from `x`, so this is not load-bearing — but a stale `ps` would be a
 # trap for anything that inspects the cache between the seed and the first residual
 # evaluation.
@@ -122,6 +122,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, oga
     _store_full!(x, results, D, S)
     # `x[D*S+d]` is the momentum, set by `initial_trajectory!` — deliberately untouched.
     @debug "Initial guess for DOF from OGA " x
+    _oga_status(results, method(int).show_status)
     return nothing
 end
 

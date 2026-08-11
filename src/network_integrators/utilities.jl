@@ -1,71 +1,3 @@
-#######
-#General functions that are used in the network integrators
-#######
-using CompactBasisFunctions
-
-
-function first_order_central_difference(f,x;ϵ=0.00001)
-    return (f(x+ϵ)-f(x-ϵ))/(2*ϵ)
-end
-
-function first_order_forward_difference(f,x;ϵ=0.00001)
-    return (f(x+ϵ)-f(x))/ϵ
-end
-
-
-function mse_loss(x,y::AbstractArray{T},NN,ps;λ=0.0,μ = 0.00001) where T
-    y_pred = NN(x,ps)
-    loss = mean(abs,y_pred - y) + λ*abs2(y_pred[1] - y[1])
-    return loss
-end
-
-function basis_first_order_central_difference(NN,ps,x;ϵ=0.00001)
-    bd = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([x-ϵ],ps[1:end-1])
-    fd = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([x+ϵ],ps[1:end-1])
-    return (fd .- bd) ./ (2*ϵ)
-end
-
-function OneLayerbasis_first_order_central_difference(NN,ps,st,x;ϵ=0.00001)
-    bd = NN[1]([x .- ϵ],ps[1],st[1])[1]
-    fd = NN[1]([x .+ ϵ],ps[1],st[1])[1]
-    return (fd .- bd) ./ (2*ϵ)
-end
-
-function vector_central_difference(basis,ps,st,x;ϵ=0.00001)
-    local NN = basis.NN
-    bd = NN[1](x .- ϵ,ps[1],st[1])[1]
-    fd = NN[1](x .+ ϵ,ps[1],st[1])[1]
-    return (fd .- bd) ./ (2*ϵ)
-end
-
-function vector_central_difference(basis,ps,x;ϵ=0.00001)
-    local NN = basis.NN
-    bd = (NN.layers[1])(x .- ϵ,ps[1])
-    fd = (NN.layers[1])(x .+ ϵ,ps[1])
-    return (fd .- bd) ./ (2*ϵ)
-    
-end
-
-function basis_first_order_central_difference(NN,ps,st,x;ϵ=0.00001)
-    bd = NN([x-ϵ],ps,st)[1]
-    fd = NN([x+ϵ],ps,st)[1]
-    return (fd .- bd) ./ (2*ϵ)
-end
-
-function vector_mse_loss(x,y,model, ps, st;λ=1000)
-    y_pred, st = model(x, ps, st)
-    loss = mean(abs2,y_pred - y) + λ*sum(abs2,y_pred[:,1]-y[:,1])
-    return loss, ps,()
-end
-
-function vector_mse_energy_loss(x,y,model,ps,st,problem_module,params,initial_hamiltonian;λ=1000,ϵ = 0.00001,μ = 0.1)
-    y_pred, st = model(x, ps, st)
-    v_pred = (model(x .+ ϵ, ps, st)[1] - model(x .- ϵ, ps, st)[1])/(2*ϵ)
-    hamiltonian_pred = [problem_module.ϑ(0.0, y_pred[:,i], v_pred[:,i], params)'*v_pred[:,i]- problem_module.lagrangian(0.0, y_pred[:,i], v_pred[:,i], params) for i in 1:size(y_pred,2)]
-    energy_loss = mean(abs2,y_pred - y) + λ*sum(abs2,y_pred[:,1]-y[:,1]) + μ*sum(abs2,hamiltonian_pred .- initial_hamiltonian)
-    return energy_loss, ps,()
-end
-
 function simpson_quadrature(N::Int, ::Type{T}=Float64) where {T}
     if N % 2 != 0
         error("N must be even for Simpson's rule.")
@@ -88,16 +20,6 @@ function simpson_quadrature(N::Int, ::Type{T}=Float64) where {T}
     
     return w
 end
-
-"""
-    initial_trajectory!(sol, history, params, int, initial_trajectory)
-
-Initial trajectory for the `NonLinear_OneLayer_Lux` integrator.
-"""
-function initial_trajectory!(sol, history, params, ::GeometricIntegrator, initial_trajectory::Extrapolation)
-    error("For extrapolation $(initial_trajectory) method is not implemented!")
-end
-
 
 function GaussQuadrature64()
     points = [0.99930504173577213946, 0.99634011677195527935, 0.99101337147674432074, 0.98333625388462595693, 0.97332682778991096374, 0.96100879965205371892, 0.94641137485840281606, 0.92956917213193957582, 0.91052213707850280576, 0.88931544599511410585, 0.86599939815409281976, 0.84062929625258036275, 0.81326531512279755974, 0.78397235894334140761, 0.75281990726053189661, 0.71988185017161082685, 0.68523631305423324256, 0.64896547125465733986, 0.61115535517239325025, 0.57189564620263403428, 0.53127946401989454566, 0.48940314570705295748, 0.44636601725346408798, 0.4022701579639916037, 0.35722015833766811595, 0.31132287199021095616, 0.26468716220876741637, 0.21742364374000708415, 0.16964442042399281804, 0.12146281929612055447, 0.07299312178779903945, 0.024350292663424432509]
@@ -147,5 +69,24 @@ end
 function lsgd_loss(network_inputs,labels,NN,ps)
     NN_output = NN(network_inputs, ps)
     return sqrt(mean((labels .- NN_output).^2))
+end
+
+"""
+    mse_loss(x, y, NN, ps; λ=0.0, μ=0.00001)
+
+Mean absolute error of `NN(x, ps)` against target `y`, with optional boundary penalty
+`λ * |NN(x[1], ps) - y[1]|²`. Used as the training objective for `TrainingMethod`.
+"""
+function mse_loss(x, y::AbstractArray{T}, NN, ps; λ=0.0, μ=0.00001) where T
+    y_pred = NN(x, ps)
+    loss = mean(abs, y_pred - y) + λ * abs2(y_pred[1] - y[1])
+    return loss
+end
+
+# Least-specific fallback: `NetworkIntegratorCore.jl` covers the three supported
+# extrapolations for every NetworkIntegratorMethod, and several integrators override those.
+# Anything else lands here and gets a readable message rather than a MethodError.
+function initial_trajectory!(sol, history, params, ::GeometricIntegrator, initial_trajectory::Extrapolation)
+    error("For extrapolation $(initial_trajectory) method is not implemented!")
 end
 

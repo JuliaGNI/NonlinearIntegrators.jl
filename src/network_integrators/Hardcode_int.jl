@@ -1,72 +1,52 @@
-struct Hardcode_int{T,NBASIS,NNODES,basisType<:Basis{T},ET<:IntegratorExtrapolation,IPMT<:InitialParametersMethod} <: OneLayerMethod
-    basis::basisType
-    quadrature::QuadratureRule{T,NNODES}
+"""
+    Hardcode_int <: OneLayerMethod
 
-    b::SVector{NNODES,T}
-    c::SVector{NNODES,T}
+One-layer variational integrator that computes network derivatives with `ForwardDiff`
+instead of the pre-compiled symbolic derivatives used by `NonLinear_OneLayer_GML`.
+The ansatz and optimisation are otherwise identical to `NonLinear_OneLayer_GML`.
 
-    nstages::Int
-    show_status::Bool
-    network_inputs::Matrix{T}
+# Constructor
 
-    initial_trajectory::ET
-    initial_guess_method::IPMT
+    Hardcode_int(basis, quadrature; kwargs...)
 
-    training_epochs::Int
-    use_hamiltonian_loss::Bool
+Keyword arguments are the same as `NonLinear_OneLayer_GML`:
+`initial_trajectory_method`, `initial_guess_method`, `extrapolation_substep`,
+`training_epochs`, `show_status`, `bias_interval`, `dict_amount`, `record_grid_points`.
+"""
+struct Hardcode_int{T, NNODES, basisType <: Basis{T},
+                    ET <: Extrapolation,
+                    IPMT <: InitialParametersMethod} <: OneLayerMethod
+    common        :: NetworkIntegratorCore{T, NNODES, basisType, ET, IPMT}
+    bias_interval :: SVector{2, T}
+    dict_amount   :: Int
 
-    bias_interval::Vector{T}
-    dict_amount::Int
     function Hardcode_int(basis::Basis{T}, quadrature::QuadratureRule{T};
-        nstages::Int=10, show_status::Bool=true, training_epochs::Int=50000, use_hamiltonian_loss::Bool=true,
-        initial_trajectory::ET=IntegratorExtrapolation(),
-        initial_guess_method::IPMT=OGA1dNormalized(),
-        bias_interval=[-pi, pi], dict_amount=50000) where {T,ET,IPMT}
-        # get number of quadrature nodes and number of basis functions
-        # initial_trajectory_list = subtypes(Extrapolation)
-        # @assert initial_trajectory in initial_trajectory_list "initial_trajectory should be one of $(initial_trajectory_list)"
-
-        # initial_guess_methods_list = subtypes(InitialParametersMethod)
-        # @assert initial_guess_method in initial_guess_methods_list "initial_guess_methods should be one of $(initial_guess_methods_list)"
-
-        NNODES = QuadratureRules.nnodes(quadrature)
-        NBASIS = basis.S
-
-        # get quadrature nodes and weights
-        quad_weights = QuadratureRules.weights(quadrature)
-        quad_nodes = QuadratureRules.nodes(quadrature)
-
-        network_inputs = reshape(collect(0:1/nstages:1), 1, nstages + 1)
-        new{T,NBASIS,NNODES,typeof(basis),ET,IPMT}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, initial_trajectory, initial_guess_method,
-            training_epochs, use_hamiltonian_loss, bias_interval, dict_amount)
+        extrapolation_substep      :: Int  = 10,
+        training_epochs           :: Int  = 50000,
+        show_status               :: Bool = true,
+        initial_trajectory_method :: ET   = IntegratorExtrapolation(),
+        initial_guess_method      :: IPMT = OGA1dNormalized(),
+        record_grid_points = 41,
+        bias_interval = [-pi, pi],
+        dict_amount   :: Int = 50000,) where {T, ET, IPMT}
+        common = NetworkIntegratorCore(basis, quadrature;
+            extrapolation_substep=extrapolation_substep,
+            training_epochs=training_epochs,
+            show_status = show_status,
+            initial_trajectory_method=initial_trajectory_method,
+            initial_guess_method=initial_guess_method,
+            record_grid_points =  record_grid_points)
+        new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(
+            common, SVector{2,T}(bias_interval), dict_amount)
     end
 end
-nbasis(method::Hardcode_int) = method.basis.S
-CompactBasisFunctions.basis(method::Hardcode_int) = method.basis
-quadrature(method::Hardcode_int) = method.quadrature
-CompactBasisFunctions.nbasis(method::Hardcode_int) = method.basis.S
-nnodes(method::Hardcode_int) = QuadratureRules.nnodes(method.quadrature)
-activation(method::Hardcode_int) = method.basis.activation
-nstages(method::Hardcode_int) = method.nstages
-show_status(method::Hardcode_int) = method.show_status
-training_epochs(method::Hardcode_int) = method.training_epochs
 
-isexplicit(::Union{Hardcode_int,Type{<:Hardcode_int}}) = false
-isimplicit(::Union{Hardcode_int,Type{<:Hardcode_int}}) = true
-issymmetric(::Union{Hardcode_int,Type{<:Hardcode_int}}) = missing
-issymplectic(::Union{Hardcode_int,Type{<:Hardcode_int}}) = missing
-
-default_solver(::Hardcode_int) = Newton()
-default_iguess(::Hardcode_int) = IntegratorExtrapolation()#CoupledHarmonicOscillator
 # Alone among the four integrators, this one's greedy step selects on the *normalized*
 # inner product. The rule decides which neurons are picked and hence which Newton basin the
 # step lands in, so it is a tuned baseline rather than a free choice.
 default_iparams(::Hardcode_int) = OGA1dNormalized()
-# default_iguess_integrator(::Hardcode_int) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
 
-default_iguess_integrator(::Hardcode_int) = ImplicitMidpoint()
-
-struct Hardcode_intCache{ST,S,R,N} <: IODEIntegratorCache{ST}
+struct Hardcode_intCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -100,11 +80,10 @@ struct Hardcode_intCache{ST,S,R,N} <: IODEIntegratorCache{ST}
     dqdbr₁::Matrix{ST}
     dqdbr₀::Matrix{ST}
 
-    current_step::Vector{ST}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    function Hardcode_intCache{ST,S,R,N}(ics) where {ST,S,R,N}
+    function Hardcode_intCache{ST,S,R,N}(ics; record_grid_points::Int = 41) where {ST,S,R,N}
         D = length(vec(ics.q))
         x = zeros(ST, D * (1 + 3 * S))
 
@@ -142,84 +121,56 @@ struct Hardcode_intCache{ST,S,R,N} <: IODEIntegratorCache{ST}
         dqdbr₁ = zeros(ST, S, D)
         dqdbr₀ = zeros(ST, S, D)
 
-        current_step = zeros(ST, 1)
-        stage_values = zeros(ST, 41, D)
+        stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N + 1, D)
 
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps,
             dqdW2c, dvdW2c, dqdW1c, dvdW1c, dqdbc, dvdbc,
             dqdW2r₁, dqdW2r₀, dqdW1r₁, dqdW1r₀, dqdbr₁, dqdbr₀,
-            current_step, stage_values, network_labels)
+            stage_values, network_labels)
     end
 end
-
-GeometricIntegrators.Integrators.nlsolution(cache::Hardcode_intCache) = cache.x
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Hardcode_int; kwargs...) where {ST}
-    Hardcode_intCache{ST,nbasis(method),nnodes(method),nstages(method)}(initial_conditions(problem); kwargs...)
+    Hardcode_intCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
+        record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Hardcode_int) = Hardcode_intCache{ST,nbasis(method),nnodes(method),nstages(method)}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Hardcode_int) =
+    Hardcode_intCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}
 
-@inline function Base.getindex(c::Hardcode_intCache, ST::DataType)
-    key = hash(Threads.threadid(), hash(ST))
-    if haskey(c.caches, key)
-        c.caches[key]
-    else
-        c.caches[key] = Cache{ST}(c.problem, c.method)
-    end::CacheType(ST, c.problem, c.method)
-end
 
-function GeometricIntegrators.Integrators.reset!(cache::Hardcode_intCache, t, q, p)
-    copyto!(cache.q̄, q)
-    copyto!(cache.p̄, p)
-end
-
-function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int})
-    local network_inputs = method(int).network_inputs
-    local network_labels = cache(int).network_labels
-    local show_status = method(int).show_status
-    local current_step = cache(int).current_step
-    local initial_trajectory = method(int).initial_trajectory
-    local initial_guess_method = method(int).initial_guess_method
-
-    show_status ? print("\n current time step: $current_step") : nothing
-    current_step[1] += 1
-
-    initial_trajectory!(sol, history, params, int, initial_trajectory)
-
-    if show_status
-        print("\n network inputs \n")
-        print(network_inputs)
-
-        print("\n network labels from initial guess methods \n")
-        print(network_labels')
-    end
-
-    initial_params!(int, initial_guess_method,sol)
-end
-
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int}, initial_trajectory::HermiteExtrapolation)
+# The extrapolated trajectory has to land in `network_labels`, because that is what the OGA
+# seed reads (`initial_params!` in `src/oga/adapters.jl`). This used to write the extrapolated
+# positions into the *output-weight* slots of `x` and leave `network_labels` at zero, so the
+# seed fitted the boundary ansatz to an all-zero target and then overwrote the very slots the
+# extrapolation had filled. It also put `p̃` into `x[D*S+k]`, which for this ansatz is the
+# endpoint *position* unknown rather than the momentum — cf. the `IntegratorExtrapolation`
+# method below, which sets `q̃` there.
+#
+# Note that `solutionstep!` only extrapolates when `iguess(int)` is a framework extrapolation;
+# with the default `NoInitialGuess()` it is a no-op. Pass `initialguess = HermiteExtrapolation()`
+# to `GeometricIntegrator` for a real Hermite warm start.
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int}, initial_trajectory_method::HermiteExtrapolation)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
     local network_inputs = method(int).network_inputs
-
-    # TODO: here we should not initialise with the solution q but with the degree of freedom x,
-    # obtained e.g. from an L2 projection of q onto the basis
+    local network_labels = cache(int).network_labels
+    local h = timestep(int)
 
     for i in eachindex(network_inputs)
         soltmp = (
-            t=sol.t + network_inputs[i] * timestep(int),
+            t=sol.t + (network_inputs[i] - 1) * h,
             q=cache(int).q̃,
             p=cache(int).p̃,
-            v=cache(int).ṽ,
-            f=cache(int).f̃,
+            q̇=cache(int).ṽ,
+            ṗ=cache(int).f̃,
         )
         solutionstep!(soltmp, history, problem(int), iguess(int))
 
         for k in 1:D
-            x[D*(i-1)+k] = cache(int).q̃[k]
+            network_labels[i, k] = cache(int).q̃[k]
         end
     end
 
@@ -227,27 +178,27 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ha
         t=sol.t,
         q=cache(int).q̃,
         p=cache(int).p̃,
-        v=cache(int).ṽ,
-        f=cache(int).f̃,
+        q̇=cache(int).ṽ,
+        ṗ=cache(int).f̃,
     )
     solutionstep!(soltmp, history, problem(int), iguess(int))
 
     for k in 1:D
-        x[D*S+k] = cache(int).p̃[k]
+        x[D*S+k] = cache(int).q̃[k]
     end
 end
 
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int}, initial_trajectory::IntegratorExtrapolation)
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int}, initial_trajectory_method::IntegratorExtrapolation)
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
     local h = int.problem.timestep
-    local nstages = method(int).nstages
+    local extrapolation_substep = method(int).extrapolation_substep
     local D = length(cache(int).q̃)
     local problem = int.problem
     local S = nbasis(method(int))
     local x = nlsolution(int)
 
-    tem_ode = similar(problem, [zero(h), h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_ode = similar(problem, [zero(h), h], h / extrapolation_substep, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -469,17 +420,6 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     # show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
 end
 
-# Compute stages of Variational Partitioned Runge-Kutta methods.
-function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Hardcode_int}) where {ST}
-    # check that x and b are compatible
-    @assert axes(x) == axes(b)
-
-    # compute stages from nonlinear solver solution x
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
-
-    # compute residual vector
-    GeometricIntegrators.Integrators.residual!(b, sol, params, int)
-end
 
 
 function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:Hardcode_int}, DT)
@@ -502,34 +442,9 @@ function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricInt
     # sol.p .= cache(int, DT).p̃
 end
 
-function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:Hardcode_int}) where {DT}
-    # compute vector field at internal stages
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
 
-    # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, int, DT)
-end
 
-function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int,<:AbstractProblemIODE})
-    # call nonlinear solver
-    # solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
-    solve!(nlsolution(int),solver(int),  (sol, params, int))
-
-    # print solver status
-    # print_solver_status(int.solver.status, int.solver.params)
-
-    # check if solution contains NaNs or error bounds are violated
-    # check_solver_status(int.solver.status, int.solver.params)
-
-    #compute the trajectory after solving by newton method
-    stages_compute!(sol, int)
-
-    # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
-
-end
-
-function stages_compute!(sol, int::GeometricIntegrator{<:Hardcode_int})
+function record_finer_solution!(sol, int::GeometricIntegrator{<:Hardcode_int})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     # local network_inputs = method(int).network_inputs
@@ -538,11 +453,13 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Hardcode_int})
     local NN = method(int).basis.NN
     local ps = cache(int).ps
     local show_status = method(int).show_status
-    local q̄ = sol.q  # 起点 q_n
-    local q = cache(int).q̃ # 终点估计 q_{n+1}
+    local q̄ = sol.q  # start point q_n
+    local q = cache(int).q̃ # endpoint estimate q_{n+1}
     local activation = method(int).basis.activation
 
-    network_inputs = reshape(collect(0:1/40:1),1,41)
+    local N_plot = method(int).record_grid_points
+    local T = eltype(x)
+    network_inputs = reshape(collect(range(zero(T), one(T), N_plot)), 1, N_plot)
 
     if show_status
         print("\n solution x after solving by Newton \n")
@@ -584,37 +501,3 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Hardcode_int})
 end
 
 
-function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:Hardcode_int}, n₁::Int, n₂::Int)
-    # check time steps range for consistency
-    @assert n₁ ≥ 1
-    @assert n₂ ≥ n₁
-    @assert n₂ ≤ ntime(sol)
-
-    # copy initial condition from solution to solutionstep and initialize
-    solstep = solutionstep(int, sol[n₁-1])
-    internal_values = Vector{Matrix}(undef,n₂ - n₁ + 1)
-    # loop over time steps
-    for n in n₁:n₂
-        println("Start integrate at time step n = $(n)")
-        # integrate one step and copy solution from cache to solution
-        reset!(solstep, timesteps(sol)[n])
-        integrate!(solstep, int)
-        copy!(sol, current(solstep), n)
-
-        havenan = false
-        for s in current(solstep)
-            havenan = havenan || any(isnan, s)
-        end
-
-        if havenan
-            @warn "Solver encountered NaNs in solution at timestep n=$(n)."
-            break
-        end
-
-        if hasproperty(cache(int),:stage_values)
-            internal_values[n] = deepcopy(cache(int).stage_values)
-        end
-    end
-
-    return sol, internal_values
-end

@@ -1,76 +1,60 @@
-struct Time_Reversible_Hardcode{T,NBASIS,NNODES,basisType<:Basis{T},ET<:IntegratorExtrapolation,IPMT<:InitialParametersMethod} <: OneLayerMethod
-    basis::basisType
-    quadrature::QuadratureRule{T,NNODES}
+"""
+    Time_Reversible_Hardcode <: OneLayerMethod
 
-    b::SVector{NNODES,T}
-    c::SVector{NNODES,T}
+Time-symmetric variant of `Hardcode_int`: computes network derivatives with
+`ForwardDiff` (no symbolic pre-compilation) and enforces the palindromic
+time-reversal symmetry (`issymmetric(method) == true`). Combines the
+forward-differentiation approach of `Hardcode_int` with the symmetry structure
+of `Time_reversible_OneLayer`.
 
-    nstages::Int
-    show_status::Bool
-    network_inputs::Matrix{T}
+# Constructor
 
-    initial_trajectory::ET
-    initial_guess_method::IPMT
+    Time_Reversible_Hardcode(basis, quadrature; kwargs...)
 
-    training_epochs::Int
-    use_hamiltonian_loss::Bool
+Keyword arguments are the same as `Hardcode_int`. Only the [`OGA`](@ref) seeds are
+supported as `initial_guess_method`. The basis must have an even number of neurons —
+they come in mirrored pairs sharing one output weight.
+"""
+struct Time_Reversible_Hardcode{T, NNODES, basisType <: Basis{T},
+                                ET <: Extrapolation,
+                                IPMT <: InitialParametersMethod} <: OneLayerMethod
+    common        :: NetworkIntegratorCore{T, NNODES, basisType, ET, IPMT}
+    bias_interval :: SVector{2, T}
+    dict_amount   :: Int
 
-    bias_interval::Vector{T}
-    dict_amount::Int
     function Time_Reversible_Hardcode(basis::Basis{T}, quadrature::QuadratureRule{T};
-        nstages::Int=10, show_status::Bool=true, training_epochs::Int=50000, use_hamiltonian_loss::Bool=true,
-        initial_trajectory::ET=IntegratorExtrapolation(),
-        initial_guess_method::IPMT=OGA1d(),
-        bias_interval=[-pi, pi], dict_amount=50000) where {T,ET,IPMT}
-        # get number of quadrature nodes and number of basis functions
-        # initial_trajectory_list = subtypes(Extrapolation)
-        # @assert initial_trajectory in initial_trajectory_list "initial_trajectory should be one of $(initial_trajectory_list)"
-
-        # initial_guess_methods_list = subtypes(InitialParametersMethod)
-        # @assert initial_guess_method in initial_guess_methods_list "initial_guess_methods should be one of $(initial_guess_methods_list)"
-
-        NNODES = QuadratureRules.nnodes(quadrature)
-        NBASIS = basis.S
-
+        extrapolation_substep      :: Int  = 10,
+        training_epochs           :: Int  = 50000,
+        show_status               :: Bool = true,
+        initial_trajectory_method :: ET   = IntegratorExtrapolation(),
+        initial_guess_method      :: IPMT = OGA1d(),
+        record_grid_points        :: Int  = 41,
+        bias_interval = [-pi, pi],
+        dict_amount   :: Int = 50000) where {T, ET, IPMT}
         # See `Time_reversible_OneLayer`: mirrored pairs, only the independent half stored.
-        iseven(NBASIS) || throw(ArgumentError(
+        iseven(basis.S) || throw(ArgumentError(
             "Time_Reversible_Hardcode requires a basis with an even number of neurons, " *
-            "got S = $NBASIS. Neurons come in mirrored pairs sharing one output weight, " *
+            "got S = $(basis.S). Neurons come in mirrored pairs sharing one output weight, " *
             "and only the S/2 independent hidden parameters are stored in the nonlinear " *
             "solution vector."))
 
-        # get quadrature nodes and weights
-        quad_weights = QuadratureRules.weights(quadrature)
-        quad_nodes = QuadratureRules.nodes(quadrature)
-
-        network_inputs = reshape(collect(0:1/nstages:1), 1, nstages + 1)
-        new{T,NBASIS,NNODES,typeof(basis),ET,IPMT}(basis, quadrature, quad_weights, quad_nodes, nstages, show_status, network_inputs, initial_trajectory, initial_guess_method,
-            training_epochs, use_hamiltonian_loss, bias_interval, dict_amount)
+        common = NetworkIntegratorCore(basis, quadrature;
+            extrapolation_substep=extrapolation_substep,
+            training_epochs=training_epochs,
+            show_status=show_status,
+            initial_trajectory_method=initial_trajectory_method,
+            initial_guess_method=initial_guess_method,
+            record_grid_points = record_grid_points)
+        new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(
+            common, SVector{2,T}(bias_interval), dict_amount)
     end
 end
-nbasis(method::Time_Reversible_Hardcode) = method.basis.S
-CompactBasisFunctions.basis(method::Time_Reversible_Hardcode) = method.basis
-quadrature(method::Time_Reversible_Hardcode) = method.quadrature
-CompactBasisFunctions.nbasis(method::Time_Reversible_Hardcode) = method.basis.S
-nnodes(method::Time_Reversible_Hardcode) = QuadratureRules.nnodes(method.quadrature)
-activation(method::Time_Reversible_Hardcode) = method.basis.activation
-nstages(method::Time_Reversible_Hardcode) = method.nstages
-show_status(method::Time_Reversible_Hardcode) = method.show_status
-training_epochs(method::Time_Reversible_Hardcode) = method.training_epochs
 
-isexplicit(::Union{Time_Reversible_Hardcode,Type{<:Time_Reversible_Hardcode}}) = false
-isimplicit(::Union{Time_Reversible_Hardcode,Type{<:Time_Reversible_Hardcode}}) = true
-issymmetric(::Union{Time_Reversible_Hardcode,Type{<:Time_Reversible_Hardcode}}) = missing
-issymplectic(::Union{Time_Reversible_Hardcode,Type{<:Time_Reversible_Hardcode}}) = missing
+GeometricIntegratorsBase.issymmetric(::Union{Time_Reversible_Hardcode, Type{<:Time_Reversible_Hardcode}}) = true
 
-default_solver(::Time_Reversible_Hardcode) = Newton()
-default_iguess(::Time_Reversible_Hardcode) = IntegratorExtrapolation()#CoupledHarmonicOscillator
 default_iparams(::Time_Reversible_Hardcode) = OGA1d()
-# default_iguess_integrator(::Time_Reversible_Hardcode) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
 
-default_iguess_integrator(::Time_Reversible_Hardcode) = ImplicitMidpoint()
-
-struct Time_Reversible_HardcodeCache{ST,S,R,N} <: IODEIntegratorCache{ST}
+struct Time_Reversible_HardcodeCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -104,11 +88,10 @@ struct Time_Reversible_HardcodeCache{ST,S,R,N} <: IODEIntegratorCache{ST}
     dqdbr₁::Matrix{ST}
     dqdbr₀::Matrix{ST}
 
-    current_step::Vector{ST}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    function Time_Reversible_HardcodeCache{ST,S,R,N}(ics) where {ST,S,R,N}
+    function Time_Reversible_HardcodeCache{ST,S,R,N}(ics; record_grid_points::Int = 41) where {ST,S,R,N}
         D = length(vec(ics.q))
         x = zeros(ST, D * (1 + 2 * S)) # Last layer Weight S (no bias for now) + q + hidden layer W S/2 + hidden layer bias S/2
 
@@ -146,83 +129,55 @@ struct Time_Reversible_HardcodeCache{ST,S,R,N} <: IODEIntegratorCache{ST}
         dqdbr₁ = zeros(ST, S, D)
         dqdbr₀ = zeros(ST, S, D)
 
-        current_step = zeros(ST, 1)
-        stage_values = zeros(ST, 41, D)
+        stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N + 1, D)
 
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps,
             dqdW2c, dvdW2c, dqdW1c, dvdW1c, dqdbc, dvdbc,
             dqdW2r₁, dqdW2r₀, dqdW1r₁, dqdW1r₀, dqdbr₁, dqdbr₀,
-            current_step, stage_values, network_labels)
+            stage_values, network_labels)
     end
 end
-
-GeometricIntegrators.Integrators.nlsolution(cache::Time_Reversible_HardcodeCache) = cache.x
 
 function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Time_Reversible_Hardcode; kwargs...) where {ST}
-    Time_Reversible_HardcodeCache{ST,nbasis(method),nnodes(method),nstages(method)}(initial_conditions(problem); kwargs...)
+    Time_Reversible_HardcodeCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
+        record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_Reversible_Hardcode) = Time_Reversible_HardcodeCache{ST,nbasis(method),nnodes(method),nstages(method)}
+@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_Reversible_Hardcode) =
+    Time_Reversible_HardcodeCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}
 
-@inline function Base.getindex(c::Time_Reversible_HardcodeCache, ST::DataType)
-    key = hash(Threads.threadid(), hash(ST))
-    if haskey(c.caches, key)
-        c.caches[key]
-    else
-        c.caches[key] = Cache{ST}(c.problem, c.method)
-    end::CacheType(ST, c.problem, c.method)
-end
-
-function GeometricIntegrators.Integrators.reset!(cache::Time_Reversible_HardcodeCache, t, q, p)
-    copyto!(cache.q̄, q)
-    copyto!(cache.p̄, p)
-end
-
-function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode})
-    local network_inputs = method(int).network_inputs
-    local network_labels = cache(int).network_labels
-    local show_status = method(int).show_status
-    local current_step = cache(int).current_step
-    local initial_trajectory = method(int).initial_trajectory
-    local initial_guess_method = method(int).initial_guess_method
-
-    show_status ? print("\n current time step: $current_step") : nothing
-    current_step[1] += 1
-
-    initial_trajectory!(sol, history, params, int, initial_trajectory)
-
-    if show_status
-        print("\n network inputs \n")
-        print(network_inputs)
-
-        print("\n network labels from initial guess methods \n")
-        print(network_labels')
-    end
-
-    initial_params!(int, initial_guess_method,sol)
-end
-
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}, initial_trajectory::HermiteExtrapolation)
+# The extrapolated trajectory has to land in `network_labels`, because that is what the OGA
+# seed reads (`initial_params!` in `src/oga/adapters.jl`). This used to write the extrapolated
+# positions into the *output-weight* slots of `x` and leave `network_labels` at zero, so the
+# seed fitted the boundary ansatz to an all-zero target and then overwrote the very slots the
+# extrapolation had filled. It also put `p̃` into `x[D*S+k]`, which for this ansatz is the
+# endpoint *position* unknown rather than the momentum — cf. the `IntegratorExtrapolation`
+# method below, and `Hardcode_int`, which both set `q̃` there.
+#
+# Note that `solutionstep!` only extrapolates when `iguess(int)` is a framework extrapolation;
+# with the default `NoInitialGuess()` it is a no-op. Pass `initialguess = HermiteExtrapolation()`
+# to `GeometricIntegrator` for a real Hermite warm start.
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}, initial_trajectory_method::HermiteExtrapolation)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
-
-    # TODO: here we should not initialise with the solution q but with the degree of freedom x,
-    # obtained e.g. from an L2 projection of q onto the basis
+    local network_inputs = method(int).network_inputs
+    local network_labels = cache(int).network_labels
+    local h = timestep(int)
 
     for i in eachindex(network_inputs)
         soltmp = (
-            t=sol.t + network_inputs[i] * timestep(int),
+            t=sol.t + (network_inputs[i] - 1) * h,
             q=cache(int).q̃,
             p=cache(int).p̃,
-            v=cache(int).ṽ,
-            f=cache(int).f̃,
+            q̇=cache(int).ṽ,
+            ṗ=cache(int).f̃,
         )
         solutionstep!(soltmp, history, problem(int), iguess(int))
 
         for k in 1:D
-            x[D*(i-1)+k] = cache(int).q̃[k]
+            network_labels[i, k] = cache(int).q̃[k]
         end
     end
 
@@ -230,27 +185,27 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
         t=sol.t,
         q=cache(int).q̃,
         p=cache(int).p̃,
-        v=cache(int).ṽ,
-        f=cache(int).f̃,
+        q̇=cache(int).ṽ,
+        ṗ=cache(int).f̃,
     )
     solutionstep!(soltmp, history, problem(int), iguess(int))
 
     for k in 1:D
-        x[D*S+k] = cache(int).p̃[k]
+        x[D*S+k] = cache(int).q̃[k]
     end
 end
 
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}, initial_trajectory::IntegratorExtrapolation)
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}, initial_trajectory_method::IntegratorExtrapolation)
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
     local h = int.problem.timestep
-    local nstages = method(int).nstages
+    local extrapolation_substep = method(int).extrapolation_substep
     local D = length(cache(int).q̃)
     local problem = int.problem
     local S = nbasis(method(int))
     local x = nlsolution(int)
 
-    tem_ode = similar(problem, [zero(h), h], h / nstages, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+    tem_ode = similar(problem, [zero(h), h], h / extrapolation_substep, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
 
     for k in 1:D
@@ -474,17 +429,6 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
     show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
 end
 
-# Compute stages of Variational Partitioned Runge-Kutta methods.
-function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}) where {ST}
-    # check that x and b are compatible
-    @assert axes(x) == axes(b)
-
-    # compute stages from nonlinear solver solution x
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
-
-    # compute residual vector
-    GeometricIntegrators.Integrators.residual!(b, sol, params, int)
-end
 
 
 function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}, DT)
@@ -507,34 +451,9 @@ function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricInt
     # sol.p .= cache(int, DT).p̃
 end
 
-function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:Time_Reversible_Hardcode}) where {DT}
-    # compute vector field at internal stages
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
 
-    # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, int, DT)
-end
 
-function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode,<:AbstractProblemIODE})
-    # call nonlinear solver
-    # solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
-    solve!(nlsolution(int),solver(int),  (sol, params, int))
-
-    # print solver status
-    # print_solver_status(int.solver.status, int.solver.params)
-
-    # check if solution contains NaNs or error bounds are violated
-    # check_solver_status(int.solver.status, int.solver.params)
-
-    #compute the trajectory after solving by newton method
-    stages_compute!(sol, int)
-
-    # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
-
-end
-
-function stages_compute!(sol, int::GeometricIntegrator{<:Time_Reversible_Hardcode})
+function record_finer_solution!(sol, int::GeometricIntegrator{<:Time_Reversible_Hardcode})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     # local network_inputs = method(int).network_inputs
@@ -543,11 +462,13 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Time_Reversible_Hardcod
     local NN = method(int).basis.NN
     local ps = cache(int).ps
     local show_status = method(int).show_status
-    local q̄ = sol.q  # 起点 q_n
-    local q = cache(int).q̃ # 终点估计 q_{n+1}
+    local q̄ = sol.q  # start point q_n
+    local q = cache(int).q̃ # endpoint estimate q_{n+1}
     local activation = method(int).basis.activation
 
-    network_inputs = reshape(collect(0:1/40:1),1,41)
+    local N_plot = method(int).record_grid_points
+    local T = eltype(x)
+    network_inputs = reshape(collect(range(zero(T), one(T), N_plot)), 1, N_plot)
 
     if show_status
         print("\n solution x after solving by Newton \n")
@@ -593,37 +514,3 @@ function stages_compute!(sol, int::GeometricIntegrator{<:Time_Reversible_Hardcod
 end
 
 
-function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:Time_Reversible_Hardcode}, n₁::Int, n₂::Int)
-    # check time steps range for consistency
-    @assert n₁ ≥ 1
-    @assert n₂ ≥ n₁
-    @assert n₂ ≤ ntime(sol)
-
-    # copy initial condition from solution to solutionstep and initialize
-    solstep = solutionstep(int, sol[n₁-1])
-    internal_values = Vector{Matrix}(undef,n₂ - n₁ + 1)
-    # loop over time steps
-    for n in n₁:n₂
-        println("Start integrate at time step n = $(n)")
-        # integrate one step and copy solution from cache to solution
-        reset!(solstep, timesteps(sol)[n])
-        integrate!(solstep, int)
-        copy!(sol, current(solstep), n)
-
-        havenan = false
-        for s in current(solstep)
-            havenan = havenan || any(isnan, s)
-        end
-
-        if havenan
-            @warn "Solver encountered NaNs in solution at timestep n=$(n)."
-            break
-        end
-
-        if hasproperty(cache(int),:stage_values)
-            internal_values[n] = deepcopy(cache(int).stage_values)
-        end
-    end
-
-    return sol, internal_values
-end
