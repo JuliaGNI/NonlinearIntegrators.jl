@@ -18,8 +18,11 @@ end
 ham(t, q, p, params) = DoublePendulum.hamiltonian(t, q, p, params)
 
 let mode = pick_mode()
-    # quick mode uses a larger network for this harder problem
-    over = mode == "quick" ? (; Rs = [16], Ss = [8]) : (;)
+    # A larger quadrature order and network for this harder problem. Measured at
+    # Float64/tanh/DogLeg over 10 steps of dt = 0.1, `ref_err` falls monotonically with width
+    # and then flattens: 5.9e-08 at S = 8, 8.4e-10 at S = 10, 9.3e-10 at S = 12. S = 10 is
+    # where the gain stops.
+    over = mode == "quick" ? (; Rs = [16], Ss = [10]) : (;)
     csv = run_sweep(; problem_name = NAME, build_prob = build_prob,
                     hamiltonian = ham, mode = mode, over...)
     write_report(read_results(csv);

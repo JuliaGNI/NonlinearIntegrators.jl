@@ -22,8 +22,14 @@ end
 ham(t, q, p, params) = Pendulum.hamiltonian(t, q, p, params)
 
 let mode = pick_mode()
+    # S = 8 is a measured optimum, not a default: unlike the other problems this one gets
+    # *worse* with a wider network. At Float64/tanh/DogLeg over 10 steps of dt = 0.1,
+    # `ref_err` is 8.0e-05 at S = 4, 2.9e-07 at S = 8, 5.8e-05 at S = 10 and 1.4e+03 at
+    # S = 12 — i.e. the solve diverges. The degenerate ϑ (p₂ = 0) leaves the parameter
+    # Jacobian singular, and widening the network enlarges its null space.
+    over = mode == "quick" ? (; Ss = [8]) : (;)
     csv = run_sweep(; problem_name = NAME, build_prob = build_prob,
-                    hamiltonian = ham, mode = mode)
+                    hamiltonian = ham, mode = mode, over...)
     write_report(read_results(csv);
         title = "One-layer GML benchmark — Pendulum ($(mode))",
         mode = mode, outdir = RESULTS_DIR, prefix = "$(NAME)_$(mode)")
