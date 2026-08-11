@@ -84,11 +84,11 @@ remains. See [Theory](@ref).
 
 *Implementation.* The grid comes from
 [`NonlinearIntegrators.bias_grid`](@ref), which generates an integer-indexed range in
-`Float64` and casts once to `T`. The naive `lo:(hi-lo)/n:hi` computed at `T` had a
+`Float64` and casts once to `T`. Computing `lo:(hi-lo)/n:hi` at `T` instead carries a
 half-precision trap: `Float16(70000)` overflows to `Inf`, the step evaluates to zero, and
 the range constructor throws `ArgumentError: range step cannot be zero`. Atom order — the
-`w = -1` block first, then `w = +1` — is preserved from the pre-refactor code because
-`argmax` tie-breaking depends on it.
+`w = -1` block first, then `w = +1` — is load-bearing, since `argmax` breaks ties by first
+index.
 
 *Cost.* ``N = 2(\texttt{dict\_amount}+1)``.
 
@@ -183,7 +183,7 @@ its norm is non-finite, or its norm is below the floor.
 
 ``\mathrm{score}(g) = \lvert\langle r, g\rangle_w\rvert``.
 
-The pre-refactor rule and the default, kept because it is what the regression tests pin:
+The default, and what the regression tests pin:
 normalising before selection changes which neurons are picked and steers the Newton solve
 into a different — empirically worse — basin. Not scale invariant, which is harmless on the
 `±1` grid (comparable norms) and wrong on a 2-D grid.
@@ -197,7 +197,7 @@ into a different — empirically worse — basin. Not scale invariant, which is 
 The textbook criterion: it measures how much of the residual the atom *explains*,
 independently of amplitude, which the output weight absorbs anyway. Exact for the first
 atom. Mandatory for [`WeightBiasGrid2d`](@ref) and [`AngularGrid`](@ref). Also
-`Hardcode_int`'s pre-refactor rule, hence the [`OGA1dNormalized`](@ref) preset.
+`Hardcode_int`'s rule, hence the [`OGA1dNormalized`](@ref) preset.
 
 *Cost.* ``O(NM)``; the norms are precomputed once per fit.
 
@@ -297,7 +297,10 @@ detected rank receive a zero coefficient.
 *Implementation.* Hand-rolled, because `qr(Â, ColumnNorm())` is LAPACK-only and therefore
 does not exist at `Float16` — the precision the remedy is *for*. Widening to `Float32` to
 borrow LAPACK would reintroduce the `Float64` island in miniature. Column norms are
-downdated as elimination proceeds; the reflector follows the LAPACK convention
+*recomputed* after each elimination rather than downdated — downdating loses accuracy
+precisely where the pivot norms collapse, which is the regime the factorisation exists to
+detect, and at ``k \le 8`` columns the recomputation is free; the reflector follows the
+LAPACK convention
 (``v_1 = 1``, unnormalised) to avoid a division that can underflow at half precision.
 
 *Cost.* ``O(Mk^2)`` per step, plus the pivot search.
