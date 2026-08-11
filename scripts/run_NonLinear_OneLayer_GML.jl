@@ -59,15 +59,15 @@ for R in R_list
                         NLOLCGVNI_Gml = NonLinear_OneLayer_GML(OLnetwork, QGau, bias_interval = [-pi,pi], dict_amount = 400000)
 
                         #HarmonicOscillator
-                        HO_NLOLsol = integrate(HO_lode, NLOLCGVNI_Gml)
-                        HO_qerror = relative_maximum_error(HO_NLOLsol.sol.q,HO_ref.q)
-                        hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.sol.q[:]), collect(HO_NLOLsol.sol.p[:]))]
+                        HO_NLOLsol, HO_internal_values = integrate(HO_lode, NLOLCGVNI_Gml)
+                        HO_qerror = relative_maximum_error(HO_NLOLsol.q,HO_ref.q)
+                        hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_NLOLsol.q[:]), collect(HO_NLOLsol.p[:]))]
                         relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
 
                         fig = Figure(size = (1000, 650))
                         # Label(fig[0, 1], "Step Size h = $h", fontsize = 28, tellwidth = false)
 
-                        sol_q = collect(HO_NLOLsol.sol.q[:, 1])
+                        sol_q = collect(HO_NLOLsol.q[:, 1])
                         total_length = length(sol_q)
                         half_length = Int((length(sol_q) -1 ) ÷ 2)
 
@@ -75,7 +75,7 @@ for R in R_list
                         xticks = ([0,half_length,total_length], ["0","500","1000"]),yticklabelsize=tick_size, xticklabelsize=tick_size,xlabelsize=label_size, ylabelsize=label_size)
                         lines!(ax, sol_q, )
 
-                        sol_p = collect(HO_NLOLsol.sol.p[:, 1])
+                        sol_p = collect(HO_NLOLsol.p[:, 1])
                         ax = Axis(fig[2, 1], xlabel="Time", ylabel = "p(t)",
                         xticks = ([0,half_length,total_length], ["0","500","1000"]),yticklabelsize=tick_size, xticklabelsize=tick_size,xlabelsize=label_size, ylabelsize=label_size)
                         lines!(ax, sol_p, )
@@ -89,9 +89,9 @@ for R in R_list
 
                         # ### Figures in the paper
                         # p = plot(layout=@layout([a; b; c]), label="", size=(300, 300), plot_title="HarmonicOscillator,h = $(int_step)")
-                        # plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(HO_NLOLsol.internal_values...)[2:end,:]...), label="S$(S)R$(R)tanh", ylims=(-0.6, 0.6))
+                        # plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(HO_internal_values...)[2:end,:]...), label="S$(S)R$(R)tanh", ylims=(-0.6, 0.6))
                         # plot!(p[1], int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Analytic Solution", xaxis="time", yaxis="q₁")
-                        # plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.sol.p[:, 1]), label="S$(S)R$(R)tanh", ylims=(-0.6, 0.6))
+                        # plot!(p[2], 0:int_step:int_timespan, collect(HO_NLOLsol.p[:, 1]), label="S$(S)R$(R)tanh", ylims=(-0.6, 0.6))
                         # plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
                         # plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)tanh", xaxis="time", yaxis="Relative Hamiltonian error")
                         # savefig(p, "add_lambda_in_solver077/NVI_HO_h$(int_step)S$(S)R$(R)tanh_reg_factor=$(reg_factor).pdf")
@@ -99,9 +99,9 @@ for R in R_list
 
 
                         # save results
-                        record_results[("HO_sol_q")] = collect(HO_NLOLsol.sol.q[:,1])
-                        record_results[("HO_sol_p")] = collect(HO_NLOLsol.sol.p[:,1])
-                        record_results[("HO_internal_sol")] = HO_NLOLsol.internal_values
+                        record_results[("HO_sol_q")] = collect(HO_NLOLsol.q[:,1])
+                        record_results[("HO_sol_p")] = collect(HO_NLOLsol.p[:,1])
+                        record_results[("HO_internal_sol")] = HO_internal_values
                         record_results[("HO_qerror")] = HO_qerror
                         record_results[("HO_hams_err")] = relative_hams_err
                         record_results[("HO_max_hams_err")] = maximum(relative_hams_err)

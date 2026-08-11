@@ -104,9 +104,9 @@ function build_reference()
     end
 end
 
-function ham_drift(res, params)
+function ham_drift(sol, params)
     try
-        qs, ps = collect(res.sol.q[:]), collect(res.sol.p[:])
+        qs, ps = collect(sol.q[:]), collect(sol.p[:])
         H = Float64[Float64(DoublePendulum.hamiltonian(0, q, p, params)) for (q, p) in zip(qs, ps)]
         H0 = H[1]
         (!isfinite(H0) || H0 == 0) && return NaN
@@ -118,6 +118,7 @@ end
 
 function run_case(basis, ::Type{T}, seed, λ, prob, refq) where {T}
     method = NonLinear_OneLayer_GML(basis, QuadratureRules.GaussLegendreQuadrature(T, R_QUAD);
+                                   show_status = false,
                                    bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
                                    initial_guess_method = seed)
     status, ref_err, drift, iters, secs = "ok", NaN, NaN, NaN, NaN
@@ -125,11 +126,13 @@ function run_case(basis, ::Type{T}, seed, λ, prob, refq) where {T}
         int = GeometricIntegrator(prob, method; regularization_factor = T(λ),
                                   max_iterations = MAXIT,
                                   f_abstol = oga_f_abstol(T))
-        local res
-        secs = @elapsed (res = integrate(int))
+        local sol
+        t0 = time()
+        sol, _ = integrate(int)
+        secs = time() - t0
         try; iters = Float64(solverstate(int).iterations); catch; end
-        qend = Float64.(collect(res.sol.q[:])[end])
-        if !(eltype(res.sol.q[end]) === T)
+        qend = Float64.(collect(sol.q[:])[end])
+        if !(eltype(sol.q[end]) === T)
             status = "upcast"
         elseif any(!isfinite, qend)
             status = "nonfinite"
@@ -143,7 +146,7 @@ function run_case(basis, ::Type{T}, seed, λ, prob, refq) where {T}
                 num = maximum(abs.(qend .- refq))
                 ref_err = den == 0 ? num : num / den
             end
-            drift = ham_drift(res, prob.parameters)
+            drift = ham_drift(sol, prob.parameters)
         end
     catch e
         status = classify(e)

@@ -82,6 +82,7 @@ end
 
 function run_case(basis, ::Type{T}, seed, λ, params, prob, refq) where {T}
     method = NonLinear_OneLayer_GML(basis, QuadratureRules.GaussLegendreQuadrature(T, R_QUAD);
+                                   show_status = false,
                                    bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
                                    initial_guess_method = seed)
     status, ref_err, iters, secs = "ok", NaN, NaN, NaN
@@ -94,15 +95,16 @@ function run_case(basis, ::Type{T}, seed, λ, params, prob, refq) where {T}
         int = GeometricIntegrator(prob, method; regularization_factor = T(λ),
                                   max_iterations = MAXIT,
                                   f_abstol = oga_f_abstol(T))
-        local res = integrate(int)
+        local sol
+        sol, _ = integrate(int)
         # The iteration count of the *final* step — the integrator keeps no per-step history.
         # Enough to catch a run that stalls, which is what the status below uses it for.
         try; iters = Float64(solverstate(int).iterations); catch; end
-        qend = collect(res.sol.q[:, 1])[end]
+        qend = collect(sol.q[:, 1])[end]
         # The precision invariant: a run started at `T` must still be at `T` at the end. A
         # silent upcast would make the reduced-precision rows meaningless, so it is recorded
         # as its own status rather than folded into "ok".
-        upcast = !(eltype(res.sol.q[end]) === T)
+        upcast = !(eltype(sol.q[end]) === T)
         if upcast
             status = "upcast"
         elseif !isfinite(Float64(qend))
