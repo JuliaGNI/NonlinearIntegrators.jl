@@ -51,17 +51,20 @@ oga_reg_factor(::Type{T}, multiple::Integer) where {T} =
 
 # ---- the residual tolerance --------------------------------------------------
 #
-# The solver's default `f_abstol` is `1.78e-15` — an *absolute* value scaled to `Float64`.
-# It is unreachable at `Float32` (`eps ≈ 1.2e-7`) and `Float16` (`eps ≈ 9.8e-4`), so a
-# reduced-precision run sits at its residual floor and burns the entire iteration budget
-# while parked on the right answer: measured, `ReLU³` at `Float32` reports 1000 iterations
-# at every regularization factor with an accuracy of `1.8e-7`. Reading that as non-convergence
-# would make the whole `Float32` column an artefact of the tolerance rather than a fact about
-# the seed.
+# The integrator default, `max(8, solversize) * eps(datatype(problem))`, is precision-scaled
+# and merged with the options a caller passes. Pinning a value here is a comparability
+# choice on top of it: the default scales with `solversize`, which varies with `S` across
+# this sweep, and cases of different network width should be held to the same tolerance.
 #
-# Same defect class as the absolute λ values the ladder above replaces, and the same fix:
-# scale it to the precision. The factor 256 matches what SolverBenchmark's nonlinear
-# specifications use for these problems.
+# The tolerance has to scale with `eps(T)` either way. An absolute one is unreachable at
+# `Float32` (`eps ≈ 1.2e-7`) and `Float16` (`eps ≈ 9.8e-4`), and a run that cannot meet it
+# sits at its residual floor burning the whole iteration budget while parked on the right
+# answer — measured, `ReLU³` at `Float32` reports 1000 iterations at every regularization
+# factor with an accuracy of `1.8e-7`. Read as non-convergence, that makes a whole precision
+# column an artefact of the tolerance rather than a fact about the seed.
+#
+# The factor 256 matches what SolverBenchmark's nonlinear specifications use for these
+# problems.
 oga_f_abstol(::Type{T}; factor = 256) where {T} = T(factor) * eps(T)
 
 """

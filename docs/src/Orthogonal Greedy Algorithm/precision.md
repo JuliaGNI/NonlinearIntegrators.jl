@@ -35,8 +35,8 @@ matrix, and never a solve.
 1. [`NonlinearIntegrators.bias_grid`](@ref) and
    [`NonlinearIntegrators.weight_grid`](@ref) generate coordinates from an integer-indexed
    `Float64` range and cast to `T`, so a large `dict_amount` cannot overflow the step to
-   zero. (The naive `lo:(hi-lo)/n:hi` at `Float16` threw `ArgumentError: range step cannot
-   be zero` for `n = 70000`, because `Float16(70000) == Inf`.)
+   zero. (Computed at `Float16`, `lo:(hi-lo)/n:hi` throws `ArgumentError: range step cannot
+   be zero` for `n = 70000`, since `Float16(70000) == Inf`.)
 2. The regularization ladder is formed as `T(2.0^k * sqrt(Float64(eps(T))))`, because
    `T(2)^k * sqrt(eps(T))` overflows to `Inf` for `Float16` well inside the ladder.
 3. [`OGA1dNormalEquations`](@ref), the baseline being measured against.
@@ -111,18 +111,23 @@ The same argument that motivates the ``\sqrt{\varepsilon(T)}`` regularization la
 to the solver's residual tolerance, and getting it wrong invalidates a whole precision rather
 than degrading it.
 
-The default `f_abstol` is `1.78e-15` — an *absolute* value scaled to `Float64`, and therefore
-unreachable at `Float32` (``\varepsilon \approx 1.2\times10^{-7}``) or `Float16`
-(``\approx 9.8\times10^{-4}``). A reduced-precision run then sits at its residual floor and
-burns the entire iteration budget while parked on the right answer. Measured before this was
-fixed: `ReLU³` at `Float32` reported 1000 iterations at *every* regularization factor, with an
-accuracy of ``1.8\times10^{-7}``. Read as non-convergence — which is what a naive status check
-does — that made the whole `Float32` column an artefact of the tolerance rather than a fact
-about the seed.
+The integrator default is
+``f_{\text{abstol}} = \max(8, \texttt{solversize})\,\varepsilon(\texttt{datatype(problem)})``
+— scaled to the working precision, and merged with any options the caller passes. Both
+properties are required of the dependency (`[compat]` pins GeometricIntegratorsBase 0.5),
+because an absolute tolerance that does not scale with `eps(T)` is simply unreachable in
+reduced precision: at `Float32` (``\varepsilon \approx 1.2\times10^{-7}``) or `Float16`
+(``\approx 9.8\times10^{-4}``) the run then sits at its residual floor and burns the entire
+iteration budget while parked on the right answer. Measured that way, `ReLU³` at `Float32`
+reports 1000 iterations at *every* regularization factor with an accuracy of
+``1.8\times10^{-7}``; read as non-convergence — which is what a naive status check does —
+that makes a whole precision column an artefact of the tolerance rather than a fact about
+the seed.
 
-The studies therefore pass ``f_{\text{abstol}} = 256\,\varepsilon(T)`` (`oga_f_abstol` in
-`scripts/oga_activations.jl`). The same reasoning applies to any absolute tolerance in a
-precision sweep: if it is not scaled to `eps(T)`, it is measuring the tolerance.
+The studies pin an explicit ``f_{\text{abstol}} = 256\,\varepsilon(T)`` (`oga_f_abstol` in
+`scripts/oga_activations.jl`) on top of that, because the default scales with `solversize`,
+which varies with `S` across the sweep: pinning keeps cases of different network width
+comparable.
 
 ## Not yet device-ready
 

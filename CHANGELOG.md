@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-08-11
 
 ### Breaking
 
@@ -83,6 +83,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   design matrix** (conditioned on `κ(Φ)` instead of `κ(Φ)²`) instead of forming
   and solving the Gram matrix. This removes the need for the `Float64` island and
   lets the fit run at `Float32`/`Float16`.
+- **`[compat]` now requires GeometricIntegratorsBase 0.5, GeometricIntegrators 0.17,
+  SimpleSolvers 0.10 and GeometricProblems 0.8.** The lower bounds are raised deliberately,
+  not routinely: under GeometricIntegratorsBase 0.4 the default `f_abstol` was the `Float64`
+  constant `8eps() = 1.78e-15` regardless of the working precision — unreachable at `Float32`
+  and `Float16` — *and* the whole default set was substituted away as soon as a caller passed
+  any option, so `integrate(prob, method; max_iterations = ...)` actually ran with
+  `f_abstol = 0` and lost `min_iterations = 1` with it. 0.5 scales the tolerance with
+  `datatype(problem)` and merges the defaults with the caller's options, which is what makes
+  a reduced-precision run able to converge at all rather than sit at its residual floor
+  burning the iteration budget. The documentation now describes that behaviour, so the bound
+  makes the description true.
+- **The benchmark suite no longer records a stalled solve as converged.** `integrate`
+  returns a finite state after exhausting `max_iterations`, and
+  `benchmark/gml_benchmark_common.jl` classified on finiteness alone, so a run that burned
+  its whole iteration budget was counted as `ok` — concentrated in exactly the
+  reduced-precision rows the suite is read for. Those are now `maxiter`, its own status,
+  matching the rule the OGA studies in `scripts/` already used. Accuracy and drift are
+  still recorded for them, so a stall can be told apart from a divergence. The reported
+  convergence counts on the Benchmarks page drop accordingly; they were measured, not
+  estimated, and the earlier ones overstated convergence.
 
 ### Added
 
