@@ -171,7 +171,9 @@ finiteness guarantee holding under measurement rather than assertion.
 
 ### Tier B — `ReLUᵏ` end-to-end
 
-Converged runs out of 28 per precision (four ReLU powers × seven regularization factors):
+Converged runs out of 28 per precision (four ReLU powers × seven regularization factors).
+Because the sweep pins its own residual tolerance, these counts are independent of the
+integrator's default and reproduce exactly across solver versions:
 
 | seed | `Float16` | `Float32` | `Float64` | median err (converged) |
 |---|---|---|---|---|
@@ -257,14 +259,16 @@ something beyond the dictionary is also limiting smooth activations at double pr
 
 The grid here is deliberately small: 3 activations × 6 seeds × 1 regularization factor per
 precision, 54 runs total. That is enough to check whether the reduced-precision failure
-reproduces on a harder problem, and **not** enough to rank the variants — every
-working-precision seed lands on 2/3, 1/3, 2/3 across the three precisions, which is one case of
-resolution.
+reproduces on a harder problem, and **not** enough to rank the variants — the
+working-precision seeds land on 2/3 at `Float16` and `Float64` and on 1/3 at `Float32`
+(`oga-sphere` on 2/3 throughout), so the whole spread between variants is one or two cases.
 
 What it does show:
 
 - **The reference fails at `Float16` here too** (0/3, by `SingularException`), while every
-  working-precision variant manages 2/3. Same failure, different problem.
+  working-precision variant manages 2/3. Same failure, different problem. At `Float32` and
+  `Float64` the reference converges as often as the rest (1/3 and 2/3), so it is half
+  precision specifically that defeats it.
 - **The accuracy ordering matches the harmonic oscillator's**: the reference has the best
   median error where it converges (`2.57e-05`), then `oga1d` (`9.15e-04`), then the 2-D
   dictionaries (`9.5e-03`–`1.0e-02`), then `oga1d-stable` and `oga1d-refined`
