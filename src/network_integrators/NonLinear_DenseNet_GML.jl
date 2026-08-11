@@ -34,15 +34,19 @@ struct NonLinear_DenseNet_GML{T, NNODES, basisType <: Basis{T},
     common :: NetworkIntegratorCore{T, NNODES, basisType, ET, IPMT}
 
     function NonLinear_DenseNet_GML(basis::Basis{T}, quadrature::QuadratureRule{T};
-        extrapolation_substep :: Int  = 10,
-        training_epochs       :: Int  = 50000,
+        extrapolation_substep      :: Int  = 10,
+        training_epochs           :: Int  = 50000,
+        show_status               :: Bool = true,
         initial_trajectory_method :: ET   = IntegratorExtrapolation(),
-        initial_guess_method  :: IPMT = LSGD()) where {T, ET, IPMT}
+        initial_guess_method  :: IPMT = LSGD(),
+        record_grid_points        :: Int  = 41,) where {T, ET, IPMT}
         common = NetworkIntegratorCore(basis, quadrature;
             extrapolation_substep=extrapolation_substep,
             training_epochs=training_epochs,
+            show_status = show_status,
             initial_trajectory_method=initial_trajectory_method,
-            initial_guess_method=initial_guess_method)
+            initial_guess_method=initial_guess_method,
+            record_grid_points = record_grid_points)
         new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(common)
     end
 end
@@ -131,7 +135,7 @@ end
     NonLinear_DenseNet_GMLCache{ST, method.basis.S₁, method.basis.S, method.basis.NP,
         nnodes(method), extrapolation_substep(method)}
 
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, initial_trajectory::HermiteExtrapolation)
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, initial_trajectory_method::HermiteExtrapolation)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
@@ -169,7 +173,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
     end
 end
 
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, initial_trajectory::IntegratorExtrapolation)
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, initial_trajectory_method::IntegratorExtrapolation)
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
     local h = timestep(int)

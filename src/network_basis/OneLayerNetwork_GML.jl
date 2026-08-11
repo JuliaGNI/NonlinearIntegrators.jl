@@ -3,7 +3,7 @@ using AbstractNeuralNetworks
 """
     OneLayerNetwork_GML{T} <: OneLayerNetBasis{T}
 
-Single-hidden-layer network basis for the GML (Galerkin Machine Learning) integrators.
+Single-hidden-layer network basis with neural network construction by GeometricMachineLearning.jl (GML).
 The network maps a scalar time input to a scalar position: `Dense(1, S, σ) → Dense(S, 1)`.
 Symbolic derivatives (`dqdθ`, `V_func`, `dvdθ`) are compiled once at construction time
 via `SymbolicNeuralNetworks.jl`.
@@ -21,9 +21,9 @@ via `SymbolicNeuralNetworks.jl`.
 basis = OneLayerNetwork_GML{Float64}(tanh, 8)
 ```
 """
-struct OneLayerNetwork_GML{T, NT, BT, SNNT, QWFT, VT, VWFT} <: OneLayerNetBasis{T}
+struct OneLayerNetwork_GML{T, AT, NT, BT, SNNT, QWFT, VT, VWFT} <: OneLayerNetBasis{T}
     S      :: Int
-    common :: NetworkBasisCore{NT, BT, SNNT, QWFT, VT, VWFT}
+    common :: NetworkBasisCore{AT,NT, BT, SNNT, QWFT, VT, VWFT}
 
     function OneLayerNetwork_GML{T}(activation, S; backend=CPU()) where T
         NN = AbstractNeuralNetworks.Chain(
@@ -43,7 +43,7 @@ struct OneLayerNetwork_GML{T, NT, BT, SNNT, QWFT, VT, VWFT} <: OneLayerNetBasis{
         dvdθ_built = build_nn_function(dvdθ_sym, SNN.params, SNN.input)
 
         core = NetworkBasisCore(activation, NN, backend, SNN, dqdθ_built, V_built, dvdθ_built)
-        new{T, typeof(NN), typeof(backend), typeof(SNN),
+        new{T, typeof(activation), typeof(NN), typeof(backend), typeof(SNN),
             typeof(dqdθ_built), typeof(V_built), typeof(dvdθ_built)}(S, core)
     end
 end

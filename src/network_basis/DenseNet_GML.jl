@@ -19,11 +19,11 @@ compiled at construction time.
 basis = DenseNet_GML{Float64}(tanh, 8, 8)
 ```
 """
-struct DenseNet_GML{T, NT, BT, SNNT, QWFT, VT, VWFT} <: DenseNetBasis{T}
+struct DenseNet_GML{T, AT, NT, BT, SNNT, QWFT, VT, VWFT} <: DenseNetBasis{T}
     S      :: Int
     S₁     :: Int
     NP     :: Int
-    common :: NetworkBasisCore{NT, BT, SNNT, QWFT, VT, VWFT}
+    common :: NetworkBasisCore{AT,NT, BT, SNNT, QWFT, VT, VWFT}
 
     function DenseNet_GML{T}(activation, S₁, S; backend=CPU()) where T
         NN = AbstractNeuralNetworks.Chain(
@@ -44,7 +44,7 @@ struct DenseNet_GML{T, NT, BT, SNNT, QWFT, VT, VWFT} <: DenseNetBasis{T}
         dvdθ_built = build_nn_function(dvdθ_sym, SNN.params, SNN.input)
 
         core = NetworkBasisCore(activation, NN, backend, SNN, dqdθ_built, V_built, dvdθ_built)
-        new{T, typeof(NN), typeof(backend), typeof(SNN),
+        new{T, typeof(activation), typeof(NN), typeof(backend), typeof(SNN),
             typeof(dqdθ_built), typeof(V_built), typeof(dvdθ_built)}(S, S₁, NP, core)
     end
 end

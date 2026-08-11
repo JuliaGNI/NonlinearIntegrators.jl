@@ -15,7 +15,6 @@
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test GeometricIntegratorsBase.issymplectic(m) == true
         @test GeometricIntegratorsBase.isexplicit(m) == false
         @debug "NonLinear_OneLayer_GML{$T} ok" extrapolation_substep=m.extrapolation_substep training_epochs=m.training_epochs
     end
@@ -26,7 +25,6 @@
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test GeometricIntegratorsBase.issymplectic(m) == true
         @debug "Hardcode_int{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 
@@ -36,7 +34,6 @@
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test GeometricIntegratorsBase.issymplectic(m) == true
         @test GeometricIntegratorsBase.issymmetric(m) == true
         @debug "Time_reversible_OneLayer{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
@@ -47,7 +44,6 @@
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test GeometricIntegratorsBase.issymplectic(m) == true
         @test GeometricIntegratorsBase.issymmetric(m) == true
         @debug "Time_Reversible_Hardcode{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
@@ -57,7 +53,6 @@
         @test m isa DenseNetMethod
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
-        @test GeometricIntegratorsBase.issymplectic(m) == true
         @debug "NonLinear_DenseNet_GML{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 

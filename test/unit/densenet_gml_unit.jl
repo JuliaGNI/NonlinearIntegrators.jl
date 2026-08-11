@@ -12,6 +12,8 @@ const DENSENET_INIT_METHODS = [
 const DENSENET_EXTRAPOLATIONS = [
     (NoExtrapolation(),          "NoExtrapolation"),
     (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
+    (HermiteExtrapolation(),     "HermiteExtrapolation"),
+
 ]
 
 for T in TEST_TYPES,

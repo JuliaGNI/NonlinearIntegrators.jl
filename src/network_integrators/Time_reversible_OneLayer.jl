@@ -27,6 +27,7 @@ struct Time_reversible_OneLayer{T, NNODES, basisType <: Basis{T},
         show_status               :: Bool = true,
         initial_trajectory_method :: ET   = IntegratorExtrapolation(),
         initial_guess_method      :: IPMT = OGA1d(),
+        record_grid_points        :: Int  = 41,
         bias_interval = [-pi, pi],
         dict_amount   :: Int = 50000) where {T, ET, IPMT}
         common = NetworkIntegratorCore(basis, quadrature;
@@ -34,7 +35,8 @@ struct Time_reversible_OneLayer{T, NNODES, basisType <: Basis{T},
             training_epochs=training_epochs,
             show_status=show_status,
             initial_trajectory_method=initial_trajectory_method,
-            initial_guess_method=initial_guess_method)
+            initial_guess_method=initial_guess_method,
+            record_grid_points = record_grid_points)
         new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(
             common, SVector{2,T}(bias_interval), dict_amount)
     end
@@ -139,67 +141,6 @@ end
 
 @inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_reversible_OneLayer) =
     Time_reversible_OneLayerCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}
-
-
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}, initial_trajectory::HermiteExtrapolation)
-    local D = length(cache(int).q̃)
-    local S = nbasis(method(int))
-    local x = nlsolution(int)
-    local network_inputs = method(int).network_inputs
-
-    # TODO: here we should not initialise with the solution q but with the degree of freedom x,
-    # obtained e.g. from an L2 projection of q onto the basis
-
-    for i in eachindex(network_inputs)
-        soltmp = (
-            t=sol.t + network_inputs[i] * timestep(int),
-            q=cache(int).q̃,
-            p=cache(int).p̃,
-            v=cache(int).ṽ,
-            f=cache(int).f̃,
-        )
-        solutionstep!(soltmp, history, problem(int), iguess(int))
-
-        for k in 1:D
-            x[D*(i-1)+k] = cache(int).q̃[k]
-        end
-    end
-
-    soltmp = (
-        t=sol.t,
-        q=cache(int).q̃,
-        p=cache(int).p̃,
-        v=cache(int).ṽ,
-        f=cache(int).f̃,
-    )
-    solutionstep!(soltmp, history, problem(int), iguess(int))
-
-    for k in 1:D
-        x[D*S+k] = cache(int).p̃[k]
-    end
-end
-
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}, initial_trajectory::IntegratorExtrapolation)
-    local network_labels = cache(int).network_labels
-    local integrator = default_iguess_integrator(method(int))
-    local h = int.problem.timestep
-    local extrapolation_substep = method(int).extrapolation_substep
-    local D = length(cache(int).q̃)
-    local problem = int.problem
-    local S = nbasis(method(int))
-    local x = nlsolution(int)
-
-    tem_ode = similar(problem, [zero(h), h], h / extrapolation_substep, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
-    tem_sol = integrate(tem_ode, integrator)
-
-    for k in 1:D
-        network_labels[:, k] = tem_sol.q[:, k]#[1].s
-        cache(int).q̃[k] = tem_sol.q[:, k][end]
-        cache(int).p̃[k] = tem_sol.p[:, k][end]
-        x[D*S+k] = cache(int).p̃[k]
-    end
-end
-
 
 function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, InitialParams::OGA1d, sol)
     local S = nbasis(method(int))

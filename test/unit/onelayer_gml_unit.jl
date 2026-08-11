@@ -38,6 +38,8 @@ const OL_INIT_METHODS = [
 const OL_EXTRAPOLATIONS = [
     (NoExtrapolation(),          "NoExtrapolation"),
     (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
+    (HermiteExtrapolation(),     "HermiteExtrapolation"),
+
 ]
 
 for T in TEST_TYPES,

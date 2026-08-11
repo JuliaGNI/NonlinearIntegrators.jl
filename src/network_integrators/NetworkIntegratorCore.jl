@@ -40,15 +40,12 @@ end
           :network_inputs, :initial_trajectory_method, :initial_guess_method,
           :training_epochs, :show_status, :record_grid_points) &&
         return getfield(getfield(m, :common), s)
-    # Backward-compatible alias for initial_trajectory field name
-    s === :initial_trajectory   && return getfield(getfield(m, :common), :initial_trajectory_method)
     return getfield(m, s)
 end
 
 # Shared accessor functions 
 CompactBasisFunctions.basis(m::NetworkIntegratorMethod)  = m.basis
 CompactBasisFunctions.nbasis(m::NetworkIntegratorMethod) = m.basis.S
-nbasis(m::NetworkIntegratorMethod)                       = m.basis.S
 quadrature(m::NetworkIntegratorMethod)                   = m.quadrature
 nnodes(m::NetworkIntegratorMethod)                       = QuadratureRules.nnodes(m.quadrature)
 activation(m::NetworkIntegratorMethod)                   = m.basis.activation
@@ -80,7 +77,7 @@ end
 # Unified initial_guess! for all NetworkIntegratorMethod subtypes.
 function GeometricIntegrators.Integrators.initial_guess!(
         sol, history, params, int::GeometricIntegrator{<:NetworkIntegratorMethod})
-    initial_trajectory!(sol, history, params, int, method(int).initial_trajectory)
+    initial_trajectory!(sol, history, params, int, method(int).initial_trajectory_method)
     @debug "network inputs" method(int).network_inputs
     @debug "network labels" cache(int).network_labels
     initial_params!(int, method(int).initial_guess_method, sol)
@@ -226,7 +223,7 @@ function GeometricIntegrators.Integrators.integrate!(
         end
         if havenan
             @warn "Solver encountered NaNs in solution at timestep n=$(n)."
-            break
+            # break
         end
 
         if hasproperty(cache(int), :stage_values)

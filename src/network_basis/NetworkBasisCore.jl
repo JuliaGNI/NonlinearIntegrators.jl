@@ -1,5 +1,5 @@
-struct NetworkBasisCore{NT, BT, SNNT, QWFT, VT, VWFT}
-    activation
+struct NetworkBasisCore{AT,NT, BT, SNNT, QWFT, VT, VWFT}
+    activation:: AT
     NN        :: NT
     backend   :: BT
     SNN       :: SNNT

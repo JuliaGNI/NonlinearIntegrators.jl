@@ -42,15 +42,19 @@ struct NonLinear_OneLayer_GML{T, NNODES, basisType <: Basis{T},
     function NonLinear_OneLayer_GML(basis::Basis{T}, quadrature::QuadratureRule{T};
         extrapolation_substep      :: Int  = 10,
         training_epochs           :: Int  = 50000,
+        show_status               :: Bool = true,
         initial_trajectory_method :: ET   = IntegratorExtrapolation(),
         initial_guess_method      :: IPMT = OGA1d(),
+        record_grid_points = 41,
         bias_interval = [-pi, pi],
-        dict_amount   :: Int = 50000) where {T, ET, IPMT}
+        dict_amount   :: Int = 50000,) where {T, ET, IPMT}
         common = NetworkIntegratorCore(basis, quadrature;
             extrapolation_substep=extrapolation_substep,
             training_epochs=training_epochs,
+            show_status = show_status,
             initial_trajectory_method=initial_trajectory_method,
-            initial_guess_method=initial_guess_method)
+            initial_guess_method=initial_guess_method,
+            record_grid_points =  record_grid_points)
         new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(
             common, SVector{2,T}(bias_interval), dict_amount)
     end
@@ -153,84 +157,6 @@ end
     NonLinear_OneLayer_GMLCache{ST, nbasis(method), nnodes(method),
         extrapolation_substep(method),}
 
-
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initial_trajectory::GeometricIntegratorsBase.HermiteExtrapolation)
-    local D = length(cache(int).q̃)
-    local S = nbasis(method(int))
-    local x = nlsolution(int)
-    local network_inputs = method(int).network_inputs
-    local network_labels = cache(int).network_labels
-
-    # TODO: here we should not initialise with the solution q but with the degree of freedom x,
-    # obtained e.g. from an L2 projection of q onto the basis
-
-    for i in eachindex(network_inputs)
-        soltmp = (
-            t=sol.t + (network_inputs[i]-1) * timestep(int),
-            q=cache(int).q̃,
-            p=cache(int).p̃,
-            q̇=cache(int).ṽ,
-            ṗ=cache(int).f̃,
-        )
-        solutionstep!(soltmp, history, problem(int), iguess(int))
-        for k in 1:D
-            network_labels[i, k] = cache(int).q̃[k]
-        end
-    end
-    soltmp = (
-        t=sol.t,
-        q=cache(int).q̃,
-        p=cache(int).p̃,
-        q̇=cache(int).ṽ,
-        ṗ=cache(int).f̃,
-    )
-    solutionstep!(soltmp, history, problem(int), iguess(int))
-
-    for k in 1:D
-        x[D*S+k] = cache(int).p̃[k]
-    end
-end
-
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initial_trajectory::IntegratorExtrapolation)
-    local network_labels = cache(int).network_labels
-    local integrator = default_iguess_integrator(method(int))
-    local h = int.problem.timestep
-    local extrapolation_substep = method(int).extrapolation_substep
-    local D = length(cache(int).q̃)
-    local problem = int.problem
-    local S = nbasis(method(int))
-    local x = nlsolution(int)
-
-    tem_ode = similar(problem, [zero(h), h], h / extrapolation_substep, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
-    tem_sol = integrate(tem_ode, integrator)
-
-    for k in 1:D
-        network_labels[:, k] = tem_sol.q[:, k]#[1].s
-        cache(int).q̃[k] = tem_sol.q[:, k][end]
-        cache(int).p̃[k] = tem_sol.p[:, k][end]
-        x[D*S+k] = cache(int).p̃[k]
-    end
-end
-
-# "No initial guess": rather than extrapolating a trajectory, use the previous
-# solution as a constant seed. Every stage label is set to the previous qₙ (so the
-# subsequent OGA/parameter fit targets a flat trajectory) and the momentum degree of
-# freedom is seeded with the previous pₙ. This is the cheapest possible warm start and
-# is useful as a baseline against the midpoint/Hermite extrapolations.
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initial_trajectory::NoExtrapolation)
-    local network_labels = cache(int).network_labels
-    local D = length(cache(int).q̃)
-    local S = nbasis(method(int))
-    local x = nlsolution(int)
-
-    for k in 1:D
-        network_labels[:, k] .= sol.q[k]
-        cache(int).q̃[k] = sol.q[k]
-        cache(int).p̃[k] = sol.p[k]
-        x[D*S+k] = sol.p[k]
-    end
-end
-
 function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initialParams::TrainingMethod, sol)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
@@ -267,7 +193,6 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
     end
     @debug "Initial guess from network training" x
 end
-
 
 function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, initialParams::OGA1d, sol)
     local S = nbasis(method(int))

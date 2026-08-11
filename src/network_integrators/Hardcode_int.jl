@@ -26,14 +26,16 @@ struct Hardcode_int{T, NNODES, basisType <: Basis{T},
         show_status               :: Bool = true,
         initial_trajectory_method :: ET   = IntegratorExtrapolation(),
         initial_guess_method      :: IPMT = OGA1d(),
+        record_grid_points = 41,
         bias_interval = [-pi, pi],
-        dict_amount   :: Int = 50000) where {T, ET, IPMT}
+        dict_amount   :: Int = 50000,) where {T, ET, IPMT}
         common = NetworkIntegratorCore(basis, quadrature;
             extrapolation_substep=extrapolation_substep,
             training_epochs=training_epochs,
-            show_status=show_status,
+            show_status = show_status,
             initial_trajectory_method=initial_trajectory_method,
-            initial_guess_method=initial_guess_method)
+            initial_guess_method=initial_guess_method,
+            record_grid_points =  record_grid_points)
         new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(
             common, SVector{2,T}(bias_interval), dict_amount)
     end
@@ -136,7 +138,7 @@ end
     Hardcode_intCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}
 
 
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int}, initial_trajectory::HermiteExtrapolation)
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int}, initial_trajectory_method::HermiteExtrapolation)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
@@ -174,7 +176,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ha
     end
 end
 
-function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int}, initial_trajectory::IntegratorExtrapolation)
+function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Hardcode_int}, initial_trajectory_method::IntegratorExtrapolation)
     local network_labels = cache(int).network_labels
     local integrator = default_iguess_integrator(method(int))
     local h = int.problem.timestep
