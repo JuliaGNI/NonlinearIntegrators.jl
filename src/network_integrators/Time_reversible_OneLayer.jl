@@ -32,6 +32,15 @@ struct Time_reversible_OneLayer{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Integrat
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = basis.S
 
+        # The ansatz pairs every neuron with its reflection about t = 1/2 and stores only
+        # the independent half, so `S` must be even. Caught here rather than at the first
+        # time step, where an odd `S` used to surface as an `InexactError` out of
+        # `Int(S/2)` in `components!` — several call levels from the cause.
+        iseven(NBASIS) || throw(ArgumentError(
+            "Time_reversible_OneLayer requires a basis with an even number of neurons, " *
+            "got S = $NBASIS. Neurons come in mirrored pairs and only the S/2 independent " *
+            "hidden parameters are stored in the nonlinear solution vector."))
+
         # get quadrature nodes and weights
         quad_weights = QuadratureRules.weights(quadrature)
         quad_nodes = QuadratureRules.nodes(quadrature)

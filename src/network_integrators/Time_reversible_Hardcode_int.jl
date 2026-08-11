@@ -32,6 +32,13 @@ struct Time_Reversible_Hardcode{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Integrat
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = basis.S
 
+        # See `Time_reversible_OneLayer`: mirrored pairs, only the independent half stored.
+        iseven(NBASIS) || throw(ArgumentError(
+            "Time_Reversible_Hardcode requires a basis with an even number of neurons, " *
+            "got S = $NBASIS. Neurons come in mirrored pairs sharing one output weight, " *
+            "and only the S/2 independent hidden parameters are stored in the nonlinear " *
+            "solution vector."))
+
         # get quadrature nodes and weights
         quad_weights = QuadratureRules.weights(quadrature)
         quad_nodes = QuadratureRules.nodes(quadrature)

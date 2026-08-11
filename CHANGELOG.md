@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version is bumped to `0.3.0` so that a downstream `[compat]` bound on `0.2` fails at
   resolve time with a clear message, rather than at run time with an `UndefVarError`.
   Known downstream: SolverBenchmark's `nonlinear_onelayer_method` defaults to this seed.
+- **`Time_reversible_OneLayer` and `Time_Reversible_Hardcode` now reject a basis with an
+  odd number of neurons.** Both represent the step with neurons in mirrored pairs and store
+  only the `S/2` independent hidden parameters, so an odd `S` was never usable: it
+  previously failed at the first time step with an `InexactError` out of `Int(S/2)` in
+  `components!`, several call levels from the cause. It is now an `ArgumentError` at
+  construction. `oga_fit` enforces the same condition for any caller of the shared greedy
+  loop — an odd `nneurons` under a mirrored symmetry would place one neuron fewer than
+  asked and leave the last at `(0, 0)`, which is the duplicated-neuron state `fill_unused`
+  exists to prevent.
 - `initial_params!` is unified on the three-argument form `initial_params!(int, method,
   sol)`. The two boundary-ansatz integrators already needed `sol`; the two `OneLayer` ones
   and `NonLinear_DenseNet_GML` took two arguments, so the seed could not be written

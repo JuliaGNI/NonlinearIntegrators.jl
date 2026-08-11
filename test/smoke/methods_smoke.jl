@@ -41,6 +41,18 @@
         @test eltype(m.bias_interval) == T
     end
 
+    # Both time-reversible methods store only the `S/2` independent hidden parameters, the
+    # other half being the mirror image of the first. An odd `S` used to be accepted at
+    # construction and fail at the first time step with an `InexactError` out of
+    # `Int(S/2)`; it is now rejected where the basis is handed over.
+    @testset "odd basis size is rejected" begin
+        odd = build_onelayer_basis(T; S = 5)
+        @test_throws ArgumentError Time_reversible_OneLayer(odd, quad; show_status = false,
+            bias_interval = [-T(pi), T(pi)], dict_amount = 400)
+        @test_throws ArgumentError Time_Reversible_Hardcode(odd, quad; show_status = false,
+            bias_interval = [-T(pi), T(pi)], dict_amount = 400)
+    end
+
     @testset "NonLinear_DenseNet_GML" begin
         m = NonLinear_DenseNet_GML(dnet, quad; training_epochs = 100)
         @test m isa DenseNetMethod

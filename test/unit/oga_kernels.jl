@@ -320,6 +320,26 @@ end
         @test length(r.atoms) ≤ 2
         @test r.neurons % 2 == 0
     end
+
+    # An odd count cannot be honoured by a symmetry that places neurons two at a time: the
+    # loop would run `nneurons ÷ 2` steps and leave the last neuron at `(0, 0)`, and
+    # `_fill_unused!` fills pairs too, so it cannot repair it. Rejected up front rather
+    # than half-honoured — otherwise the duplicate neuron reappears as a rank-deficient
+    # Newton Jacobian, several call levels from the cause.
+    @testset "an odd neuron count is rejected ($(nameof(typeof(sym))))" for sym in
+                                                (MirrorPairs(), SharedMirrorPairs())
+        nodes, weights, y = oga_testcase(Float64)
+        @test_throws ArgumentError oga_fit(OGA1d(), x -> max(zero(x), x)^3, nodes, weights,
+                                           y, 5; bias_interval = [-pi, pi],
+                                           dict_amount = 200, symmetry = sym)
+    end
+
+    @testset "an odd neuron count is fine without a symmetry" begin
+        nodes, weights, y = oga_testcase(Float64)
+        r = oga_fit(OGA1d(), x -> max(zero(x), x)^3, nodes, weights, y, 5;
+                    bias_interval = [-pi, pi], dict_amount = 200, symmetry = NoSymmetry())
+        @test length(r.W) == 5
+    end
 end
 
 @testset "precision discipline" begin

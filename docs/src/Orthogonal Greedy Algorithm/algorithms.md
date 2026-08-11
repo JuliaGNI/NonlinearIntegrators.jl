@@ -379,3 +379,13 @@ would move rather than go away.
 **Activation check.** [`oga_fit`](@ref) calls
 [`NonlinearIntegrators.oga_check_precision`](@ref) once per fit and throws if `σ(::T)` is not
 a `T`. See [Precision](@ref).
+
+**Neuron-count check.** [`oga_fit`](@ref) calls
+[`NonlinearIntegrators.oga_check_neuron_count`](@ref) and throws if `nneurons` is not a
+multiple of `neurons_per_atom(symmetry)` — i.e. if an odd count is requested under
+[`MirrorPairs`](@ref) or [`SharedMirrorPairs`](@ref). The greedy loop places whole atoms, so
+an odd count would run one step fewer and leave the last neuron at `(0, 0)`, which the
+unused-neuron fill cannot repair either since it fills a pair at a time. That is exactly the
+duplicated-row state the fill exists to prevent, so the count is rejected rather than
+half-honoured. The two time-reversible integrators enforce the same condition on `S` at
+construction.

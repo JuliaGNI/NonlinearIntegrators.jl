@@ -43,6 +43,9 @@ columns, so each member of the pair gets its own output weight.
 
 The map `(w, b) ↦ (-w, w + b)` sends `σ(w t + b)` to `σ(w (1 - t) + b)`, i.e. reflects the
 neuron about the midpoint of the unit time interval. Used by `Time_reversible_OneLayer`.
+
+Since neurons come in pairs, the requested neuron count must be even; [`oga_fit`](@ref)
+rejects an odd one rather than quietly placing one neuron fewer.
 """
 struct MirrorPairs <: OGASymmetry end
 
@@ -54,6 +57,8 @@ single output weight.
 
 Sharing the weight is what actually enforces time-reversal symmetry of the ansatz (with
 independent weights the pair can drift apart). Used by `Time_Reversible_Hardcode`.
+
+As for [`MirrorPairs`](@ref), the requested neuron count must be even.
 """
 struct SharedMirrorPairs <: OGASymmetry end
 
@@ -117,6 +122,26 @@ function oga_check_precision(σ, ::Type{T}) where {T}
 end
 
 """
+    oga_check_neuron_count(nneurons, symmetry)
+
+Assert that `nneurons` is a multiple of `neurons_per_atom(symmetry)`.
+
+The greedy loop places whole atoms, so under a mirrored symmetry an odd `nneurons` would
+run `nneurons ÷ 2` steps and leave the last neuron at its initial `(0, 0)` — and
+`_fill_unused!` cannot repair it either, since it too fills a pair at a time. That is the
+duplicated-neuron state the fill exists to avoid: a rank-deficient seed becomes a
+rank-deficient Newton Jacobian. Reject the count instead of half-honouring it.
+"""
+function oga_check_neuron_count(nneurons::Int, symmetry::OGASymmetry)
+    npa = neurons_per_atom(symmetry)
+    nneurons % npa == 0 && return nothing
+    throw(ArgumentError(
+        "nneurons = $nneurons is not a multiple of $npa, the number of neurons " *
+        "$(nameof(typeof(symmetry))) places per dictionary atom. The mirrored symmetries " *
+        "add a neuron together with its reflection, so the basis size must be even."))
+end
+
+"""
     oga_fit(oga, σ, nodes, w, y, nneurons; bias_interval, dict_amount,
             modulation = nothing, symmetry = NoSymmetry()) -> OGAResult
 
@@ -131,6 +156,12 @@ Greedily fit `nneurons` neurons of a one-layer network to the target `y` sampled
   `t(1-t) σ(w t + b)`. Pass the `t(1-t)` vector; `nothing` means no modulation.
 * `symmetry::`[`OGASymmetry`](@ref) — how atoms map to neurons.
 
+`nneurons` must be a multiple of `neurons_per_atom(symmetry)` — i.e. even for the two
+mirrored symmetries, which place a neuron and its reflection together. An odd count is an
+`ArgumentError` rather than a silently short fit, since the loop would place one neuron
+fewer than asked and leave the last one at `(0, 0)`, duplicating a neuron in the Newton
+system that `fill_unused` exists to keep distinct.
+
 Runs entirely at `T = eltype(nodes)`.
 """
 function oga_fit(oga::OGA, σ, nodes::AbstractVector{T}, w::AbstractVector{T},
@@ -141,6 +172,7 @@ function oga_fit(oga::OGA, σ, nodes::AbstractVector{T}, w::AbstractVector{T},
     oga_check_precision(σ, T)
     M = length(nodes)
     @assert length(w) == M && length(y) == M
+    oga_check_neuron_count(nneurons, symmetry)
 
     mod = modulation === nothing ? ones(T, M) : modulation
     sw  = sqrt.(w)                      # quadrature weights are positive ⇒ real sqrt
