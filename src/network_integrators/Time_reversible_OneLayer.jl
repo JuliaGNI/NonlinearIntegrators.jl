@@ -44,7 +44,6 @@ end
 
 GeometricIntegratorsBase.issymmetric(::Union{Time_reversible_OneLayer, Type{<:Time_reversible_OneLayer}}) = true
 
-default_iguess(::Time_reversible_OneLayer) = IntegratorExtrapolation()
 default_iparams(::Time_reversible_OneLayer) = OGA1d()
 
 struct Time_reversible_OneLayerCache{ST,S,R,N} <: NetworkIntegratorCache{ST}

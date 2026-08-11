@@ -12,6 +12,7 @@ using GeometricSolutions: relative_maximum_error
 
 using QuadratureRules
 using CompactBasisFunctions
+import CompactBasisFunctions:nbasis
 using Zygote
 using Random
 using Optimisers

@@ -46,13 +46,20 @@ for T in TEST_TYPES,
     (init_method, init_name) in OL_INIT_METHODS,
     (extrap, extrap_name) in OL_EXTRAPOLATIONS
 
+    params = HarmonicOscillator.default_parameters(T)
+    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];timespan = (T(0.0), T(1.0)), timestep = T(0.1), parameters = params)
+
     @testset "NonLinear_OneLayer_GML $init_name × $extrap_name ($T)" begin
         prob = ho_problem(T; timespan = (T(0.0), T(0.2)), timestep = T(0.1))
         sol, _ = integrate(prob,
             build_ol_method(T; dict_amount = 40000, init_method = init_method, extrap = extrap);
             regularization_factor = T(1e-5), max_iterations = 10000)
         assert_no_upcast(sol.q, T)
-        @test all(isfinite, collect(sol.q[:, 1])[end])
+
+        qend = collect(sol.q[:, 1])[end]
+        ref = HarmonicOscillator.exact_solution_q(T(1.0), T(0.5), T(0.0), T(0.0), params)
+        err = abs(T(qend) - T(ref))
+        @test err < 1
     end
 end
 

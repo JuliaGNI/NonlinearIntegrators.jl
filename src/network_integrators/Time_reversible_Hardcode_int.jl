@@ -44,7 +44,6 @@ end
 
 GeometricIntegratorsBase.issymmetric(::Union{Time_Reversible_Hardcode, Type{<:Time_Reversible_Hardcode}}) = true
 
-default_iguess(::Time_Reversible_Hardcode) = IntegratorExtrapolation()
 default_iparams(::Time_Reversible_Hardcode) = OGA1d()
 
 struct Time_Reversible_HardcodeCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
@@ -145,6 +144,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
     local S = nbasis(method(int))
     local x = nlsolution(int)
     local network_inputs = method(int).network_inputs
+    local network_labels = cache(int).network_labels
 
     # TODO: here we should not initialise with the solution q but with the degree of freedom x,
     # obtained e.g. from an L2 projection of q onto the basis
@@ -160,7 +160,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
         solutionstep!(soltmp, history, problem(int), iguess(int))
 
         for k in 1:D
-            x[D*(i-1)+k] = cache(int).q̃[k]
+            network_labels[i, k] = cache(int).q̃[k]
         end
     end
 
@@ -174,7 +174,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
     solutionstep!(soltmp, history, problem(int), iguess(int))
 
     for k in 1:D
-        x[D*S+k] = cache(int).p̃[k]
+        x[D*S+k] = cache(int).q̃[k]
     end
 end
 

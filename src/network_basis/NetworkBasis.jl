@@ -1,5 +1,3 @@
-using CompactBasisFunctions: Basis
-
 """
     NetworkBasis{T} <: Basis{T}
 

@@ -41,7 +41,6 @@ struct Hardcode_int{T, NNODES, basisType <: Basis{T},
     end
 end
 
-default_iguess(::Hardcode_int) = IntegratorExtrapolation()
 default_iparams(::Hardcode_int) = OGA1d()
 
 struct Hardcode_intCache{ST,S,R,N} <: NetworkIntegratorCache{ST}

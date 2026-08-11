@@ -45,7 +45,7 @@ end
 
 # Shared accessor functions 
 CompactBasisFunctions.basis(m::NetworkIntegratorMethod)  = m.basis
-CompactBasisFunctions.nbasis(m::NetworkIntegratorMethod) = m.basis.S
+nbasis(m::NetworkIntegratorMethod) = m.basis.S
 quadrature(m::NetworkIntegratorMethod)                   = m.quadrature
 nnodes(m::NetworkIntegratorMethod)                       = QuadratureRules.nnodes(m.quadrature)
 activation(m::NetworkIntegratorMethod)                   = m.basis.activation
@@ -59,7 +59,7 @@ GeometricIntegratorsBase.isexplicit(::Union{NetworkIntegratorMethod, Type{<:Netw
 GeometricIntegratorsBase.isimplicit(::Union{NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}}) = true
 GeometricIntegratorsBase.issymmetric(::Union{NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}}) = missing
 # issymmetric = true is overridden in Time_reversible_OneLayer.jl and Time_reversible_Hardcode_int.jl
-GeometricIntegratorsBase.issymplectic(::Union{NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}}) = true
+GeometricIntegratorsBase.issymplectic(::Union{NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}}) = missing
 
 default_solver(::NetworkIntegratorMethod) = Newton()
 default_iguess_integrator(::NetworkIntegratorMethod) = ImplicitMidpoint()
