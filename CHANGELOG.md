@@ -103,8 +103,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The widths are now 10 (harmonic oscillator), 8 (pendulum) and 10 (double pendulum). The
   pendulum's is an optimum rather than a maximum — its degenerate `ϑ` leaves the parameter
   Jacobian singular, so a wider network enlarges the null space and `S = 12` diverges outright.
-  The cost is at half precision, where wider networks are harder to condition and convergence
-  falls. The Toda lattice has no measured width yet, which puts its quick grid at ~5 h against
+  The cost is at half precision, and is a deliberate trade rather than an oversight: on the
+  harmonic oscillator's full quick grid, `Float16` convergence falls from 17/36 at `S = 4` to
+  12/36 at `S = 8` and 9/36 at `S = 10`, while the best `Float64` `ref_err` improves from
+  2.8e-06 to 3.4e-14. A wider network puts more nearly dependent columns in the parameter
+  Jacobian, and 11 bits of mantissa cannot separate them. Accuracy is what the suite reports and
+  half precision is studied on its own terms in the OGA section, so the widths favour `Float64`;
+  `S` is the knob if that priority ever inverts. See "The half-precision trade-off" on the
+  Benchmarks page. The Toda lattice has no measured width yet, which puts its quick grid at ~5 h against
   ~7 min for the other three, so it is out of the docs build until it has one;
   `benchmark/run_toda_lattice.jl` and the `full` preset still run it.
 - `quick` no longer overrides `max_iterations`, using the solver default of 1000; the `maxiter`
