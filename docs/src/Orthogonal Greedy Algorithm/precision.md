@@ -18,7 +18,7 @@ form "`Float16` converges here" is a statement about the island, not about `Floa
   `one(T)`, `zero(T)`, `T(C) * eps(T)`, `oftype(x, 0.044715)`, `sqrt(eps(T))`.
 - **Reductions are spelled `sqrt(sum(abs2, ·))`, not `norm`** — the generic `norm` fallback
   rescales through `float`, which is a promotion waiting to happen.
-- **`simpson_quadrature(nstages, T)` is always passed `T`.** Its signature defaults to
+- **`simpson_quadrature(extrapolation_substep, T)` is always passed `T`.** Its signature defaults to
   `Float64`, and that default is precisely how the legacy path acquired its island.
 - **The rank-revealing fits stay generic.** [`PivotedQR`](@ref) and
   [`TruncatedSVD`](@ref) are hand-rolled so that they run *at* `T`; widening to `Float32` to
