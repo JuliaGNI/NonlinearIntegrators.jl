@@ -36,8 +36,8 @@ end
         @test B[1] == T(-pi) && B[end] == T(pi)
         @test issorted(B)
 
-        # The Float16 trap: `T(70000)` overflows to `Inf`, so a naive
-        # `lo:(hi-lo)/n:hi` had a zero step and threw `ArgumentError`.
+        # The Float16 trap: `T(70000)` overflows to `Inf`, so a range built as
+        # `lo:(hi-lo)/n:hi` in `T` has a zero step and throws `ArgumentError`.
         big = NI.bias_grid(-pi, pi, 70000, T)
         @test length(big) == 70001
         @test all(isfinite, big)
@@ -67,13 +67,14 @@ end
         end
     end
 
-    # Regression: the convergence test used to be `abs(β) ≤ eps(T)*sqrt(α*γ)`. At Float16
-    # the product of two squared column norms overflows once the norms exceed ~16, making
-    # the threshold `Inf`, so every column pair tested as "already orthogonal" and the
-    # routine returned the *unrotated* matrix — wrong singular values, no error raised.
+    # The convergence test must compare against `eps(T)*sqrt(α)*sqrt(γ)` and never form
+    # `α*γ`: at Float16 the product of two squared column norms overflows once the norms
+    # exceed ~16, and an `Inf` threshold makes every column pair test as "already
+    # orthogonal", so the routine returns the *unrotated* matrix — wrong singular values,
+    # no error raised.
     @testset "jacobi_svd does not overflow its convergence test (Float16)" begin
         # Column norms ≈ 33 and 66, so `α ≈ 1100` and `γ ≈ 4400` and `α*γ` is well past the
-        # 65504 ceiling — the configuration that used to make the test vacuous.
+        # 65504 ceiling — the configuration that makes a `sqrt(α*γ)` threshold vacuous.
         A = Float16[20 40; 20.5 41.5; 19 38; 1 3]
         σ, U, V = NI.jacobi_svd(A)
         @test norm(Float64.(U)' * Float64.(U) - I) < 0.05      # columns really orthogonal
@@ -382,11 +383,10 @@ end
 end
 
 @testset "OGA1d regression pin" begin
-    # `OGA1d` must keep selecting the atoms the pre-refactor implementation selected: the
-    # docs record that normalising before selection steers the Newton solve into a
-    # different, empirically worse basin, so this sequence is load-bearing rather than
-    # incidental. Values captured from the implementation that passes the Float64
-    # end-to-end accuracy guard (`test/integration/onelayer_accuracy.jl`, < 1e-12).
+    # `OGA1d`'s selected atoms are load-bearing rather than incidental: the docs record
+    # that normalising before selection steers the Newton solve into a different and
+    # empirically worse basin. Values captured from the implementation that passes the
+    # Float64 end-to-end accuracy guard (`test/integration/onelayer_accuracy.jl`, < 1e-12).
     @testset "$T" for T in (Float64, Float32)
         nodes, weights, y = oga_testcase(T)
         r = oga_fit(OGA1d(), x -> max(zero(x), x)^3, nodes, weights, y, 4;

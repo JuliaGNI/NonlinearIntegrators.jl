@@ -23,19 +23,19 @@ build_ol_method(::Type{T}; R = 8, S = 4, k = 3, dict_amount = 400) where {T} =
     @test abs(Float64(qend) - Float64(ref)) < (T == Float64 ? 1e-8 : 1e-3)
 end
 
-# Regression test for OGA dictionary construction at half precision. A `dict_amount`
-# above the finite range of Float16 (max ≈ 65504) previously made the bias-interval
-# step evaluate to zero (`Float16(70000) == Inf`), throwing `ArgumentError: range
-# step cannot be zero` before the solve was reached. The dictionary range is now built in
-# Float64, so a 70000-atom dictionary is constructible at Float16.
+# Regression test for OGA dictionary construction at half precision. A `dict_amount` above
+# the finite range of Float16 (max ≈ 65504) makes the bias-interval step evaluate to zero
+# (`Float16(70000) == Inf`), which a range built in `T` rejects with `ArgumentError: range
+# step cannot be zero` before the solve is reached; the dictionary range is built in Float64
+# to keep a 70000-atom dictionary constructible at Float16.
 #
-# The assertion is split deliberately. What this file can state as a *fact* is that the
-# seed itself runs and returns a finite Float16 fit — that is checked directly, without an
-# integrator, so it holds independently of rounding. Whether the subsequent Newton solve
-# converges at half precision is not a contract: the Jacobian is ill-conditioned there, and
-# which side of the divergence a given machine lands on is decided by rounding (measured:
-# the same configuration converges at q₀ = 0.5 and raises `NonlinearSolverException` at
-# q₀ = 0.6). So the end-to-end run only guards against a *new class* of failure.
+# The assertion is split deliberately. What this file can state as a *fact* is that the seed
+# runs and returns a finite Float16 fit — checked directly, without an integrator, so it
+# holds independently of rounding. Whether the subsequent Newton solve converges at half
+# precision is not a contract: the Jacobian is ill-conditioned there, and which side of the
+# divergence a machine lands on is decided by rounding (measured: the same configuration
+# converges at some initial conditions and raises `NonlinearSolverException` at others a few
+# percent away). So the end-to-end run guards only against a *new class* of failure.
 @testset "Float16 OGA dictionary construction is robust (dict_amount = 70000)" begin
     # ---- the seed, directly: deterministic and rounding-independent -----------
     nodes = Float16.((0:10) ./ 10)                      # the method's `network_inputs`

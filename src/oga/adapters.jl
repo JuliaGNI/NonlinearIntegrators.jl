@@ -46,9 +46,9 @@ function oga_seed(int::GeometricIntegrator, oga::OGA, symmetry::OGASymmetry,
 end
 
 # Keep the parameter cache consistent with the seed. `components!` and `stages_compute!`
-# both repopulate `ps` from `x`, so this is not load-bearing — but the pre-refactor code
-# maintained it, and a stale `ps` would be a trap for anything that inspects the cache
-# between the seed and the first residual evaluation.
+# both repopulate `ps` from `x`, so this is not load-bearing — but a stale `ps` would be a
+# trap for anything that inspects the cache between the seed and the first residual
+# evaluation.
 function _store_params!(ps, results)
     for d in eachindex(results)
         # Linear indexing, not plain broadcast: the hidden layer's `W` is `S×1` and the

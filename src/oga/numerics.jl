@@ -20,9 +20,9 @@
 Uniform grid of `n + 1` bias values from `lo` to `hi` in precision `T`.
 
 The coordinates are generated from an integer-indexed `range` in `Float64` and then
-cast to `T`, so a large `n` cannot overflow the step to zero in reduced precision
-(the Float16 trap where `T(n)` overflows to `Inf` and `(hi - lo)/n` evaluates to
-zero, previously throwing `ArgumentError: range step cannot be zero`). Only the grid
+cast to `T`, so a large `n` cannot overflow the step to zero in reduced precision: at
+`Float16`, `T(n)` overflows to `Inf` for `n > 65504` and `(hi - lo)/n` evaluates to zero,
+which a range built in `T` rejects with `ArgumentError: range step cannot be zero`. Only the grid
 *coordinates* touch `Float64`; the seed's dictionary and solve run entirely in `T`.
 """
 function bias_grid(lo, hi, n::Integer, ::Type{T}) where {T}
@@ -93,7 +93,7 @@ Solved by QR on the `√w`-scaled design matrix rather than the normal equations
 that lets the fit run in reduced precision without a rank-deficient Gram matrix.
 
 The plain QR solve is used whenever it is finite (so the Float64/Float32 atom choice
-is byte-for-byte the old Gram solution and the greedy residual is unperturbed). Only
+matches the Gram solution bit for bit and the greedy residual is unperturbed). Only
 if it returns a non-finite result — a genuinely rank-deficient design matrix, i.e. the
 Float16 case — is the fit retried with a `√λ·I` augmentation, where the ridge
 `λ = C · eps(T) · tr(ÂᵀÂ)/natoms` is the precision-scaled Tikhonov floor (see
@@ -205,7 +205,11 @@ function pivoted_qr_lstsq(Â::AbstractMatrix{T}, ŷ::AbstractVector{T}, rtol::T)
     R    = Matrix{T}(Â)
     qty  = Vector{T}(ŷ)
     perm = collect(1:n)
-    # Squared norms of the *not yet eliminated* part of each column, downdated below.
+    # Squared norms of the *not yet eliminated* part of each column, recomputed rather
+    # than downdated after every elimination: downdating subtracts the eliminated
+    # component and loses accuracy exactly where the pivot norms collapse, which is the
+    # regime this factorisation exists to detect. At `k ≤ 8` columns the recomputation is
+    # free.
     cnorm = T[sum(abs2, view(R, :, j)) for j in 1:n]
 
     rank = 0
@@ -329,8 +333,8 @@ Thin QR factorisation of the greedily selected design matrix, maintained by appe
 one column at a time.
 
 OGA adds exactly one atom per iteration, so re-solving a `k × k` system from scratch at
-every step — what all four integrators used to do — repeats work the previous step
-already did. Maintaining `Q` (orthonormal columns) and `R` (upper triangular) instead
+every step repeats work the previous step already did. Maintaining `Q` (orthonormal
+columns) and `R` (upper triangular) instead
 costs `O(k · nnodes)` per step, never forms a Gram matrix, and, as a side effect, yields
 two quantities the greedy loop wants anyway:
 
@@ -371,7 +375,7 @@ end
 Append column `a` to the factorisation and return the deflated norm `ρ = ‖a⊥‖`, the
 part of `a` orthogonal to the columns already present. The column is rejected (nothing
 is appended, `ρ` still returned) when `ρ ≤ min_gain · ‖a‖`, i.e. when `a` lies in the
-existing span to within the requested tolerance — the rank drop that used to surface
+existing span to within the requested tolerance — the rank drop that otherwise surfaces
 downstream as `SingularException: zero pivot found at index 3`.
 
 Orthogonalisation is modified Gram–Schmidt with one reorthogonalisation pass. That

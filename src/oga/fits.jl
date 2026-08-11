@@ -1,12 +1,12 @@
 # ---- OGA fit strategies -----------------------------------------------------
 #
-# The greedy loop refits the output weights of all selected atoms after every
-# selection. How that linear least-squares problem is solved is the single biggest
-# lever on reduced-precision robustness, because the original formulation solved it
-# on the normal equations `G = Φ diag(w) Φᵀ`, and forming `G` squares the condition
-# number: `κ(G) = κ(Φ)²`. A matrix is solvable while `κ ≲ 1/eps(T)`, so squaring κ
-# halves the usable digits — which is exactly the `Float64`→`Float32` gap that made
-# the seed's `Float64` island look necessary.
+# The greedy loop refits the output weights of all selected atoms after every selection.
+# How that linear least-squares problem is solved is the single biggest lever on
+# reduced-precision robustness: solving it on the normal equations `G = Φ diag(w) Φᵀ` —
+# what `NormalEquationsFit` does, and what the original-paper reference does — squares the
+# condition number, `κ(G) = κ(Φ)²`. A matrix is solvable while `κ ≲ 1/eps(T)`, so squaring
+# κ halves the usable digits. That is the whole `Float64`→`Float32` gap, and the reason a
+# `Float64` island looks necessary until the Gram matrix is avoided.
 #
 # Each fit below receives the *already* `√w`-scaled design matrix `Â` (nnodes × k) and
 # target `ŷ`, so all of them minimise the same quadrature-weighted objective and differ
@@ -29,9 +29,8 @@ QR least squares on the `√w`-scaled design matrix (see [`weighted_lstsq`](@ref
 conditioned on `κ(Φ)` rather than `κ(Φ)²`, with no Gram matrix and no ridge unless the
 plain solve comes back non-finite.
 
-The default, and the fit whose behaviour the `Float64`/`Float32` regression tests pin —
-it re-solves from scratch at each greedy step, matching the pre-refactor arithmetic
-exactly.
+The default, and the fit whose behaviour the `Float64`/`Float32` regression tests pin. It
+re-solves from scratch at each greedy step.
 """
 struct WeightedQR <: OGAFit end
 
@@ -174,8 +173,8 @@ function _normal_equations(Â::AbstractMatrix{T}, ŷ::AbstractVector{T}, ridge::
             G[i, i] += λ
         end
     end
-    # A singular Gram matrix is the documented failure mode of this fit — and the reason the
-    # greedy seed used to abort the whole time step. Let it throw: `oga_solve` catches rank
-    # failures uniformly and falls back to the ridged solve.
+    # A singular Gram matrix is the documented failure mode of this fit, and would otherwise
+    # abort the whole time step. Let it throw: `oga_solve` catches rank failures uniformly
+    # and falls back to the ridged solve.
     return G \ rhs
 end

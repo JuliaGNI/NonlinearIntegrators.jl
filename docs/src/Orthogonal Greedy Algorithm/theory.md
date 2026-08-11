@@ -171,7 +171,7 @@ which is [`OrthogonalProjection`](@ref). Two simplifications of it are also impl
 - replacing ``\lVert g^{\perp} \rVert_w`` by ``\lVert g \rVert_w``, which ignores overlap
   with the selected set but keeps scale invariance — [`NormalizedProjection`](@ref). It is
   exact at the first step, where the selected set is empty and ``g^{\perp} = g``.
-- dropping the denominator altogether — [`RawProjection`](@ref), the pre-refactor rule.
+- dropping the denominator altogether — [`RawProjection`](@ref), the default rule.
   This is *not* scale invariant: a large-norm atom outranks a better-aligned small one.
   Harmless when all atoms have comparable norms, as on the `±1` grid; wrong on a 2-D grid,
   where norms differ by orders of magnitude.
@@ -199,11 +199,10 @@ selected set rank-deficient.
 \qquad \texttt{min\_gain} = \sqrt{\varepsilon(T)} \ \text{by default},
 ```
 
-a *relative* test, so it is scale invariant. This is the direct fix for the observed
-reduced-precision failure: what used to surface as `SingularException: zero pivot found at
-index 3` — out of only four neurons — is exactly this quantity going to zero at the third
-selected atom, and the guard makes selecting such an atom impossible rather than merely
-detecting it afterwards.
+a *relative* test, so it is scale invariant. This is the direct fix for the
+reduced-precision failure: a `SingularException: zero pivot found at index 3` — out of only
+four neurons — is exactly this quantity going to zero at the third selected atom, and the
+guard makes selecting such an atom impossible rather than merely detecting it afterwards.
 
 ## Conditioning: why the fit needed care
 
@@ -233,10 +232,10 @@ so the accuracy is governed by ``\kappa(\hat{A})`` — recovering roughly the fa
 in digits, which is exactly the `Float64`→`Float32` gap. This is
 [`NonlinearIntegrators.weighted_lstsq`](@ref) and the [`WeightedQR`](@ref) fit.
 
-Note what the island was *not* buying. The OGA result is a seed: it is rounded back to `T`
+Note what the island does *not* buy. The OGA result is a seed: it is rounded back to `T`
 the moment it is stored, and the final accuracy is set by the working-precision Newton
-solve. Double precision bought only robustness of an ill-conditioned solve — and that is
-unnecessary once the solve is no longer ill-conditioned.
+solve. Double precision buys only robustness of an ill-conditioned solve, which a
+well-conditioned formulation does not need.
 
 ## References
 

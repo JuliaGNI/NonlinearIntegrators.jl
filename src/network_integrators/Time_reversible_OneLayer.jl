@@ -33,9 +33,9 @@ struct Time_reversible_OneLayer{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Integrat
         NBASIS = basis.S
 
         # The ansatz pairs every neuron with its reflection about t = 1/2 and stores only
-        # the independent half, so `S` must be even. Caught here rather than at the first
-        # time step, where an odd `S` used to surface as an `InexactError` out of
-        # `Int(S/2)` in `components!` — several call levels from the cause.
+        # the independent half, so `S` must be even. Caught here rather than in
+        # `components!`, where `Int(S/2)` would throw an `InexactError` several call levels
+        # from the basis that caused it.
         iseven(NBASIS) || throw(ArgumentError(
             "Time_reversible_OneLayer requires a basis with an even number of neurons, " *
             "got S = $NBASIS. Neurons come in mirrored pairs and only the S/2 independent " *

@@ -42,9 +42,8 @@
     end
 
     # Both time-reversible methods store only the `S/2` independent hidden parameters, the
-    # other half being the mirror image of the first. An odd `S` used to be accepted at
-    # construction and fail at the first time step with an `InexactError` out of
-    # `Int(S/2)`; it is now rejected where the basis is handed over.
+    # other half being the mirror image of the first, so an odd `S` is rejected where the
+    # basis is handed over rather than deep in `components!`.
     @testset "odd basis size is rejected" begin
         odd = build_onelayer_basis(T; S = 5)
         @test_throws ArgumentError Time_reversible_OneLayer(odd, quad; show_status = false,

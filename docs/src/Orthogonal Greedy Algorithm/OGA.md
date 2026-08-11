@@ -44,7 +44,7 @@ type rather than enumerated as a type per combination:
 - **fit** ([`OGAFit`](@ref)) — how the output weights are refit.
 
 Named presets recover the useful corners: [`OGA1d`](@ref) (the default, and the
-pre-refactor behaviour exactly), [`OGA1dNormalized`](@ref), [`OGA1dStable`](@ref),
+default), [`OGA1dNormalized`](@ref), [`OGA1dStable`](@ref),
 [`OGA2d`](@ref), [`OGASphere`](@ref). The original-paper reference implementation is kept
 separately as [`OGA1dNormalEquations`](@ref).
 
@@ -62,10 +62,10 @@ squared condition number exceeded ``1/\varepsilon`` at `Float32` while still fit
 it at `Float64`. Hence the `Float64` island: the seed was assembled in double precision
 regardless of the solver's working type.
 
-Crucially the island bought **no accuracy**. The OGA result is a seed, rounded back to `T`
+Crucially the island buys **no accuracy**. The OGA result is a seed, rounded back to `T`
 the moment it is stored, and the final accuracy is set by the working-precision Newton
-solve. It bought only robustness of an ill-conditioned solve — which is unnecessary once
-the solve is no longer ill-conditioned.
+solve. It buys only robustness of an ill-conditioned solve, which a well-conditioned
+formulation does not need.
 
 Three hard-coded guard-rail constants encoded the same `Float64` assumption and were
 silently ineffective in reduced precision:
@@ -97,12 +97,12 @@ a strict generalisation. See [Theory](@ref).
 
 ## A didactic `Float16` example
 
-The following self-contained example reproduces, in miniature, the failure that used to
-force the `Float64` island. We build four `ReLU³` neurons — two of them with almost
+The following self-contained example reproduces, in miniature, the failure that forces a
+`Float64` island on the normal-equations formulation. We build four `ReLU³` neurons — two of them with almost
 identical biases (`0.300` and `0.305`), the situation that makes the Gram matrix
 ill-conditioned — and fit a target that is a known combination of them. We solve the
-least-squares problem both the old way (normal equations / Gram matrix) and the new way (QR
-on the ``\sqrt{w}``-scaled design matrix), in `Float64` and in `Float16`.
+least-squares problem both ways — normal equations / Gram matrix, and QR on the
+``\sqrt{w}``-scaled design matrix — in `Float64` and in `Float16`.
 
 ```@example oga
 using LinearAlgebra
@@ -180,8 +180,8 @@ println("weighted_lstsq x = ", Float64.(NonlinearIntegrators.weighted_lstsq(Φ, 
 
 In the full integrator the `Float16` Gram garbage does not merely produce a poor seed: fed
 into the Newton solve it makes the parameter Jacobian singular (two nearly identical neurons
-are nearly linearly dependent), which previously surfaced as a `SingularException` or a
-`NaN`. The QR reformulation, the coherence guard and the ridged fallback together keep the
+are nearly linearly dependent), surfacing as a `SingularException` or a `NaN`. The QR
+reformulation, the coherence guard and the ridged fallback together keep the
 seed finite and well-behaved, so the run proceeds at the working precision — and the
 [Studies](@ref) measure how far that gets each variant.
 

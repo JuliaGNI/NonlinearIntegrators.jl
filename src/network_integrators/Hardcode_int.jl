@@ -58,8 +58,9 @@ issymplectic(::Union{Hardcode_int,Type{<:Hardcode_int}}) = missing
 
 default_solver(::Hardcode_int) = Newton()
 default_iguess(::Hardcode_int) = IntegratorExtrapolation()#CoupledHarmonicOscillator
-# Unlike the other three integrators, this one's pre-refactor greedy step selected on the
-# *normalized* inner product; that is its baseline, so it keeps it.
+# Alone among the four integrators, this one's greedy step selects on the *normalized*
+# inner product. The rule decides which neurons are picked and hence which Newton basin the
+# step lands in, so it is a tuned baseline rather than a free choice.
 default_iparams(::Hardcode_int) = OGA1dNormalized()
 # default_iguess_integrator(::Hardcode_int) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
 

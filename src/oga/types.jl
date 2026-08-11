@@ -80,9 +80,8 @@ end
 The default seed: the original `{±1} × (bias grid)` dictionary, raw-projection selection,
 and a QR fit of the `√w`-scaled design matrix.
 
-Reproduces the pre-refactor `OGA1d` behaviour exactly — including its atom choices, which
-the regression tests pin, since normalising before selection would steer the Newton solve
-into a different (empirically worse) basin.
+Its atom choices are pinned by the regression tests: normalising before selection steers
+the Newton solve into a different and empirically worse basin.
 """
 OGA1d(; kwargs...) = OGA(BiasGrid1d(), RawProjection(), WeightedQR(); kwargs...)
 
@@ -91,11 +90,10 @@ OGA1d(; kwargs...) = OGA(BiasGrid1d(), RawProjection(), WeightedQR(); kwargs...)
 
 `OGA1d`, but selecting on the *normalized* inner product.
 
-This is `Hardcode_int`'s baseline, and it is its constructor default for that reason:
-unlike the other three integrators, its pre-refactor greedy step ranked candidates by
-`|⟨r, g⟩_w| / ‖g‖_w` rather than by the raw projection. Which of the two an integrator
-uses changes which neurons get picked and therefore which basin the Newton solve lands
-in, so each keeps the rule it was tuned with rather than inheriting a single default.
+`Hardcode_int`'s constructor default: alone among the four integrators it ranks candidates
+by `|⟨r, g⟩_w| / ‖g‖_w` rather than by the raw projection. Which of the two an integrator
+uses changes which neurons get picked and therefore which basin the Newton solve lands in,
+so each keeps the rule it was tuned with rather than inheriting a single default.
 """
 OGA1dNormalized(; kwargs...) = OGA(BiasGrid1d(), NormalizedProjection(), WeightedQR(); kwargs...)
 
@@ -105,9 +103,9 @@ OGA1dNormalized(; kwargs...) = OGA(BiasGrid1d(), NormalizedProjection(), Weighte
 The same 1-D dictionary made robust at reduced precision: orthogonal-greedy selection
 with a rank-gain floor, on top of the incrementally maintained QR.
 
-This is the combination aimed squarely at the observed 16-bit failure — an atom that adds
-no new direction can no longer be selected, so the selected design matrix cannot go
-rank-deficient regardless of precision.
+The combination aimed squarely at the 16-bit failure mode: an atom that adds no new
+direction is never selected, so the selected design matrix cannot go rank-deficient
+regardless of precision.
 """
 OGA1dStable(; kwargs...) = OGA(BiasGrid1d(), OrthogonalProjection(), IncrementalQR(); kwargs...)
 

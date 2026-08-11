@@ -3,9 +3,8 @@
 # One integrator-agnostic implementation. It knows nothing about
 # `GeometricIntegrator`, the parameter cache, or the variational equations — it takes a
 # dictionary spec, an activation, quadrature nodes and weights, and a target, and returns
-# neuron parameters. That makes it directly unit-testable at any precision, and it
-# replaces four hand-rolled copies of this loop that had drifted apart into four
-# different guard-rail policies.
+# neuron parameters. That makes it directly unit-testable at any precision, and it is the
+# single place the guard-rail policy is defined for all four integrators.
 #
 # Everything happens in the `√w`-scaled space: with `Â = √w ⊙ Φᵀ` and `ŷ = √w ⊙ y`, the
 # plain Euclidean inner product *is* the quadrature-weighted one, so the greedy scores,
@@ -126,11 +125,10 @@ end
 
 Assert that `nneurons` is a multiple of `neurons_per_atom(symmetry)`.
 
-The greedy loop places whole atoms, so under a mirrored symmetry an odd `nneurons` would
-run `nneurons ÷ 2` steps and leave the last neuron at its initial `(0, 0)` — and
-`_fill_unused!` cannot repair it either, since it too fills a pair at a time. That is the
-duplicated-neuron state the fill exists to avoid: a rank-deficient seed becomes a
-rank-deficient Newton Jacobian. Reject the count instead of half-honouring it.
+The loop places whole atoms, so under a mirrored symmetry an odd `nneurons` runs
+`nneurons ÷ 2` steps and leaves the last neuron at `(0, 0)`; `_fill_unused!` fills pairs
+too, so it cannot repair it. That is the duplicated-neuron state the fill exists to avoid,
+where a rank-deficient seed becomes a rank-deficient Newton Jacobian.
 """
 function oga_check_neuron_count(nneurons::Int, symmetry::OGASymmetry)
     npa = neurons_per_atom(symmetry)
@@ -156,11 +154,9 @@ Greedily fit `nneurons` neurons of a one-layer network to the target `y` sampled
   `t(1-t) σ(w t + b)`. Pass the `t(1-t)` vector; `nothing` means no modulation.
 * `symmetry::`[`OGASymmetry`](@ref) — how atoms map to neurons.
 
-`nneurons` must be a multiple of `neurons_per_atom(symmetry)` — i.e. even for the two
-mirrored symmetries, which place a neuron and its reflection together. An odd count is an
-`ArgumentError` rather than a silently short fit, since the loop would place one neuron
-fewer than asked and leave the last one at `(0, 0)`, duplicating a neuron in the Newton
-system that `fill_unused` exists to keep distinct.
+`nneurons` must be a multiple of `neurons_per_atom(symmetry)` — even, for the two mirrored
+symmetries. An odd count is an `ArgumentError` rather than a silently short fit; see
+[`oga_check_neuron_count`](@ref).
 
 Runs entirely at `T = eltype(nodes)`.
 """
@@ -252,10 +248,9 @@ function oga_fit(oga::OGA, σ, nodes::AbstractVector{T}, w::AbstractVector{T},
     gains = T[]
     gcand = Vector{T}(undef, M)      # off-grid refinement scratch, reused
 
-    # Only `OrthogonalProjection` imposes a *relative* rank-gain floor. The other rules
-    # reject a candidate only when it contributes exactly nothing, which is what the
-    # pre-refactor implementations would have solved through into garbage — so the
-    # well-conditioned atom sequence they produce is unchanged.
+    # Only `OrthogonalProjection` imposes a *relative* rank-gain floor; the other rules
+    # reject a candidate only when it contributes exactly nothing, leaving the atom
+    # sequences they produce on well-conditioned problems untouched.
     gainfloor = oga.selection isa OrthogonalProjection ?
         _min_gain(oga.selection.min_gain, T) : zero(T)
 

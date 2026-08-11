@@ -24,8 +24,8 @@ abstract type OGASelection end
 
 Score by the bare weighted inner product `|⟨r, g⟩_w|`.
 
-The pre-refactor rule, and the default: it is what the `Float64`/`Float32` regression
-tests pin. Note it is *not* scale-invariant — an atom with a large norm outranks a
+The default, and what the `Float64`/`Float32` regression tests pin. Note it is *not*
+scale-invariant — an atom with a large norm outranks a
 better-aligned small one — which is harmless for the `{±1} × (bias grid)` dictionary,
 whose atoms all have comparable norms, and wrong for a 2-D `(w, b)` dictionary, whose
 atoms do not.
@@ -54,11 +54,11 @@ ones*, `|⟨r, g⟩_w| / ‖g⊥‖_w`, and refuse any atom whose orthogonal par
 This is what makes the algorithm *orthogonal* greedy rather than matching pursuit, and
 it is the direct fix for the observed reduced-precision failure. The residual is already
 orthogonal to the selected span, so the numerator is unchanged from
-[`NormalizedProjection`](@ref) — but the denominator now penalises an atom that mostly
-duplicates what is already there, and the `min_gain` floor rules it out entirely. An
-atom that adds no new direction can therefore no longer be selected, which is precisely
-the condition that used to surface downstream as `SingularException: zero pivot found at
-index 3` out of four neurons.
+[`NormalizedProjection`](@ref) — but the denominator penalises an atom that mostly
+duplicates what is already there, and the `min_gain` floor rules it out entirely. An atom
+that adds no new direction is therefore never selected, which is the condition that
+otherwise surfaces downstream as `SingularException: zero pivot found at index 3` out of
+four neurons.
 
 Costs one dictionary-sized matrix product against the maintained `Q` per step, the same
 order as the score itself.

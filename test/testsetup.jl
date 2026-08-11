@@ -63,27 +63,13 @@ end
 # per time step); its final entry must retain the working element type `T`.
 assert_no_upcast(q, ::Type{T}) where {T} = @test eltype(q[end]) == T
 
-# The two ways an integration is allowed to give up at reduced precision. `Float16` (and
-# occasionally `Float32`) leaves the Newton system near-singular, and which of the two
-# surfaces depends on where the arithmetic breaks down first:
+# The two ways a nonlinear solve is allowed to give up: `SingularException` (a factorisation
+# hit a zero pivot) and `NonlinearSolverException` (the Newton direction came back
+# non-finite). Half precision usually reaches the latter, since `oga_solve` guarantees the
+# seed itself is finite at every precision.
 #
-#   * `SingularException` — a factorisation hit a zero pivot.
-#   * `NonlinearSolverException` — the Newton direction came back non-finite. Since the
-#     OGA seed now guarantees a finite fit at every precision (see `oga_solve`), this is
-#     the one a half-precision failure reaches: the seed no longer aborts the step, so the
-#     run gets as far as the solve before it runs out of digits.
-#
-# Anything else is a genuine defect and must propagate.
+# Used only by the `Float16` regression test, which asserts a failure there is one of these
+# rather than a new class. `TEST_TYPES` stops at `Float32`, where these problems are well
+# conditioned on every platform, so every other integration calls `integrate` directly and a
+# give-up is a real failure.
 const SOLVER_GAVE_UP = Union{SingularException,NonlinearSolverException}
-
-# Run a thunk that performs an integration which may legitimately fail to converge
-# at reduced precision. Returns the result, or `nothing` if the solve gave up in one of
-# the two documented ways. Any other error propagates.
-function try_integrate(f)
-    try
-        return f()
-    catch e
-        e isa SOLVER_GAVE_UP && return nothing
-        rethrow()
-    end
-end

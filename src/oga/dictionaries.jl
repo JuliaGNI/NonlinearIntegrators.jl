@@ -36,9 +36,9 @@ The original dictionary: weights `w = ±1` crossed with a uniform grid of
 `dict_amount + 1` biases over the method's `bias_interval`, for `2·(dict_amount + 1)`
 atoms.
 
-Complete for `ReLUᵏ` (see the discussion at the top of this file) and the default.
-Atom order — the `w = -1` block first, then `w = +1` — is preserved from the
-pre-refactor implementation because `argmax` tie-breaking depends on it.
+Complete for `ReLUᵏ` (see the discussion at the top of this file) and the default. Atom
+order — the `w = -1` block first, then `w = +1` — is load-bearing: `argmax` breaks ties by
+first index, so reordering changes which atoms are selected.
 """
 struct BiasGrid1d <: OGADictionary end
 

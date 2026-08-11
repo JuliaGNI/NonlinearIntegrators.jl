@@ -95,7 +95,7 @@ reimplemented:
 | `Time_reversible_OneLayer` | — | [`MirrorPairs`](@ref) | [`OGA1d`](@ref) |
 | `Time_Reversible_Hardcode` | `t(1-t)`, target minus the linear part | [`SharedMirrorPairs`](@ref) | [`OGA1d`](@ref) |
 
-`Hardcode_int` is the odd one out, and deliberately so: its pre-refactor greedy step ranked
+`Hardcode_int` is the odd one out, and deliberately so: its greedy step ranks
 candidates by the normalised inner product where the other three used the raw one. Since that
 choice decides which neurons are picked and hence which basin the Newton solve lands in, each
 integrator keeps the rule it was tuned with rather than inheriting a single shared default.
