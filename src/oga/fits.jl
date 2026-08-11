@@ -52,7 +52,8 @@ struct IncrementalQR <: OGAFit end
     PivotedQR(; rtol = nothing)
 
 Rank-revealing Householder QR with column pivoting, truncated below
-`rtol · (largest pivot)`; `rtol = nothing` uses `sqrt(eps(T))`.
+`rtol · (largest pivot)`; `rtol = nothing` uses `eps(T) · max(4, k)` with
+`k = min(nnodes, ncols)` — see the note above `_rtol` for why not `sqrt(eps(T))`.
 
 Unlike [`WeightedQR`](@ref), a numerically dependent selected atom is *detected* and
 given a zero coefficient rather than solved through. Hand-rolled because
@@ -68,7 +69,8 @@ end
     TruncatedSVD(; rtol = nothing)
 
 Minimum-norm solve through a truncated pseudo-inverse, dropping singular directions
-with `σ < rtol · σ_max`; `rtol = nothing` uses `sqrt(eps(T))`.
+with `σ < rtol · σ_max`; `rtol = nothing` uses `eps(T) · max(4, k)` with
+`k = min(nnodes, ncols)` — see the note above `_rtol` for why not `sqrt(eps(T))`.
 
 The most robust of the fits — a rank-deficient selected set gives a bounded solution
 instead of amplified rounding noise — and the one to reach for if a single variant must
