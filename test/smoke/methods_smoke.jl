@@ -4,17 +4,19 @@
 # are built once per T and shared across the network methods to keep this fast.
 
 @testset "method smoke ($T)" for T in TEST_TYPES
+    @debug "method smoke: element type = $T"
     net  = build_onelayer_basis(T; S = 4)
     dnet = build_densenet_basis(T; S₁ = 3, S = 3)
     quad = gauss(T, 4)
 
     @testset "NonLinear_OneLayer_GML" begin
-        m = NonLinear_OneLayer_GML(net, quad; bias_interval = [-T(pi), T(pi)], dict_amount = 400)
+        m = NonLinear_OneLayer_GML(net, quad; show_status = false, bias_interval = [-T(pi), T(pi)], dict_amount = 400)
         @test m isa OneLayerMethod
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test typeof(m.problem_initial_hamitltonian) == T
+        @test GeometricIntegratorsBase.isexplicit(m) == false
+        @debug "NonLinear_OneLayer_GML{$T} ok" extrapolation_substep=m.extrapolation_substep training_epochs=m.training_epochs
     end
 
     @testset "Hardcode_int" begin
@@ -23,6 +25,7 @@
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
+        @debug "Hardcode_int{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 
     @testset "Time_reversible_OneLayer" begin
@@ -31,6 +34,8 @@
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
+        @test GeometricIntegratorsBase.issymmetric(m) == true
+        @debug "Time_reversible_OneLayer{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 
     @testset "Time_Reversible_Hardcode" begin
@@ -39,6 +44,8 @@
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
+        @test GeometricIntegratorsBase.issymmetric(m) == true
+        @debug "Time_Reversible_Hardcode{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 
     # Both time-reversible methods store only the `S/2` independent hidden parameters, the
@@ -57,6 +64,7 @@
         @test m isa DenseNetMethod
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
+        @debug "NonLinear_DenseNet_GML{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 
     @testset "CGVI_standard" begin
@@ -66,6 +74,7 @@
         @test cg isa GeometricIntegratorsBase.LODEMethod
         @test eltype(cg.b) == T && eltype(cg.c) == T
         @test eltype(cg.x) == T
+        @debug "CGVI_standard{$T} ok" nnodes=length(cg.b)
     end
 
     @testset "PR_Integrator" begin
@@ -74,5 +83,6 @@
         @test pri isa GeometricIntegratorsBase.LODEMethod
         @test eltype(pri.b) == T && eltype(pri.c) == T
         @test eltype(pri.init_w[1]) == T
+        @debug "PR_Integrator{$T} ok" extrapolation_substep=pri.extrapolation_substep
     end
 end
