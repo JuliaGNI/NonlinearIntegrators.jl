@@ -31,9 +31,25 @@ using Infiltrator
 include("methods.jl")
 export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
 export IntegratorExtrapolation
-export InitialParametersMethod, TrainingMethod, OGA1d, OGA1d_Legacy, LSGD
+export InitialParametersMethod, TrainingMethod, LSGD
 
 include("network_integrators/utilities.jl")
+
+# Orthogonal Greedy Algorithm. The core (dictionaries, selection rules, fits and the
+# greedy loop) is integrator-agnostic and comes first; the per-integrator adapters have
+# to come after the integrator definitions, since they dispatch on them.
+include("oga/numerics.jl")
+include("oga/fits.jl")
+include("oga/selection.jl")
+include("oga/dictionaries.jl")
+include("oga/types.jl")
+include("oga/greedy.jl")
+export OGA, OGA1d, OGA1dNormalized, OGA1dStable, OGA2d, OGASphere, OGA1dNormalEquations
+export OGADictionary, BiasGrid1d, WeightBiasGrid2d, AngularGrid, Refined
+export OGASelection, RawProjection, NormalizedProjection, OrthogonalProjection
+export OGAFit, WeightedQR, IncrementalQR, PivotedQR, TruncatedSVD, NormalEquationsFit
+export OGASymmetry, NoSymmetry, MirrorPairs, SharedMirrorPairs
+export oga_fit, OGAResult, oga_label
 
 include("network_basis/NetworkBasis.jl")
 export NetworkBasis, DenseNetBasis, OneLayerNetBasis
@@ -69,6 +85,10 @@ include("network_integrators/Time_reversible_OneLayer.jl")
 include("network_integrators/Time_reversible_Hardcode_int.jl")
 export Time_Reversible_Hardcode
 export Time_reversible_OneLayer
+
+# The OGA seeds for the four integrators above, plus the original-paper reference.
+include("oga/adapters.jl")
+include("oga/normal_equations.jl")
 
 # include("network_integrators/NonLinear_OneLayer_VectorValue_Lux.jl")
 # include("network_integrators/NonLinear_OneLayer_VectorValue_GML.jl")

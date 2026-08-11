@@ -13,7 +13,7 @@
 
 using NonlinearIntegrators
 using GeometricIntegrators                       # integrate, Gauss, relative_maximum_error, extrapolations
-import GeometricIntegratorsBase: solverstate      # read solver iteration count after a run
+import GeometricIntegratorsBase: solverstate, solver  # read iteration count / solver config after a run
 using QuadratureRules
 import SimpleSolvers
 using LinearAlgebra: SingularException
@@ -35,6 +35,17 @@ elu(x)  = max(zero(x), x) + min(zero(x), exp(x) - one(x))
 gelu(x) = x / 2 * (one(x) + tanh(sqrt(oftype(x, 2 / pi)) *
                                  (x + oftype(x, 0.044715) * x^3)))
 
+# ---- convergence tolerance --------------------------------------------------
+
+# The suite passes no `f_abstol`: the integrator default,
+# `max(8, solversize) * eps(datatype(problem))`, is scaled to the working precision and is
+# merged with the options `run_case` does pass. An absolute tolerance that does not scale
+# with `eps(T)` is unreachable in reduced precision, and a run that cannot meet its
+# tolerance burns its whole iteration budget parked on the right answer — measured on the
+# harmonic oscillator at `Float32`, the entire budget against a single iteration. That is a
+# `maxiter` here, not an `ok`, so getting the tolerance right is what keeps the
+# reduced-precision columns meaningful.
+
 # ---- axis definitions -------------------------------------------------------
 
 const ACTIVATIONS_FULL  = [("relu2", relu_k(2)), ("relu3", relu_k(3)),
@@ -53,7 +64,13 @@ const SOLVERS_FULL = [
     mkstrat("Newton", "StrongWolfe",  () -> SimpleSolvers.Newton(), T -> SimpleSolvers.StrongWolfe(T)),
     mkstrat("DogLeg", "-",            () -> SimpleSolvers.DogLeg(),  nothing),
 ]
-const SOLVERS_QUICK = [SOLVERS_FULL[4]]           # DogLeg only
+# DogLeg and Newton with backtracking. Two strategies rather than one because they diverge
+# in ways the suite exists to compare, and one of them alone leaves a whole precision column
+# uninformative: measured at `Float64` on the harmonic oscillator, DogLeg exhausts the
+# 1000-iteration budget while Newton/Backtracking converges in 767. Selected by label rather
+# than by index so reordering `SOLVERS_FULL` cannot silently change the quick preset.
+const SOLVERS_QUICK = filter(s -> (s.solver, s.linesearch) in
+                                  (("DogLeg", "-"), ("Newton", "Backtracking")), SOLVERS_FULL)
 
 # An initial-guess strategy: the method's `initial_trajectory` field plus whether the
 # integrator also needs `initialguess = HermiteExtrapolation()` (the Hermite branch
@@ -86,9 +103,9 @@ function preset(mode::AbstractString)
                 igs = IGS_FULL, maxit = 10000)
     elseif mode == "quick"
         return (dts = [0.1, 1.0, 10.0], types = [Float64, Float32, Float16],
-                Rs = [8], Ss = [4], activations = ACTIVATIONS_QUICK,
+                Rs = [8], Ss = [8], activations = ACTIVATIONS_QUICK,
                 solvers = SOLVERS_QUICK, lambdas = LAMBDAS_QUICK,
-                igs = IGS_QUICK, maxit = 100)
+                igs = IGS_QUICK, maxit = nothing)
     else
         error("unknown mode $(repr(mode)); use \"quick\" or \"full\"")
     end
@@ -149,16 +166,21 @@ end
 # One integration. Returns (status, ref_err, ham_drift, iters, solve_secs, total_secs).
 # `iters` is the nonlinear-solver iteration count of the final step (read from the
 # solver state); the integrator is built explicitly so we can query that state.
+#
+# `maxit = nothing` leaves the solver's own `max_iterations` in place. The cap that
+# actually applied is then read back off the solver's configuration rather than assumed,
+# which is what the `maxiter` status below compares against.
 function run_case(prob, method, ::Type{T}, ig, strat, λ, maxit, refq, hamfn, params) where {T}
     kw = Pair{Symbol,Any}[:solver => strat.makesolver(),
-                          :regularization_factor => T(λ),
-                          :max_iterations => maxit]
+                          :regularization_factor => T(λ)]
+    maxit === nothing || push!(kw, :max_iterations => maxit)
     strat.makels === nothing || push!(kw, :linesearch => strat.makels(T))
     ig.hermite && push!(kw, :initialguess => HermiteExtrapolation())
 
     status = "ok"; ref_err = NaN; ham_drift = NaN; iters = NaN; solve_secs = NaN; total_secs = NaN
     try
         int = GeometricIntegrator(prob, method; kw...)
+        itcap = SimpleSolvers.config(solver(int)).max_iterations
         local res
         total_secs = @elapsed (res = integrate(int))
         try; iters = Float64(solverstate(int).iterations); catch; end
@@ -169,6 +191,12 @@ function run_case(prob, method, ::Type{T}, ig, strat, λ, maxit, refq, hamfn, pa
             solve_secs = Float64(sum(res.solving_time_list))
             ref_err    = compute_ref_err(res, refq)
             ham_drift  = compute_ham_drift(res, hamfn, params)
+            # A finite result is not a converged one: `integrate` returns a finite state
+            # after exhausting `max_iterations`, and stalls concentrate in the
+            # reduced-precision rows the suite is read for. Accuracy and drift are recorded
+            # above regardless, so a stall can be told apart from a divergence. Same rule as
+            # `scripts/oga_sweep.jl`.
+            (!isnan(iters) && iters ≥ itcap) && (status = "maxiter")
         end
     catch e
         status = classify_error(e)

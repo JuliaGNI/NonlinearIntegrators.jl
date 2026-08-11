@@ -13,9 +13,14 @@ The suite has three goals:
 2. identify issues in the package that are detrimental to performance;
 3. identify robust solver strategies.
 
-There is also a separate, narrower `benchmark/oga_comparison.jl` that compares the two
-OGA initial-guess variants; see the *Orthogonal Greedy Algorithm* page and
-`benchmark/README.md`.
+Three further studies target the OGA initial guess specifically:
+`scripts/oga_fit_study.jl` measures seed quality on its own (no integrator, no Newton
+solve), `scripts/oga_sweep.jl` runs the end-to-end harmonic-oscillator sweep over seed
+variant × precision × regularization factor × activation, and
+`scripts/oga_double_pendulum.jl` repeats a reduced grid on the hardest problem. They live
+under `scripts/` rather than here because they study one component rather than the
+integrator suite, and they are not part of the documentation build. See the *Orthogonal
+Greedy Algorithm* section and `scripts/README.md`.
 
 ## What is swept
 
@@ -38,6 +43,13 @@ The test problems (from
 harmonic oscillator, the pendulum (a degenerate two-component IODE — it has no
 `lodeproblem`), the double pendulum, and the Toda lattice with `N = 16`.
 
+The Toda lattice is currently **excluded from the documentation build**, though
+`benchmark/run_toda_lattice.jl` still runs it on request and `full` still includes it. Its
+network width has not been measured the way the other three now have (see *Network width*
+below), so its residual floors above the convergence target and every `Float64` case runs its
+full iteration budget: about five hours for its quick grid, against seven minutes for the
+other three combined. It returns once a width has been chosen for it.
+
 ## Modes
 
 Each per-problem run file takes a mode — `quick` (default) or `full` — from its first
@@ -47,13 +59,13 @@ command-line argument or from the `GML_BENCH_PRESET` environment variable.
 |---|---|---|
 | `dt` | 0.01, 0.1, 1.0, 10.0 | 0.1, 1.0, 10.0 |
 | precision | Float16, Float32, Float64 | Float64, Float32, Float16 |
-| `R` | 4, 8, 16 | 8 (16 for double pendulum & Toda) |
-| `S` | 4, 6, 8 | 4 (8 for double pendulum & Toda) |
+| `R` | 4, 8, 16 | 8 (16 for double pendulum) |
+| `S` | 4, 6, 8 | per problem: 10 harmonic, 8 pendulum, 10 double pendulum |
 | activation | ReLU², ReLU³, ReLU⁴, ELU, GELU, tanh | GELU, tanh |
 | solver | Newton/{Static, Backtracking, StrongWolfe}, DogLeg | DogLeg |
 | `λ` | 0.0, 1e-7, 1e-5, 1e-3, 16√eps(T) | 16√eps(T) |
 | initial guess | midpoint, Hermite, previous | midpoint |
-| `max_iterations` | 10000 | 100 |
+| `max_iterations` | 10000 | solver default (1000) |
 
 `quick` is roughly 18 cases per problem (seconds to minutes each — the Toda lattice is
 the slowest because of its `N = 16` state and larger network); `full` is on the order of
@@ -66,12 +78,52 @@ large and tends to over-damp half precision; note, however, that at half precisi
 `ReLUᵏ` basis is ill-conditioned and diverges independently of `λ`, whereas `tanh` still
 converges — the accuracy limit there is the precision, not the regularization.
 
+## Network width
+
+`S` is set per problem rather than globally, because it decides the accuracy the ansatz can
+*represent*, and therefore whether the nonlinear solve has a target it can meet at all. A
+network too narrow for the trajectory floors its residual above the convergence tolerance;
+the solve then iterates to its cap without ever getting there, which is a `maxiter` however
+long it is given.
+
+Measured at `Float64`/`tanh`/`DogLeg` over ten steps of `dt = 0.1`, `ref_err` against the
+sweep's own `Gauss(8)` reference:
+
+| `S` | harmonic oscillator | pendulum | double pendulum |
+|---|---|---|---|
+| 2 | 6.4e-05 | 3.5e-01 | 3.4e-04 |
+| 4 | 2.8e-06 | 8.0e-05 | 2.4e-05 |
+| 6 | 1.9e-07 | 1.4e-05 | 1.5e-06 |
+| 8 | 1.9e-11 | **2.9e-07** | 5.9e-08 |
+| 10 | **3.2e-14** | 5.8e-05 | **8.4e-10** |
+| 12 | 4.4e-13 | 1.4e+03 | 9.3e-10 |
+
+Three different shapes, which is why one global value will not do:
+
+- The **harmonic oscillator** improves by eight orders of magnitude from `S = 4` to `S = 10`,
+  and the iteration count collapses with it — 1000 at `S = 4`, 112 at `S = 10`, and **nine**
+  at `S = 12`. Accuracy and cost improve together, because the solve stops chasing a target
+  its ansatz cannot reach.
+- The **pendulum** has a sharp optimum at `S = 8` and then *diverges* — `1.4e+03` at
+  `S = 12`. Its `ϑ` is degenerate (`p₂ = 0`), which leaves the parameter Jacobian singular,
+  and a wider network enlarges that null space. This is the one problem where
+  over-parameterisation is the failure.
+- The **double pendulum** falls monotonically and then flattens: the gain from `S = 10` to
+  `S = 12` is nothing, so `S = 10` is where it stops.
+
+There is a cost at half precision. As `S` grows the harmonic oscillator's `Float16`
+convergence *falls* — 17, then 12, then 9 of 36 cases at `S = 4`, `8`, `10` — because a wider
+network is harder to condition in 11 bits of mantissa. The widths above are chosen for
+`Float64` accuracy, and that choice is paid for in the `Float16` column.
+
 ## Metrics
 
 For each case the suite records:
 
-- **status** — `ok`, or a failure class (`singular`, `diverged`, `nonfinite`, or the
-  short name of any other exception raised);
+- **status** — `ok`, or a failure class: `maxiter` (the nonlinear solve exhausted
+  `max_iterations` — it still returns a finite state, so this is *not* convergence and is
+  counted separately, following the same rule as the OGA studies in `scripts/`),
+  `singular`, `diverged`, `nonfinite`, or the short name of any other exception raised;
 - **`ref_err`** — the relative max-norm error of the final state against a reference,
   which is a `Gauss(8)` integration at `Float64` using the smallest timestep in the
   sweep (over the same 10-step horizon);
@@ -134,9 +186,9 @@ per problem, and failure hot-spots. It embeds the plots:
 The figures on this page are **not committed**: they are regenerated at documentation-build
 time by a fresh `quick` run over the four problems (driven from `docs/make.jl`), so they
 track the current package. The narrative and tables are kept as an illustrative reference
-from one representative run — the numbers are not a fixed reference and may not match the
-freshly generated figures exactly. That run used the `DogLeg` solver, the `midpoint`
-initial guess, and the precision-scaled regularization `λ = 16√eps(T)`.
+from one representative `quick` run — the numbers are not a fixed reference and may not
+match the freshly generated figures exactly. That run used the `DogLeg` solver, the
+`midpoint` initial guess, and the precision-scaled regularization `λ = 16√eps(T)`.
 
 Results are organised as a summary across all problems followed by one section per problem
 (harmonic oscillator, pendulum, double pendulum, Toda lattice). The summary scatters are
@@ -145,14 +197,26 @@ precision.
 
 ### Summary across all problems
 
-Across the four problems (72 cases in the representative run), 48 converged. Convergence is
-dominated by precision: half precision is by far the least robust.
+Across the three problems (108 cases in the representative run), 53 met the solver's
+convergence criterion and a further 17 produced a finite trajectory without meeting it
+(`maxiter`). The two are counted separately, and the medians below are over all 70 runs that
+produced a trajectory, since a stalled run's accuracy is still measured.
 
-| precision | cases | converged | success | median `ref_err` | median `ham_drift` |
-|---|---|---|---|---|---|
-| Float16 | 24 | 5 | 21% | 7.15e-03 | 7.81e-03 |
-| Float32 | 24 | 21 | 88% | 1.90e-04 | 1.04e-04 |
-| Float64 | 24 | 22 | 92% | 2.22e-04 | 1.67e-04 |
+| precision | cases | converged | success | measured | median `ref_err` | median `ham_drift` | median `iter` |
+|---|---|---|---|---|---|---|---|
+| Float16 | 36 | 9 | 25% | 9 | 1.07e-02 | 2.14e-02 | 2 |
+| Float32 | 36 | 29 | 81% | 29 | 4.88e-06 | 2.05e-05 | 6 |
+| Float64 | 36 | 15 | 42% | 32 | 5.22e-07 | 2.38e-06 | 1000 |
+
+`Float32` is the most reliable column and `Float64` the most accurate — a distinction worth
+keeping separate. `Float64` is judged against `f_abstol = max(8, solversize)·eps(T)` ≈ 1.8e-15,
+which is a demanding target; where it is not met the run still integrates, and the median
+`ref_err` of 5.2e-07 against `Float32`'s 4.9e-06 shows those runs are an order of magnitude
+*more* accurate than the ones that converged. The median iteration count of 1000 in that
+column is the flip side: reaching 1.8e-15 takes the whole budget when it is reachable at all.
+`Float16` converges in a couple of iterations because its tolerance is 0.0078, and its
+accuracy is correspondingly the worst by four orders of magnitude. Success rate and accuracy
+are answering different questions.
 
 Success rate broken down by problem, by solver strategy, and by solver × precision:
 
@@ -163,9 +227,10 @@ Success rate broken down by problem, by solver strategy, and by solver × precis
 ![Convergence success rate by solver and precision](figures/onelayer_gml_benchmark_convergence_heatmap.png)
 
 Accuracy, energy drift, run time and nonlinear-iteration counts versus the timestep, with
-all four problems overlaid and **coloured by problem** (each dot is one converged case).
-Accuracy and energy conservation degrade sharply as the timestep grows; at `dt = 10` the
-10-step horizon is far too coarse and the relative error is `O(1)`.
+all four problems overlaid and **coloured by problem** (each dot is one case that produced a
+trajectory, `ok` or `maxiter`). Accuracy and energy conservation degrade sharply as the
+timestep grows; at `dt = 10` the 10-step horizon is far too coarse and the relative error is
+`O(1)`.
 
 ![Accuracy versus timestep](figures/onelayer_gml_benchmark_accuracy_vs_dt.png)
 
@@ -175,24 +240,28 @@ Accuracy and energy conservation degrade sharply as the timestep grows; at `dt =
 
 ![Nonlinear iterations versus timestep](figures/onelayer_gml_benchmark_iterations_vs_dt.png)
 
-The best (lowest `ref_err`) converged configuration found for each problem:
+The most accurate (lowest `ref_err`) configuration found for each problem, over the runs
+that produced a trajectory:
 
-| problem | best `ref_err` | T | dt | network | iguess / λ |
-|---|---|---|---|---|---|
-| harmonic\_oscillator | 3.77e-13 | Float64 | 0.1 | R8 S4 ReLU³ | midpoint, λ=2.4e-7 |
-| pendulum | 1.03e-07 | Float64 | 0.1 | R8 S4 ReLU³ | midpoint, λ=2.4e-7 |
-| double\_pendulum | 1.28e-07 | Float64 | 0.1 | R16 S8 tanh | midpoint, λ=2.4e-7 |
-| toda\_lattice | 1.55e-08 | Float64 | 0.1 | R16 S8 tanh | midpoint, λ=2.4e-7 |
+| problem | best `ref_err` | T | dt | network | solver | iguess / λ |
+|---|---|---|---|---|---|---|
+| harmonic\_oscillator | 3.42e-14 | Float64 | 0.1 | R8 S10 tanh | DogLeg | midpoint, λ=2.4e-7 |
+| pendulum | 1.77e-08 | Float64 | 0.1 | R8 S8 gelu | DogLeg | midpoint, λ=2.4e-7 |
+| double\_pendulum | 8.36e-10 | Float64 | 0.1 | R16 S10 tanh | DogLeg | midpoint, λ=2.4e-7 |
 
-The failures concentrate at half precision (across all timesteps) and at the largest
-timestep `dt = 10` (across all precisions) — consistent with the accuracy plot.
+All three peak at `Float64` and the smallest timestep, as expected. The `quick` preset sweeps
+only `gelu` and `tanh`; the `ReLUᵏ` powers are in `full`. Outright failures — as opposed to
+`maxiter` — concentrate at half precision and at the largest timestep `dt = 10`, consistent
+with the accuracy plot.
 
 ### Harmonic oscillator
 
-The simplest test problem: a single linear oscillator. It reaches the best accuracy of the
-four (`ref_err` down to `O(1e-13)` at `dt = 0.1`, Float64), and the precision split is the
-clearest — Float64 and Float32 track each other closely while Float16 is limited by the
-working precision. Each dot below is a converged case, coloured by precision.
+The simplest test problem: a single linear oscillator, and the most reliable of the three
+(27 of 36 converged in the representative `quick` run). With `S = 10` it is also the most
+accurate, reaching `ref_err = 3.4e-14` at `dt = 0.1` in `Float64` — and it gets there in ~100
+iterations rather than exhausting the budget, because the ansatz can represent the trajectory
+to below the convergence tolerance. Each dot below is a case that produced a trajectory,
+coloured by precision.
 
 ![Accuracy versus timestep — harmonic oscillator](figures/harmonic_oscillator_quick_accuracy_vs_dt.png)
 
@@ -207,8 +276,11 @@ working precision. Each dot below is a converged case, coloured by precision.
 ### Pendulum
 
 A *degenerate* two-component IODE (`ϑ`: `p₁ = ml²q₂`, `p₂ = 0`; it has no `lodeproblem`),
-included deliberately to stress the nonlinear solve. It is nonlinear and less accurate than
-the harmonic oscillator, and its half-precision cases are the most fragile.
+included deliberately to stress the nonlinear solve — and the one problem whose accuracy gets
+*worse* with a wider network, since the degeneracy leaves the parameter Jacobian singular (see
+*Network width*). At its measured optimum `S = 8` it reaches `ref_err = 1.8e-08` at
+`dt = 0.1`, six orders better than the harmonic oscillator's floor but three worse than the
+oscillator's own optimum.
 
 ![Accuracy versus timestep — pendulum](figures/pendulum_quick_accuracy_vs_dt.png)
 
@@ -222,8 +294,10 @@ the harmonic oscillator, and its half-precision cases are the most fragile.
 
 ### Double pendulum
 
-A four-dimensional chaotic system. Quick mode uses a larger network (`R = 16`, `S = 8`)
-than the two simple problems; `tanh` gives the best accuracy here.
+A four-dimensional chaotic system, and the hardest of the three: it accounts for every
+`singular` case in the representative run and has the lowest convergence rate (9 of 36).
+Quick mode uses a larger quadrature order and network (`R = 16`, `S = 10`) than the two simple
+problems; `tanh` gives the best accuracy here, `ref_err = 8.4e-10` at `dt = 0.1` in Float64.
 
 ![Accuracy versus timestep — double pendulum](figures/double_pendulum_quick_accuracy_vs_dt.png)
 
@@ -237,19 +311,24 @@ than the two simple problems; `tanh` gives the best accuracy here.
 
 ### Toda lattice (N = 16)
 
-The largest problem, with a 16-dimensional state and a correspondingly larger network
-(`R = 16`, `S = 8` in quick mode). It is the slowest to run — its run-time scatter sits
-above the other three problems in the summary.
+The largest problem, with a 16-dimensional state and a correspondingly larger network. It is
+**not part of the documentation build**, so no figures are generated for it here.
 
-![Accuracy versus timestep — Toda lattice](figures/toda_lattice_quick_accuracy_vs_dt.png)
+Its network width has not been measured the way the other three have, and the consequence is
+not merely a slower run: with a width too narrow for the trajectory, the residual floors above
+the convergence tolerance and every `Float64` case exhausts its iteration budget. That puts its
+quick grid at roughly five hours against seven minutes for the other three combined, which is
+why it is excluded rather than capped — an iteration cap would hide the cause instead of fixing
+it.
 
-![Energy drift versus timestep — Toda lattice](figures/toda_lattice_quick_energy_drift_vs_dt.png)
+To run it:
 
-![Run time versus timestep — Toda lattice](figures/toda_lattice_quick_runtime_vs_dt.png)
+```
+julia --project=benchmark benchmark/run_toda_lattice.jl quick
+```
 
-![Nonlinear iterations versus timestep — Toda lattice](figures/toda_lattice_quick_iterations_vs_dt.png)
-
-![Convergence heatmap — Toda lattice](figures/toda_lattice_quick_convergence_heatmap.png)
+It is also included in `full`. Once a width has been chosen for it — the same measurement as
+in *Network width* above — it returns to this page.
 
 ## Extending
 

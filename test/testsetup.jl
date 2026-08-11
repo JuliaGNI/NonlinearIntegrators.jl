@@ -15,9 +15,14 @@ using GeometricIntegratorsBase
 using GeometricProblems.HarmonicOscillator
 using GeometricSolutions: relative_maximum_error
 using LinearAlgebra: SingularException
+using SimpleSolvers: NonlinearSolverException
 using Symbolics: @variables
 
 const TEST_TYPES = (Float64, Float32)
+
+# Shorthand for reaching internals that are deliberately not exported (the OGA kernels,
+# the quadrature helper). Defined here so every test file can rely on it.
+const NI = NonlinearIntegrators
 
 # Type-generic ReLU^k activation: `max(zero(x), x)^k`, never `max(0.0, x)`, so the
 # network is evaluated at the working precision rather than silently upcasting.
@@ -58,14 +63,13 @@ end
 # per time step); its final entry must retain the working element type `T`.
 assert_no_upcast(q, ::Type{T}) where {T} = @test eltype(q[end]) == T
 
-# Run a thunk that performs an integration which may legitimately fail to converge
-# at reduced precision (near-singular Newton system). Returns the result, or
-# `nothing` if the solve was singular. Any other error propagates.
-function try_integrate(f)
-    try
-        return f()
-    catch e
-        e isa SingularException && return nothing
-        rethrow()
-    end
-end
+# The two ways a nonlinear solve is allowed to give up: `SingularException` (a factorisation
+# hit a zero pivot) and `NonlinearSolverException` (the Newton direction came back
+# non-finite). Half precision usually reaches the latter, since `oga_solve` guarantees the
+# seed itself is finite at every precision.
+#
+# Used only by the `Float16` regression test, which asserts a failure there is one of these
+# rather than a new class. `TEST_TYPES` stops at `Float32`, where these problems are well
+# conditioned on every platform, so every other integration calls `integrate` directly and a
+# give-up is a real failure.
+const SOLVER_GAVE_UP = Union{SingularException,NonlinearSolverException}

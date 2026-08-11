@@ -32,6 +32,15 @@ struct Time_reversible_OneLayer{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Integrat
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = basis.S
 
+        # The ansatz pairs every neuron with its reflection about t = 1/2 and stores only
+        # the independent half, so `S` must be even. Caught here rather than in
+        # `components!`, where `Int(S/2)` would throw an `InexactError` several call levels
+        # from the basis that caused it.
+        iseven(NBASIS) || throw(ArgumentError(
+            "Time_reversible_OneLayer requires a basis with an even number of neurons, " *
+            "got S = $NBASIS. Neurons come in mirrored pairs and only the S/2 independent " *
+            "hidden parameters are stored in the nonlinear solution vector."))
+
         # get quadrature nodes and weights
         quad_weights = QuadratureRules.weights(quadrature)
         quad_nodes = QuadratureRules.nodes(quadrature)
@@ -195,7 +204,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
         print(network_labels')
     end
 
-    initial_params!(int, initial_guess_method)
+    initial_params!(int, initial_guess_method, sol)
 end
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}, initial_trajectory::HermiteExtrapolation)
@@ -257,103 +266,6 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Ti
     end
 end
 
-
-function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, InitialParams::OGA1d)
-    local S = nbasis(method(int))
-    local D = length(cache(int).q̃)
-    local quad_nodes = method(int).network_inputs
-    local NN = method(int).basis.NN
-    local ps = cache(int).ps
-    local network_labels = cache(int).network_labels'
-    local activation = method(int).basis.activation
-    local x = nlsolution(int)
-    local show_status = method(int).show_status
-    local nstages = method(int).nstages
-    local bias_interval = method(int).bias_interval
-    local dict_amount = method(int).dict_amount
-
-    # Working-precision, GPU-portable OGA seed (see NonLinear_OneLayer_GML for the
-    # rationale): the dictionary and the weighted least-squares fit are assembled in
-    # T, the fit uses a QR solve with a precision-scaled Tikhonov fallback, and a
-    # coherence guard keeps the selected atoms independent. Neurons are added in
-    # time-symmetric pairs (w, b) and (−w, w + b).
-    local T = eltype(x)
-
-    quad_weights = simpson_quadrature(nstages, T)
-
-    B = bias_grid(bias_interval[1], bias_interval[2], dict_amount, T)
-    A = hcat(vcat(-ones(T, length(B)), ones(T, length(B))), vcat(B, B))
-    nodes = vec(T.(quad_nodes))
-    quad_nodes_mat = permutedims(hcat(nodes, ones(T, length(nodes))))   # (2 × M)
-    gx_quad = activation.(A * quad_nodes_mat)
-
-    dict_norms = sqrt.(gx_quad .^ 2 * quad_weights)
-    gx_normed = gx_quad ./ ifelse.(dict_norms .< oga_norm_floor(T, maximum(dict_norms)), one(T), dict_norms)
-    coherence_cap = one(T) - sqrt(eps(T))
-
-    for d in 1:D
-        ps[d][1].W .= zero(T)
-        ps[d][1].b .= zero(T)
-        ps[d][2].W .= zero(T)
-
-        W = zeros(T, S)         # hidden weights
-        Bias = zeros(T, S)      # hidden biases
-        C = zeros(T, S, length(nodes))
-        blocked = falses(length(dict_norms))
-        label = network_labels[d, :]
-
-        for k = 1:S÷2
-            # Greedy step on the raw inner product with the current residual,
-            # skipping atoms too coherent with those already selected.
-            residual = label .- vec(NN(quad_nodes, ps[d]))
-            score = ifelse.(blocked, -one(T), abs.(gx_quad * (residual .* quad_weights)))
-            best = argmax(score)
-
-            w0 = A[best, 1]
-            b0 = A[best, 2]
-            W[2k-1] = w0
-            Bias[2k-1] = b0
-            W[2k] = -w0
-            Bias[2k] = w0 + b0
-
-            C[2k-1, :] = hcat(W[2k-1], Bias[2k-1]) * quad_nodes_mat
-            C[2k, :]   = hcat(W[2k],   Bias[2k])   * quad_nodes_mat
-            selected_g = activation.(C[1:2k, :])
-
-            # Orthogonal projection over all selected (paired) atoms via weighted QR.
-            xk = weighted_lstsq(selected_g, quad_weights, label)
-
-            ps[d][1].W .= W
-            ps[d][1].b .= Bias
-            ps[d][2].W[1:2k] .= xk
-
-            coh = gx_normed * (gx_normed[best, :] .* quad_weights)
-            blocked .|= abs.(coh) .> coherence_cap
-
-            if show_status
-                errs = sum((label .- vec(NN(quad_nodes, ps[d]))) .^ 2)
-                println("Dimension $d, pair $k, OGA residual error: $errs")
-            end
-        end
-        show_status ? println("Finish OGA for dimension $d") : nothing
-    end
-
-    for k in 1:D
-        for i in 1:S
-            x[D*(i-1)+k] = ps[k][2].W[i]
-        end
-
-        for i in 1:Int(S/2)
-            x[Int(D*(S+1)+D*(i-1)+k)] = ps[k][1].W[Int(2i-1)]
-            x[Int(D*(S+1+S/2)+D*(i-1)+k)] = ps[k][1].b[Int(2i-1)]
-        end
-    end
-
-    # st = st_tem[1]
-    show_status ? print("\n initial guess for DOF from OGA  ") : nothing
-    show_status ? print("\n ", x) : nothing
-
-end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}) where {ST}
     local D = length(cache(int).q̃)

@@ -20,7 +20,7 @@ struct Hardcode_int{T,NBASIS,NNODES,basisType<:Basis{T},ET<:IntegratorExtrapolat
     function Hardcode_int(basis::Basis{T}, quadrature::QuadratureRule{T};
         nstages::Int=10, show_status::Bool=true, training_epochs::Int=50000, use_hamiltonian_loss::Bool=true,
         initial_trajectory::ET=IntegratorExtrapolation(),
-        initial_guess_method::IPMT=OGA1d(),
+        initial_guess_method::IPMT=OGA1dNormalized(),
         bias_interval=[-pi, pi], dict_amount=50000) where {T,ET,IPMT}
         # get number of quadrature nodes and number of basis functions
         # initial_trajectory_list = subtypes(Extrapolation)
@@ -58,7 +58,10 @@ issymplectic(::Union{Hardcode_int,Type{<:Hardcode_int}}) = missing
 
 default_solver(::Hardcode_int) = Newton()
 default_iguess(::Hardcode_int) = IntegratorExtrapolation()#CoupledHarmonicOscillator
-default_iparams(::Hardcode_int) = OGA1d()
+# Alone among the four integrators, this one's greedy step selects on the *normalized*
+# inner product. The rule decides which neurons are picked and hence which Newton basin the
+# step lands in, so it is a tuned baseline rather than a free choice.
+default_iparams(::Hardcode_int) = OGA1dNormalized()
 # default_iguess_integrator(::Hardcode_int) =  CGVI(Lagrange(QuadratureRules.nodes(QuadratureRules.GaussLegendreQuadrature(4))),QuadratureRules.GaussLegendreQuadrature(4))
 
 default_iguess_integrator(::Hardcode_int) = ImplicitMidpoint()
@@ -282,108 +285,6 @@ VNN_anstaz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_ansta
 
 ∂VNN_anstaz_∂q̄(ps,S,activation,t,q̄,q)= -one(t)
 ∂VNN_anstaz_∂q(ps,S,activation,t,q̄,q) = one(t)
-
-function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, InitialParams::OGA1d, sol)
-    local S = nbasis(method(int))
-    local D = length(cache(int).q̃)
-    local quad_nodes = method(int).network_inputs # Assumed to be a 1x(nstages+1) row vector
-    local NN = method(int).basis.NN
-    local ps = cache(int).ps
-    local network_labels = cache(int).network_labels' # (D x nstages+1)
-    local activation = method(int).basis.activation
-    local x = nlsolution(int)
-    local show_status = method(int).show_status
-    local nstages = method(int).nstages
-    local bias_interval = method(int).bias_interval
-    local dict_amount = method(int).dict_amount
-    local q_start = sol.q # Starting point q_n
-
-    # NOTE: this OGA greedy fit only produces a *seed* for the nonlinear (Newton)
-    # solve. It is deliberately assembled in the default (Float64) precision for
-    # numerical robustness; the resulting parameters are stored into the
-    # working-precision cache and the integrator equations + Newton solve run at
-    # the working precision T. (Same rationale as NonLinear_OneLayer_GML.)
-
-    # 1. Prepare quadrature weights and Ansatz factors (working precision T; the
-    #    whole seed is now assembled in T rather than a Float64 island).
-    local T = eltype(x)
-    local t_vec = T.(quad_nodes[:])
-    local quad_weights = simpson_quadrature(nstages, T)
-    local t_factor = t_vec .* (one(T) .- t_vec) # Core: t(1-t) in the Ansatz
-
-    # 2. Construct "weighted" basis function dictionary (Weighted Dictionary)
-    # Each row represents a basis function: g_i(t) = t(1-t) * σ(wt + b), with
-    # weights ±1 over a uniform bias grid (built without the Float16 range trap).
-    B = bias_grid(bias_interval[1], bias_interval[2], dict_amount, T)
-    A_dict = hcat(vcat(-ones(T, length(B)), ones(T, length(B))), vcat(B, B))
-    nodes_mat = permutedims(hcat(t_vec, ones(T, length(t_vec))))    # (2 × M)
-    gx_quad = activation.(A_dict * nodes_mat) .* t_factor'          # (dict × M)
-
-    # Normalize dictionary to improve search stability; the floor scales with
-    # sqrt(eps(T)) (replaces the hard-coded 1e-12, which never fired below Float32).
-    dict_norms = sqrt.((gx_quad .^ 2) * quad_weights)
-    gx_quad_normed = gx_quad ./ ifelse.(dict_norms .< oga_norm_floor(T, maximum(dict_norms)), one(T), dict_norms)
-
-    for d in 1:D
-        # 3. Compute fitting target: reference trajectory minus linear part
-        # Since Ansatz is q_h = linear + t(1-t)NN, NN should fit the (q_label - linear) part
-        q_end_guess = network_labels[d, end] # Use the endpoint estimate from initial value integrator
-        f_target = network_labels[d, :] .- ((one(T) .- t_vec) .* q_start[d] .+ t_vec .* q_end_guess)
-
-        f_res = copy(f_target)
-        W1 = zeros(T, S)
-        b1 = zeros(T, S)
-        selected_g = zeros(T, S, length(t_vec))
-        selected_indices = Int[]
-
-        for k = 1:S
-            # 4. Greedy selection: find the neuron most consistent with current residual direction
-            projections = gx_quad_normed * (f_res .* quad_weights)
-
-            for idx in selected_indices
-                projections[idx] = zero(T) # Avoid reselection
-            end
-
-            best_idx = argmax(abs.(projections))
-            push!(selected_indices, best_idx)
-
-            W1[k] = A_dict[best_idx, 1]
-            b1[k] = A_dict[best_idx, 2]
-            selected_g[k, :] = gx_quad[best_idx, :]
-
-            # 5. Orthogonal projection to solve output weights W2 by weighted QR
-            #    least squares (replaces the (Gk + 1e-12·I) \\ rhs normal equations);
-            #    Phi already includes the t(1-t) factor.
-            W2_k = weighted_lstsq(selected_g[1:k, :], quad_weights, f_target)
-
-            # Update residual
-            f_res = f_target .- vec(W2_k' * selected_g[1:k, :])
-
-            # Write to temporary parameter structure
-            ps[d][1].W .= W1
-            ps[d][1].b .= b1
-            ps[d][2].W[1:k] .= W2_k
-        end
-
-        show_status ? println("Finish OGA for dimension $d, residual MSE: $(sum(f_res .^ 2))") : nothing
-    end
-
-
-    for k in 1:D
-        for i in 1:S
-            x[D*(i-1)+k] = ps[k][2].W[i]
-        end
-
-        x[D*S+k] = cache(int).q̃[k]
-
-        for i in 1:S
-            x[D*(S+1)+D*(i-1)+k] = ps[k][1].W[i]
-            x[D*(S+1+S)+D*(i-1)+k] = ps[k][1].b[i]
-        end
-    end
-
-    show_status ? println("Initial guess x for Newton solver updated via OGA.") : nothing
-end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Hardcode_int}) where {ST}
     local D = length(cache(int).q̃)

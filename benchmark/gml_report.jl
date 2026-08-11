@@ -44,7 +44,15 @@ read_results(path::AbstractString) = read_results([path])
 # ---- helpers ----------------------------------------------------------------
 
 strategy_label(r) = r.solver == "DogLeg" ? "DogLeg" : "$(r.solver)/$(r.linesearch)"
+
+# Two different questions, so two predicates. `is_ok`: did the solve meet its convergence
+# criterion — what the success rates count. `has_metrics`: did the run produce a trajectory
+# worth measuring — a `maxiter` run met no tolerance but still integrated ten steps, and its
+# accuracy, drift and timing are real. Dropping those from the accuracy plots would discard
+# the reduced-precision cases the page exists to compare; counting them as `ok` would
+# overstate convergence.
 is_ok(r) = r.status == "ok"
+has_metrics(r) = r.status == "ok" || r.status == "maxiter"
 
 # Group rows by a key function, returning key => Vector{row} with keys sorted.
 function groupby(rows, keyfn)
@@ -60,12 +68,14 @@ _median_finite(xs) = (v = filter(isfinite, xs); isempty(v) ? NaN : median(v))
 # A one-line summary of a group of rows.
 function group_stats(rows)
     n = length(rows); ok = count(is_ok, rows)
-    okrows = filter(is_ok, rows)
-    (n = n, ok = ok, frac = n == 0 ? 0.0 : ok / n,
-     med_ref  = _median_finite([r.ref_err   for r in okrows]),
-     med_ham  = _median_finite([r.ham_drift for r in okrows]),
-     med_iter = _median_finite([r.iterations for r in okrows]),
-     med_secs = _median_finite([r.solve_secs for r in okrows]))
+    # Counts are convergence; medians are over every run that produced a trajectory, so a
+    # group whose runs all stalled still reports the accuracy it reached.
+    mrows = filter(has_metrics, rows)
+    (n = n, ok = ok, frac = n == 0 ? 0.0 : ok / n, measured = length(mrows),
+     med_ref  = _median_finite([r.ref_err   for r in mrows]),
+     med_ham  = _median_finite([r.ham_drift for r in mrows]),
+     med_iter = _median_finite([r.iterations for r in mrows]),
+     med_secs = _median_finite([r.solve_secs for r in mrows]))
 end
 
 fmt_pct(x)  = @sprintf("%.0f%%", 100x)
@@ -124,13 +134,14 @@ end
 # x-jitter per series so overlapping points at the same dt stay distinguishable).
 # `colorby` selects the series field: `:T` (precision — the default, used by per-problem
 # reports) or `:problem` (used by the combined report so the four problems stay
-# distinguishable). Each dot is one converged case; the spread at a given dt reflects the
-# remaining swept axes (activation, R, S, solver, λ, initial guess).
+# distinguishable). Each dot is one case that produced a trajectory (`ok` or `maxiter` —
+# see `has_metrics`); the spread at a given dt reflects the remaining swept axes
+# (activation, R, S, solver, λ, initial guess).
 function plot_metric_vs_dt(rows, field, ylabel, title, path;
                            ylog = true, colorby = :T, colortitle = "Precision")
     getv(r) = Float64(getproperty(r, field))
     data = [(r.dt, getv(r), string(getproperty(r, colorby))) for r in rows
-            if is_ok(r) && isfinite(getv(r)) && isfinite(r.dt) && (!ylog || getv(r) > 0)]
+            if has_metrics(r) && isfinite(getv(r)) && isfinite(r.dt) && (!ylog || getv(r) > 0)]
     isempty(data) && return false
     series = sort(unique(s for (_, _, s) in data))
     palette = Makie.wong_colors()
@@ -165,19 +176,24 @@ end
 
 function _stats_table(io, rows, keyfn, colname)
     groups = groupby(rows, keyfn)
-    cells = [[string(k), string(s.n), string(s.ok), fmt_pct(s.frac),
+    cells = [[string(k), string(s.n), string(s.ok), fmt_pct(s.frac), string(s.measured),
               fmt_sci(s.med_ref), fmt_sci(s.med_ham), fmt_iter(s.med_iter), fmt_secs(s.med_secs)]
              for (k, v) in groups for s in (group_stats(v),)]
-    _table(io, [colname, "n", "ok", "success", "med ref_err", "med ham_drift", "med iter", "med solve_s"], cells)
+    # `ok` counts convergence; `measured` counts runs that produced a trajectory (`ok` plus
+    # `maxiter`), which is the set the medians are taken over.
+    _table(io, [colname, "n", "ok", "success", "measured", "med ref_err", "med ham_drift",
+                "med iter", "med solve_s"], cells)
 end
 
-# Best (lowest ref_err among converged) configuration per problem.
+# Best (lowest ref_err among runs that produced a trajectory) configuration per problem.
+# Not restricted to converged runs: a stalled run's accuracy is still measured, and at
+# reduced precision it is often the only accuracy there is.
 function _best_configs(io, rows)
     rowsout = Vector{Vector{String}}()
     for (prob, v) in groupby(rows, r -> r.problem)
-        cand = [r for r in v if is_ok(r) && isfinite(r.ref_err)]
+        cand = [r for r in v if has_metrics(r) && isfinite(r.ref_err)]
         if isempty(cand)
-            push!(rowsout, [string(prob), "— no converged run with a finite reference error —", "", "", "", "", ""])
+            push!(rowsout, [string(prob), "— no run with a finite reference error —", "", "", "", "", ""])
             continue
         end
         b = cand[argmin([r.ref_err for r in cand])]
@@ -241,7 +257,12 @@ function write_report(rows; title, mode, outdir, prefix)
     open(md, "w") do io
         println(io, "# $(title)\n")
         println(io, "*Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")) — mode `$(mode)`.*\n")
+        nmeas = count(has_metrics, rows)
         println(io, "- Total cases: **$(ntot)**  •  converged (`ok`): **$(nok)** ($(fmt_pct(ntot == 0 ? 0.0 : nok/ntot)))")
+        println(io, "  •  produced a trajectory (`ok` + `maxiter`): **$(nmeas)**. A `maxiter` run")
+        println(io, "  exhausted `max_iterations` without meeting the residual tolerance; it is *not*")
+        println(io, "  counted as converged, but its accuracy, drift and timing are measured and are")
+        println(io, "  what the medians and the scatter plots below are taken over.")
         println(io, "- Each case integrates **10 steps**. `ref_err` is the relative max-norm error")
         println(io, "  of the final state vs a `Gauss(8)` / Float64 reference at the smallest timestep;")
         println(io, "  `ham_drift` is the max relative Hamiltonian drift; `iter` is the nonlinear-solver")
@@ -273,7 +294,8 @@ function write_report(rows; title, mode, outdir, prefix)
         end
 
         println(io, "## Performance metrics vs timestep\n")
-        println(io, "Each dot is one converged case, coloured by precision (small x-jitter per")
+        println(io, "Each dot is one case that produced a trajectory (`ok` or `maxiter`),")
+        println(io, "coloured by precision (small x-jitter per")
         println(io, "precision keeps overlapping points visible).\n")
         have_acc    && println(io, "![accuracy]($(p_acc))\n")
         have_energy && println(io, "![energy drift]($(p_energy))\n")

@@ -32,6 +32,13 @@ struct Time_Reversible_Hardcode{T,NBASIS,NNODES,basisType<:Basis{T},ET<:Integrat
         NNODES = QuadratureRules.nnodes(quadrature)
         NBASIS = basis.S
 
+        # See `Time_reversible_OneLayer`: mirrored pairs, only the independent half stored.
+        iseven(NBASIS) || throw(ArgumentError(
+            "Time_Reversible_Hardcode requires a basis with an even number of neurons, " *
+            "got S = $NBASIS. Neurons come in mirrored pairs sharing one output weight, " *
+            "and only the S/2 independent hidden parameters are stored in the nonlinear " *
+            "solution vector."))
+
         # get quadrature nodes and weights
         quad_weights = QuadratureRules.weights(quadrature)
         quad_nodes = QuadratureRules.nodes(quadrature)
@@ -280,116 +287,6 @@ end
 
 # ∂VNN_anstaz_∂q̄(ps,S,activation,t,q̄,q)= -1.0
 # ∂VNN_anstaz_∂q(ps,S,activation,t,q̄,q) = 1.0
-
-function initial_params!(int::GeometricIntegrator{<:Time_Reversible_Hardcode}, InitialParams::OGA1d, sol)
-    local S = nbasis(method(int))
-    local D = length(cache(int).q̃)
-    local quad_nodes = method(int).network_inputs # 0:0.1:1 (1x11)
-    local NN = method(int).basis.NN
-    local ps = cache(int).ps
-    local network_labels = cache(int).network_labels' # (D x 11)
-    local activation = method(int).basis.activation
-    local x = nlsolution(int)
-    local show_status = method(int).show_status
-    local nstages = method(int).nstages
-    local bias_interval = method(int).bias_interval
-    local dict_amount = method(int).dict_amount
-    local q̄ = sol.q  # 起点 q_n
-    local q̃ = cache(int).q̃ # 终点估计 q_{n+1}
-
-
-    # 1. Quadrature weights and Ansatz factors (working precision T; the seed is
-    #    assembled in T rather than a Float64 island).
-    local T = eltype(x)
-    local t_vec = T.(quad_nodes[:])
-    local quad_weights = simpson_quadrature(nstages, T)
-    local t_factor = t_vec .* (one(T) .- t_vec) # t(1-t) factor in the Ansatz
-
-    # 2. Symmetric dictionary  g_i(t) = t(1-t)·[σ(w t + b) + σ(w(1-t) + b)]  (w = 1;
-    #    symmetry is guaranteed by the formula). Bias grid built without the Float16
-    #    range trap.
-    B = bias_grid(bias_interval[1], bias_interval[2], dict_amount, T)
-    A_dict = hcat(ones(T, length(B)), B)
-    gx_quad_sym = zeros(T, length(B), length(t_vec))
-    for i in axes(A_dict, 1)
-        w, b = A_dict[i, 1], A_dict[i, 2]
-        val = activation.(w .* t_vec .+ b) .+ activation.(-w .* t_vec .+ (w + b))
-        gx_quad_sym[i, :] = t_factor .* val
-    end
-
-    for d in 1:D
-        # 3. Fit target: reference trajectory minus the linear part
-        #    f_target = q_label(t) - [(1-t)q_n + t·q_{n+1}]
-        f_target = network_labels[d, :] .- ((one(T) .- t_vec) .* q̄[d] .+ t_vec .* q̃[d])
-
-        W = zeros(T, S)
-        Bias = zeros(T, S)
-        selected_indices = Int[]
-        xk_low = zeros(T, 0)
-
-        # OGA loop: one symmetric neuron pair per iteration.
-        for k = 1:S÷2
-            current_residual = isempty(selected_indices) ? f_target :
-                f_target .- vec(gx_quad_sym[selected_indices, :]' * xk_low)
-            projections = (gx_quad_sym * (current_residual .* quad_weights)) .^ 2
-
-            for idx in selected_indices
-                projections[idx] = -one(T) # avoid reselection
-            end
-
-            best_idx = argmax(projections)
-            push!(selected_indices, best_idx)
-
-            W[2k-1] = A_dict[best_idx, 1]
-            Bias[2k-1] = A_dict[best_idx, 2]
-            W[2k] = -W[2k-1]
-            Bias[2k] = W[2k-1] + Bias[2k-1]
-
-            # 4. Refit the (shared) pair weights by weighted QR least squares
-            #    (replaces the (Gk + 1e-14·I) \\ rhs normal equations).
-            selected_g = gx_quad_sym[selected_indices, :]
-            xk_low = weighted_lstsq(selected_g, quad_weights, f_target)
-
-            # Each pair shares one output weight to preserve time-reversal symmetry.
-            ps[d][1].W .= W
-            ps[d][1].b .= Bias
-            for j in 1:k
-                ps[d][2].W[2j-1] = xk_low[j]
-                ps[d][2].W[2j] = xk_low[j]
-            end
-
-            if show_status
-                errs = sum((f_target .- vec(selected_g' * xk_low)) .^ 2)
-                println("Dimension $d, Pair $k, Current OGA Residual Error: $errs")
-            end
-        end
-        show_status ? println("Finish OGA for dimension $d") : nothing
-    end
-
-    # 5. 将结果映射回非线性求解器的初始向量 x
-    # 布局必须与 components! 严格一致
-    for k in 1:D
-        # 终点 q_{n+1}
-        x[D*S+k] = q̃[k]
-
-        # 输出层权重 W2
-        for i in 1:S
-            x[D*(i-1)+k] = ps[k][2].W[i]
-        end
-
-        # 隐藏层 W1, b (只映射独立的部分，即 2i-1)
-        for i in 1:Int(S/2)
-            idx_W1 = Int(D*(S+1)+D*(i-1)+k)
-            idx_b  = Int(D*(S+1+S/2)+D*(i-1)+k)
-            x[idx_W1] = ps[k][1].W[2i-1]
-            x[idx_b]  = ps[k][1].b[2i-1]
-        end
-    end
-
-    if show_status
-        println("Initial guess for DOF from OGA successfully computed.")
-    end
-end
 
 function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}) where {ST}
     local D = length(cache(int).q̃)

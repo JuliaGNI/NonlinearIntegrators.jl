@@ -20,7 +20,13 @@ function generate_benchmark_figures()
     mkpath(figdir)
     julia = Base.julia_cmd()
 
-    problems = ["harmonic_oscillator", "pendulum", "double_pendulum", "toda_lattice"]
+    # The Toda lattice is deliberately absent. Its quick sweep costs about five hours against
+    # seven minutes for the other three combined, because every `Float64` case runs its full
+    # iteration budget: the network width has not been chosen for it the way it now has for
+    # the others (see the `Ss` override in each `run_*.jl`), so its residual floors above the
+    # convergence target and the solve iterates to the cap. `benchmark/run_toda_lattice.jl`
+    # still works and is included in `full`; it returns here once the width is measured.
+    problems = ["harmonic_oscillator", "pendulum", "double_pendulum"]
     for p in problems
         run(`$(julia) --project=$(benchdir) $(joinpath(benchdir, "run_$(p).jl")) quick`)
     end
@@ -69,7 +75,14 @@ makedocs(
     ),
     pages=[
         "Home" => "index.md",
-        "Orthogonal Greedy Algorithm" => "Orthogonal Greedy Algorithm/OGA.md",
+        "Orthogonal Greedy Algorithm" => [
+            "Overview" => "Orthogonal Greedy Algorithm/OGA.md",
+            "Theory" => "Orthogonal Greedy Algorithm/theory.md",
+            "Algorithms" => "Orthogonal Greedy Algorithm/algorithms.md",
+            "Usage" => "Orthogonal Greedy Algorithm/usage.md",
+            "Precision" => "Orthogonal Greedy Algorithm/precision.md",
+            "Studies" => "Orthogonal Greedy Algorithm/studies.md",
+        ],
         "Benchmarks" => "Benchmarks/benchmarks.md",
     ],
 )
