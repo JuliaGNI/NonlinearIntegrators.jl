@@ -13,8 +13,7 @@ using NonlinearIntegrators
 using LinearAlgebra
 using Test
 
-const NI = NonlinearIntegrators
-const OGA_TYPES = (Float16, TEST_TYPES...)
+const OGA_TYPES = (Float16, TEST_TYPES...)   # `NI` comes from testsetup.jl
 
 # All fits, and all selection rules, as they are actually configured.
 oga_fits() = (WeightedQR(), IncrementalQR(), PivotedQR(), TruncatedSVD(),

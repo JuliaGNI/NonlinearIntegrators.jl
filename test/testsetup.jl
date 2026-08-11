@@ -15,9 +15,14 @@ using GeometricIntegratorsBase
 using GeometricProblems.HarmonicOscillator
 using GeometricSolutions: relative_maximum_error
 using LinearAlgebra: SingularException
+using SimpleSolvers: NonlinearSolverException
 using Symbolics: @variables
 
 const TEST_TYPES = (Float64, Float32)
+
+# Shorthand for reaching internals that are deliberately not exported (the OGA kernels,
+# the quadrature helper). Defined here so every test file can rely on it.
+const NI = NonlinearIntegrators
 
 # Type-generic ReLU^k activation: `max(zero(x), x)^k`, never `max(0.0, x)`, so the
 # network is evaluated at the working precision rather than silently upcasting.
@@ -58,14 +63,27 @@ end
 # per time step); its final entry must retain the working element type `T`.
 assert_no_upcast(q, ::Type{T}) where {T} = @test eltype(q[end]) == T
 
+# The two ways an integration is allowed to give up at reduced precision. `Float16` (and
+# occasionally `Float32`) leaves the Newton system near-singular, and which of the two
+# surfaces depends on where the arithmetic breaks down first:
+#
+#   * `SingularException` — a factorisation hit a zero pivot.
+#   * `NonlinearSolverException` — the Newton direction came back non-finite. Since the
+#     OGA seed now guarantees a finite fit at every precision (see `oga_solve`), this is
+#     the one a half-precision failure reaches: the seed no longer aborts the step, so the
+#     run gets as far as the solve before it runs out of digits.
+#
+# Anything else is a genuine defect and must propagate.
+const SOLVER_GAVE_UP = Union{SingularException,NonlinearSolverException}
+
 # Run a thunk that performs an integration which may legitimately fail to converge
-# at reduced precision (near-singular Newton system). Returns the result, or
-# `nothing` if the solve was singular. Any other error propagates.
+# at reduced precision. Returns the result, or `nothing` if the solve gave up in one of
+# the two documented ways. Any other error propagates.
 function try_integrate(f)
     try
         return f()
     catch e
-        e isa SingularException && return nothing
+        e isa SOLVER_GAVE_UP && return nothing
         rethrow()
     end
 end
