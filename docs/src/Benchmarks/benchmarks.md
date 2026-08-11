@@ -111,10 +111,32 @@ Three different shapes, which is why one global value will not do:
 - The **double pendulum** falls monotonically and then flattens: the gain from `S = 10` to
   `S = 12` is nothing, so `S = 10` is where it stops.
 
-There is a cost at half precision. As `S` grows the harmonic oscillator's `Float16`
-convergence *falls* — 17, then 12, then 9 of 36 cases at `S = 4`, `8`, `10` — because a wider
-network is harder to condition in 11 bits of mantissa. The widths above are chosen for
-`Float64` accuracy, and that choice is paid for in the `Float16` column.
+#### The half-precision trade-off
+
+The widths above are chosen for `Float64` accuracy, and that choice is paid for at `Float16`.
+It is a deliberate trade, not an oversight, so the size of it is recorded here.
+
+As `S` grows, `Float16` convergence *falls* while `Float64` accuracy improves. Measured on the
+harmonic oscillator over the whole `quick` grid (36 cases per width, both solvers, three
+timesteps, two activations):
+
+| `S` | `Float16` converged | best `Float64` `ref_err` |
+|---|---|---|
+| 4 | 17 / 36 | 2.8e-06 |
+| 8 | 12 / 36 | 1.9e-11 |
+| 10 | **9 / 36** | **3.4e-14** |
+
+A wider network is harder to condition in 11 bits of mantissa: more neurons means more nearly
+dependent columns in the parameter Jacobian, and half precision has no digits to spare in
+distinguishing them. So the same change that buys eight orders of magnitude at double precision
+costs roughly half the half-precision cases.
+
+The widths were chosen this way because accuracy is what the suite exists to report and because
+`Float16` is a robustness study rather than a production precision here — the
+[Orthogonal Greedy Algorithm Initial Guess](@ref) section covers half precision on its own
+terms, with the seed measured directly rather than through a solve. If half-precision robustness were the
+priority instead, `S` is the knob: `S = 4` nearly doubles the `Float16` success rate, at the
+cost of everything in the table above.
 
 ## Metrics
 
@@ -217,6 +239,10 @@ column is the flip side: reaching 1.8e-15 takes the whole budget when it is reac
 `Float16` converges in a couple of iterations because its tolerance is 0.0078, and its
 accuracy is correspondingly the worst by four orders of magnitude. Success rate and accuracy
 are answering different questions.
+
+The 25% in that `Float16` row is also *lower* than it would be with a narrower network — see
+[The half-precision trade-off](@ref) for the measurement and why the widths were chosen that
+way regardless.
 
 Success rate broken down by problem, by solver strategy, and by solver × precision:
 
