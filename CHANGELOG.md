@@ -94,6 +94,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a reduced-precision run able to converge at all rather than sit at its residual floor
   burning the iteration budget. The documentation now describes that behaviour, so the bound
   makes the description true.
+- **The benchmark suite's network width is now measured per problem, and the Toda lattice is
+  excluded from the documentation build.** `S` decides the accuracy the shallow-network ansatz
+  can represent, and therefore whether the nonlinear solve has a reachable target at all: too
+  narrow, and the residual floors above the tolerance while the solve iterates to its cap.
+  Measured at `Float64`/`tanh`/`DogLeg`, `quick`'s previous `S = 4` reached `ref_err = 2.8e-06`
+  on the harmonic oscillator in 1000 iterations, where `S = 10` reaches `3.2e-14` in about 100.
+  The widths are now 10 (harmonic oscillator), 8 (pendulum) and 10 (double pendulum). The
+  pendulum's is an optimum rather than a maximum — its degenerate `ϑ` leaves the parameter
+  Jacobian singular, so a wider network enlarges the null space and `S = 12` diverges outright.
+  The cost is at half precision, where wider networks are harder to condition and convergence
+  falls. The Toda lattice has no measured width yet, which puts its quick grid at ~5 h against
+  ~7 min for the other three, so it is out of the docs build until it has one;
+  `benchmark/run_toda_lattice.jl` and the `full` preset still run it.
+- `quick` no longer overrides `max_iterations`, using the solver default of 1000; the `maxiter`
+  status reads the cap that actually applied off the solver configuration rather than assuming
+  it. `SOLVERS_QUICK` gains `Newton`/`Backtracking` alongside `DogLeg`, so every precision has
+  at least one strategy that converges.
 - **The benchmark suite no longer records a stalled solve as converged.** `integrate`
   returns a finite state after exhausting `max_iterations`, and
   `benchmark/gml_benchmark_common.jl` classified on finiteness alone, so a run that burned
