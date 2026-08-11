@@ -35,6 +35,16 @@ elu(x)  = max(zero(x), x) + min(zero(x), exp(x) - one(x))
 gelu(x) = x / 2 * (one(x) + tanh(sqrt(oftype(x, 2 / pi)) *
                                  (x + oftype(x, 0.044715) * x^3)))
 
+# ---- convergence tolerance --------------------------------------------------
+
+# The suite passes no `f_abstol`: the integrator default,
+# `max(8, solversize) * eps(datatype(problem))`, is scaled to the working precision and is
+# merged with the options `run_case` does pass. An absolute tolerance that does not scale
+# with `eps(T)` is unreachable in reduced precision, and a run that cannot meet its
+# tolerance burns the whole iteration budget parked on the right answer — measured on the
+# harmonic oscillator, 100 iterations against 1. That is a `maxiter` here, not an `ok`, so
+# getting the tolerance right is what keeps the reduced-precision columns meaningful.
+
 # ---- axis definitions -------------------------------------------------------
 
 const ACTIVATIONS_FULL  = [("relu2", relu_k(2)), ("relu3", relu_k(3)),
@@ -169,6 +179,12 @@ function run_case(prob, method, ::Type{T}, ig, strat, λ, maxit, refq, hamfn, pa
             solve_secs = Float64(sum(res.solving_time_list))
             ref_err    = compute_ref_err(res, refq)
             ham_drift  = compute_ham_drift(res, hamfn, params)
+            # A finite result is not a converged one: `integrate` returns a finite state
+            # after exhausting `max_iterations`, and stalls concentrate in the
+            # reduced-precision rows the suite is read for. Accuracy and drift are recorded
+            # above regardless, so a stall can be told apart from a divergence. Same rule as
+            # `scripts/oga_sweep.jl`.
+            (!isnan(iters) && iters ≥ maxit) && (status = "maxiter")
         end
     catch e
         status = classify_error(e)
