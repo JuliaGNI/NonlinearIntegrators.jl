@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- **`integrate` returns `(sol, internal_values)` for every network integrator.**
+  `NonLinear_OneLayer_GML` used to return a named tuple carrying per-step instrumentation
+  (`sol`, `mse_err_list`, `abs_err_list`, `training_time_list`, `solving_time_list`, …)
+  while the other four returned the two-element tuple, so nothing could be written
+  generically across them. The instrumentation cache fields are gone with it; the benchmark
+  harness therefore reports only `total_secs`, the wall clock around `integrate`, and its
+  CSV drops the `solve_secs` column (17 → 16 fields). Callers reading `res.sol` must
+  destructure: `sol, internal_values = integrate(...)`.
+- **Constructor keywords renamed.** `nstages` → `extrapolation_substep` (it counts
+  sub-steps of the warm-start extrapolation, not quadrature stages) and
+  `initial_trajectory` → `initial_trajectory_method` (to match `initial_guess_method`).
+  Applies to all five network integrators and to `PR_Integrator`. New keyword
+  `record_grid_points = 41` replaces the hard-coded 41-point recording grid.
+- **`stages_compute!` is renamed `record_finer_solution!`.** It never computed quadrature
+  stages; it samples the converged ansatz on a finer grid for plotting.
+- Removed the unused `use_hamiltonian_loss` keyword from all one-layer integrators and
+  `problem_initial_hamitltonian` from `NonLinear_OneLayer_GML`.
+- `issymplectic` now genuinely returns `missing` for every `NetworkIntegratorMethod`.
+  The previous per-integrator definitions were *bare*, so — `GeometricIntegratorsBase`
+  exporting the name and the module only doing `using` — they defined a shadowing
+  `NonlinearIntegrators.issymplectic` that nothing ever called; the trait fell through to
+  the framework's `missing`. The definitions are now qualified and therefore live, and the
+  value is stated as `missing` rather than the `true` that a refactor would otherwise have
+  introduced by accident: symplecticity is not established for an ansatz whose parameters
+  are refitted every step.
 - **`OGA1d_Legacy` is renamed `OGA1dNormalEquations`.** The new name says what the
   variant *is* — the reference implementation from the original paper, solving the fit
   through the normal equations in a `Float64` island — rather than merely that it came
@@ -34,6 +59,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Shared code for the five network integrators is extracted into
+  `NetworkIntegratorCore` and `NetworkBasisCore`.** Each method struct now holds a
+  `common::NetworkIntegratorCore` (with `getproperty` forwarding, so `method.basis` and
+  friends keep working) plus only the fields that are genuinely its own; the accessors,
+  traits, `initial_guess!`, the three `initial_trajectory!` methods, `residual!`, both
+  `update!`s, `integrate_step!` and `integrate!` exist once instead of five times. The five
+  concrete caches subtype a shared `NetworkIntegratorCache`. This is the second axis of the
+  same decomposition as `src/oga/`: that release factored out *which neurons the seed
+  picks*, this one factors out *the step machinery around it*.
+- `NoExtrapolation` is now available to all five integrators, not just
+  `NonLinear_OneLayer_GML`.
+- Docstrings added to every exported method, basis and option type; the landing page gains
+  a type-hierarchy overview and a runnable example.
+- The docs build now fails immediately, naming the files, when the Benchmarks page
+  references a figure the sweep did not produce — previously a batch of Documenter
+  cross-reference errors half an hour into the build.
 - **All OGA code now lives in `src/oga/`, behind one composable seed type.** The three
   axes of the algorithm — which candidate neurons are on offer, how the greedy step ranks
   them, and how the output weights are refit — are independent, and are now fields of a
@@ -212,6 +253,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its references, with a self-contained didactic `Float16` example.
 
 ### Fixed
+
+- **`nbasis` resolved to an empty local function.** `CompactBasisFunctions` exports
+  `basis`/`nbasis`, and a bare top-level definition under `using` creates a *new* function
+  rather than extending the imported one. With definitions split between bare and qualified
+  forms, every internal `nbasis(method(int))` call raised `MethodError`. Both names are now
+  imported explicitly, so a bare definition anywhere extends the right generic.
+- **`HermiteExtrapolation` was unusable, in four separate ways.** Widening the test matrix to
+  the full (seed × extrapolation) cross product surfaced all of them; none was reachable
+  before, because no test or benchmark drove that combination through these integrators.
+  - `default_iguess` returned this package's `IntegratorExtrapolation` for `Hardcode_int`,
+    `Time_Reversible_Hardcode` and `Time_reversible_OneLayer`. `iguess` is the *framework's*
+    vocabulary — the extrapolation `GeometricIntegratorsBase.solutionstep!` applies — and it
+    has methods only for the framework's own types, so all three raised `MethodError` on the
+    first step. The two knobs are now kept distinct: `initial_trajectory_method` selects our
+    code path, `iguess` is left to the framework.
+  - The `soltmp` named tuple passed to `solutionstep!` used the field names `v`/`f`, but the
+    `AbstractProblemIODE` method reads `q̇`/`ṗ` — a `FieldError` once dispatch succeeded.
+    (`NonLinear_DenseNet_GML`'s override already had the right names, which is why it was the
+    only one that got as far as a solve.)
+  - `Hardcode_int` and `Time_Reversible_Hardcode` wrote the extrapolated positions into the
+    *output-weight* slots of `x` and never populated `network_labels` — which is what the OGA
+    seed reads. The seed therefore fitted the boundary ansatz to an all-zero target and
+    overwrote the slots the extrapolation had just filled. They now fill `network_labels`.
+  - Both also stored `p̃` in `x[D*S+k]`, which for the boundary ansatz is the endpoint
+    *position* unknown, not the momentum; they now store `q̃` there, matching their own
+    `IntegratorExtrapolation` methods.
+
+  Two failures that looked like independent numerical fragilities were symptoms of the
+  third item above: `OGA1dNormalEquations` raising `SingularException` (its Gram matrix was
+  rank-deficient because the fit target was all zeros, not because of its κ(Φ)²
+  conditioning) and `NonLinear_DenseNet_GML` raising `NaN detected in direction vector!` for
+  both of its seeds. Both converge now.
+
+  Note that a real Hermite warm start needs `initialguess = HermiteExtrapolation()` on the
+  integrator as well: with the framework default (`NoInitialGuess`) `solutionstep!` is a
+  no-op, so `initial_trajectory_method` alone selects the code path but extrapolates nothing.
+  This is what the benchmark harness has always done, and the tests now do it too.
+- `internal_values` in the shared `integrate!` is indexed from `n₁`, not from 1: a restart
+  with `n₁ > 1` previously left the leading slots `#undef` and indexed past the end.
+- `Time_reversible_Hardcode`'s `HermiteExtrapolation` override was missing a local binding
+  for `network_inputs` (a latent `UndefVarError`).
+- **`PR_Integrator` could not take a step.** `integrate_step!` called
+  `solve!(solver, x, args)`, which matches no `SimpleSolvers.solve!` method — the argument
+  order is `(x, solver, args)`, as in `CGVI_standard` and the shared `integrate_step!`. It
+  went unnoticed because `test/unit/pr_integrator_unit.jl` existed but was never `include`d
+  by `runtests.jl`; it now is.
+- Dropped the `BSplineKit` and `Infiltrator` dependencies; neither was used by `src/`.
+- `Project.toml` gained the missing `[compat]` entries for `julia`, `Logging` and `Test`.
 
 - Replaced the hard-coded regularization/guard constants that were silently
   ineffective in reduced precision:

@@ -6,18 +6,18 @@ struct PR_Integrator{T,NNODES,basisType<:Basis{T}} <: LODEMethod
     c::SVector{NNODES,T}
 
     init_w::Vector{Vector{T}}
-    nstages::Int
+    extrapolation_substep::Int
 
     function PR_Integrator(basis::Basis{T}, quadrature, init_w::Vector{Vector{T}};
-        nstages::Int=10) where {T}
+        extrapolation_substep::Int=10) where {T}
         quad_weights = quadrature.weights
         quad_nodes = quadrature.nodes
         NNODES = QuadratureRules.nnodes(quadrature)
-        new{T,NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, init_w, nstages)
+        new{T,NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, init_w, extrapolation_substep)
     end
 end
 
-CompactBasisFunctions.basis(method::PR_Integrator) = method.basis
+basis(method::PR_Integrator) = method.basis
 quadrature(method::PR_Integrator) = method.quadrature
 nnodes(method::PR_Integrator) = QuadratureRules.nnodes(method.quadrature)
 
@@ -27,7 +27,7 @@ issymmetric(::Union{PR_Integrator,Type{<:PR_Integrator}}) = missing
 issymplectic(::Union{PR_Integrator,Type{<:PR_Integrator}}) = missing
 
 default_solver(::PR_Integrator) = Newton()
-nstages(method::PR_Integrator) = method.nstages
+extrapolation_substep(method::PR_Integrator) = method.extrapolation_substep
 default_iguess_integrator(::PR_Integrator) = ImplicitMidpoint()
 
 struct PR_IntegratorCache{ST,R} <: IODEIntegratorCache{ST}
@@ -117,25 +117,12 @@ end
 
 @inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::PR_Integrator) = PR_IntegratorCache{ST,nnodes(method)}
 
-@inline function Base.getindex(c::PR_IntegratorCache, ST::DataType)
-    key = hash(Threads.threadid(), hash(ST))
-    if haskey(c.caches, key)
-        c.caches[key]
-    else
-        c.caches[key] = Cache{ST}(c.problem, c.method)
-    end::CacheType(ST, c.problem, c.method)
-end
-
 function GeometricIntegrators.Integrators.internal_variables(method::PR_Integrator, problem::AbstractProblemIODE)
     # intermidiate_x = [zeros(Int, length(x)) for x in method(int).init_w]
     S = sum(method.basis.W_sizes)
 
     intermidiate_x = zeros(S)
     (int_x=intermidiate_x,)
-end
-
-function copy_internal_variables(solstep::SolutionStep, cache::PR_IntegratorCache)
-    haskey(internal(solstep), :int_x) && copyto!(internal(solstep).int_x, cache.int_x)
 end
 
 function GeometricIntegrators.Integrators.reset!(cache::PR_IntegratorCache, t, q, p)
@@ -325,7 +312,11 @@ end
 function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:PR_Integrator,<:AbstractProblemIODE})
     # call nonlinear solver
     # solve!(nlsolution(int), (b,x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))+
-    solve!(solver(int), nlsolution(int), (sol, params, int))
+    # Argument order is (x, solver, args), as in `CGVI_standard.jl` and the network
+    # integrators' shared `integrate_step!`. It read `solve!(solver, x, args)` here, which
+    # matches no `SimpleSolvers.solve!` method — a `MethodError` on the first step. It went
+    # unnoticed because `test/unit/pr_integrator_unit.jl` was written but never included.
+    solve!(nlsolution(int), solver(int), (sol, params, int))
 
     # print solver status
     # print_solver_status(int.solver.status, int.solver.params)
@@ -335,13 +326,13 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
 
     # compute final update
     GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
-    println("solution after solving,", nlsolution(int))
+    @debug "PR_Integrator solution after solving" nlsolution(int)
 
-    stages_compute!(sol, int)
+    record_finer_solution!(sol, int)
 end
 
 
-function stages_compute!(sol, int::GeometricIntegrator{<:PR_Integrator})
+function record_finer_solution!(sol, int::GeometricIntegrator{<:PR_Integrator})
     local x = nlsolution(int)
     local stage_values = cache(int).stage_values
     local q_expr = method(int).basis.q_expr

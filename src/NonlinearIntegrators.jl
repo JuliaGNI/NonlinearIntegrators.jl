@@ -12,6 +12,11 @@ using GeometricSolutions: relative_maximum_error
 
 using QuadratureRules
 using CompactBasisFunctions
+# `basis`/`nbasis` are extended for the bases *and* for the methods, from several files.
+# Import them so that a bare definition anywhere extends CompactBasisFunctions rather than
+# silently creating a shadowing NonlinearIntegrators.nbasis — which is what turned every
+# internal `nbasis(method(int))` call site into a MethodError.
+import CompactBasisFunctions: basis, nbasis
 using Zygote
 using Random
 using Optimisers
@@ -23,9 +28,7 @@ import GeometricMachineLearning
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks
 using LinearAlgebra
-using BSplineKit
 using ForwardDiff
-using Infiltrator
 
 
 include("methods.jl")
@@ -50,6 +53,15 @@ export OGASelection, RawProjection, NormalizedProjection, OrthogonalProjection
 export OGAFit, WeightedQR, IncrementalQR, PivotedQR, TruncatedSVD, NormalEquationsFit
 export OGASymmetry, NoSymmetry, MirrorPairs, SharedMirrorPairs
 export oga_fit, OGAResult, oga_label
+
+# Fields, accessors, traits, cache supertype and the shared step/solve machinery that all
+# five network integrators have in common. Comes after `oga/types.jl`, whose `OGA1d()` is
+# the default `initial_guess_method` in the core constructor.
+include("network_integrators/NetworkIntegratorCore.jl")
+export NetworkIntegratorCore, NetworkIntegratorCache
+
+include("network_basis/NetworkBasisCore.jl")
+export NetworkBasisCore
 
 include("network_basis/NetworkBasis.jl")
 export NetworkBasis, DenseNetBasis, OneLayerNetBasis

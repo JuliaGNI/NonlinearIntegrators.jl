@@ -1,55 +1,53 @@
-# struct DenseNet_GML{T,NT,BT}<:DenseNetBasis{T}
-#     activation
-#     S₁::Int
-#     S::Int
-#     layers::Int
-#     NN::NT
-#     backend::BT
-#     function DenseNet_GML{T}(activation,S₁,S;layers=3,backend=CPU()) where {T}
-#         NN = AbstractNeuralNetworks.Chain(AbstractNeuralNetworks.Dense(1,S₁,activation),
-#                                         AbstractNeuralNetworks.Dense(S₁,S,activation),
-#                                         AbstractNeuralNetworks.Dense(S,1,identity,use_bias= false))
-#         new{T,typeof(NN),typeof(backend)}(activation,S₁,S,layers,NN,backend)
-#     end
-# end
+"""
+    DenseNet_GML{T} <: DenseNetBasis{T}
 
-struct DenseNet_GML{T,NT,BT,SNNT,QWFT,VT,VWFT} <: DenseNetBasis{T}
-    activation
-    S::Int
-    S₁::Int
-    NN::NT
-    backend::BT
-    NP::Int
+Three-layer dense-network basis for `NonLinear_DenseNet_GML`. Architecture:
+`Dense(1, S₁, σ) → Dense(S₁, S, σ) → Dense(S, 1)`. Symbolic derivatives are
+compiled at construction time.
 
-    SNN::SNNT
-    dqdθ::QWFT
+# Constructor
 
-    V_func::VT
-    dvdθ::VWFT
- 
-    function DenseNet_GML{T}(activation, S₁, S; backend=CPU()) where {T}
-        NN = AbstractNeuralNetworks.Chain(AbstractNeuralNetworks.Dense(1, S₁, activation),
+    DenseNet_GML{T}(activation, S₁, S; backend = CPU())
+
+- `activation`: elementwise activation (e.g. `tanh`)
+- `S₁::Int`: first hidden layer width
+- `S::Int`: second hidden layer width (= number of basis functions)
+
+# Example
+
+```julia
+basis = DenseNet_GML{Float64}(tanh, 8, 8)
+```
+"""
+struct DenseNet_GML{T, AT, NT, BT, SNNT, QWFT, VT, VWFT} <: DenseNetBasis{T}
+    S      :: Int
+    S₁     :: Int
+    NP     :: Int
+    common :: NetworkBasisCore{AT,NT, BT, SNNT, QWFT, VT, VWFT}
+
+    function DenseNet_GML{T}(activation, S₁, S; backend=CPU()) where T
+        NN = AbstractNeuralNetworks.Chain(
+            AbstractNeuralNetworks.Dense(1, S₁, activation),
             AbstractNeuralNetworks.Dense(S₁, S, activation),
             AbstractNeuralNetworks.Dense(S, 1, identity, use_bias=false))
         NP = parameterlength(NN)
         SNN = SymbolicNeuralNetwork(NN)
 
-
         soutput = SNN.model(SNN.input, SNN.params)
-        dqdθ = SymbolicNeuralNetworks.symbolic_pullback(soutput, SNN)[1]
-        dqdθ_built_function = build_nn_function(dqdθ, SNN.params, SNN.input)
+        dqdθ_sym = SymbolicNeuralNetworks.symbolic_pullback(soutput, SNN)[1]
+        dqdθ_built = build_nn_function(dqdθ_sym, SNN.params, SNN.input)
 
         VNN = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Jacobian(SNN))
-        V_built_function = build_nn_function(VNN, SNN.params, SNN.input)
+        V_built = build_nn_function(VNN, SNN.params, SNN.input)
 
-        dvdθ = SymbolicNeuralNetworks.symbolic_pullback(VNN, SNN)
-        dvdθ_built_function = build_nn_function(dvdθ, SNN.params, SNN.input)
+        dvdθ_sym = SymbolicNeuralNetworks.symbolic_pullback(VNN, SNN)
+        dvdθ_built = build_nn_function(dvdθ_sym, SNN.params, SNN.input)
 
-        new{T,typeof(NN),typeof(backend),typeof(SNN),typeof(dqdθ_built_function),typeof(V_built_function),typeof(dvdθ_built_function)}(activation,S,S₁,NN, backend, NP, SNN,
-            dqdθ_built_function, V_built_function, dvdθ_built_function)
+        core = NetworkBasisCore(activation, NN, backend, SNN, dqdθ_built, V_built, dvdθ_built)
+        new{T, typeof(activation), typeof(NN), typeof(backend), typeof(SNN),
+            typeof(dqdθ_built), typeof(V_built), typeof(dvdθ_built)}(S, S₁, NP, core)
     end
 end
-
 
 function Base.show(io::IO, basis::DenseNet_GML)
     print(io, "\n")
@@ -62,4 +60,3 @@ function Base.show(io::IO, basis::DenseNet_GML)
     print(io, "    Last Layer Nodes, Number of Basis S  = ", basis.S, "\n")
     print(io, "\n")
 end
-

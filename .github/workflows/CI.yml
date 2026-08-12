@@ -50,9 +50,23 @@ jobs:
               run: echo "JULIA_NUM_THREADS=2" >> $GITHUB_ENV
             - uses: julia-actions/cache@v3
             - uses: julia-actions/julia-buildpkg@v1
+            # Coverage is collected and uploaded from exactly one job — Linux on the oldest
+            # supported Julia. Twelve jobs measuring the same source produced twelve uploads of
+            # the same numbers, and every extra one was a chance to fail on something unrelated
+            # to the tests: `CoverageTools.process_cov` reads each line of a `.cov` file as
+            # `line[1:9]` with no length guard, so a single short or empty line aborts the step
+            # after the tests have already passed. That is what took down `^1.13.0-0 - macOS`
+            # in run 31497754170 while the same commit's `^1.13.0-0` ubuntu and windows jobs
+            # were green.
+            #
+            # Instrumentation also costs runtime, so the other eleven jobs now run without it.
             - uses: julia-actions/julia-runtest@v1
+              with:
+                  coverage: ${{ matrix.version == '1.10' && matrix.os == 'ubuntu-latest' }}
             - uses: julia-actions/julia-processcoverage@v1
+              if: matrix.version == '1.10' && matrix.os == 'ubuntu-latest'
             - uses: codecov/codecov-action@v7
+              if: matrix.version == '1.10' && matrix.os == 'ubuntu-latest'
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

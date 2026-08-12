@@ -137,10 +137,10 @@ end
 
 # Relative max-norm error of the case's final state against the reference final state
 # (both at t = 10·dt).
-function compute_ref_err(res, qref)
+function compute_ref_err(sol, qref)
     qref === nothing && return NaN
     try
-        qc = Float64.(collect(res.sol.q[:])[end])
+        qc = Float64.(collect(sol.q[:])[end])
         length(qc) == length(qref) || return NaN
         num = maximum(abs.(qc .- qref))
         den = maximum(abs.(qref))
@@ -150,10 +150,10 @@ function compute_ref_err(res, qref)
     end
 end
 
-function compute_ham_drift(res, hamfn, params)
+function compute_ham_drift(sol, hamfn, params)
     hamfn === nothing && return NaN
     try
-        qs = collect(res.sol.q[:]); ps = collect(res.sol.p[:])
+        qs = collect(sol.q[:]); ps = collect(sol.p[:])
         hams = Float64[Float64(hamfn(0, q, p, params)) for (q, p) in zip(qs, ps)]
         H0 = hams[1]
         (!isfinite(H0) || H0 == 0) && return NaN
@@ -163,13 +163,17 @@ function compute_ham_drift(res, hamfn, params)
     end
 end
 
-# One integration. Returns (status, ref_err, ham_drift, iters, solve_secs, total_secs).
+# One integration. Returns (status, ref_err, ham_drift, iters, total_secs).
 # `iters` is the nonlinear-solver iteration count of the final step (read from the
 # solver state); the integrator is built explicitly so we can query that state.
 #
 # `maxit = nothing` leaves the solver's own `max_iterations` in place. The cap that
 # actually applied is then read back off the solver's configuration rather than assumed,
 # which is what the `maxiter` status below compares against.
+#
+# `total_secs` is the wall-clock time of the whole `integrate` call — the network
+# integrators no longer record per-step nonlinear-solve time, so this is the only
+# run-time metric available.
 function run_case(prob, method, ::Type{T}, ig, strat, λ, maxit, refq, hamfn, params) where {T}
     kw = Pair{Symbol,Any}[:solver => strat.makesolver(),
                           :regularization_factor => T(λ)]
@@ -177,20 +181,20 @@ function run_case(prob, method, ::Type{T}, ig, strat, λ, maxit, refq, hamfn, pa
     strat.makels === nothing || push!(kw, :linesearch => strat.makels(T))
     ig.hermite && push!(kw, :initialguess => HermiteExtrapolation())
 
-    status = "ok"; ref_err = NaN; ham_drift = NaN; iters = NaN; solve_secs = NaN; total_secs = NaN
+    status = "ok"; ref_err = NaN; ham_drift = NaN; iters = NaN; total_secs = NaN
     try
         int = GeometricIntegrator(prob, method; kw...)
         itcap = SimpleSolvers.config(solver(int)).max_iterations
-        local res
-        total_secs = @elapsed (res = integrate(int))
+        t0 = time()
+        sol, _ = integrate(int)
+        total_secs = time() - t0
         try; iters = Float64(solverstate(int).iterations); catch; end
-        qend = collect(res.sol.q[:])[end]
+        qend = collect(sol.q[:])[end]
         if any(x -> !isfinite(x), qend)
             status = "nonfinite"
         else
-            solve_secs = Float64(sum(res.solving_time_list))
-            ref_err    = compute_ref_err(res, refq)
-            ham_drift  = compute_ham_drift(res, hamfn, params)
+            ref_err   = compute_ref_err(sol, refq)
+            ham_drift = compute_ham_drift(sol, hamfn, params)
             # A finite result is not a converged one: `integrate` returns a finite state
             # after exhausting `max_iterations`, and stalls concentrate in the
             # reduced-precision rows the suite is read for. Accuracy and drift are recorded
@@ -201,12 +205,12 @@ function run_case(prob, method, ::Type{T}, ig, strat, λ, maxit, refq, hamfn, pa
     catch e
         status = classify_error(e)
     end
-    return (; status, ref_err, ham_drift, iters, solve_secs, total_secs)
+    return (; status, ref_err, ham_drift, iters, total_secs)
 end
 
 # ---- CSV --------------------------------------------------------------------
 
-const CSV_HEADER = "problem,T,dt,steps,R,S,activation,solver,linesearch,initial_guess,lambda,status,ref_err,ham_drift,iterations,solve_secs,total_secs"
+const CSV_HEADER = "problem,T,dt,steps,R,S,activation,solver,linesearch,initial_guess,lambda,status,ref_err,ham_drift,iterations,total_secs"
 
 csvnum(x) = (x isa Integer) ? string(x) : (isfinite(x) ? @sprintf("%.8e", x) : "NaN")
 csvint(x) = isnan(x) ? "NaN" : string(round(Int, x))
@@ -249,7 +253,7 @@ function run_sweep(; problem_name, build_prob, hamiltonian, mode, Rs = nothing, 
     println("="^90)
     @printf("%-6s %-8s %6s %2s %2s %-6s %-11s %-9s %-11s | %-10s %-10s %-10s %-5s %-8s\n",
             "T", "dt", "", "R", "S", "act", "solver/ls", "iguess", "λ",
-            "status", "ref_err", "ham_drift", "iter", "solve_s")
+            "status", "ref_err", "ham_drift", "iter", "total_s")
     println("-"^116)
 
     refcache  = Dict{Float64,Any}()
@@ -263,8 +267,9 @@ function run_sweep(; problem_name, build_prob, hamiltonian, mode, Rs = nothing, 
                 basis = OneLayerNetwork_GML{T}(act, S)            # expensive symbolic build, amortized
                 for R in Rs, ig in cfg.igs
                     method = NonLinear_OneLayer_GML(basis, QuadratureRules.GaussLegendreQuadrature(T, R);
+                                show_status = false,
                                 bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
-                                initial_trajectory = ig.extrap)
+                                initial_trajectory_method = ig.extrap)
                     for dt in cfg.dts
                         prob   = get!(() -> build_prob(T, (T(0), T(10 * dt)), T(dt)), probcache, (T, dt))
                         params = prob.parameters
@@ -281,11 +286,11 @@ function run_sweep(; problem_name, build_prob, hamiltonian, mode, Rs = nothing, 
                                     isnan(r.ref_err)   ? "—" : @sprintf("%.2e", r.ref_err),
                                     isnan(r.ham_drift) ? "—" : @sprintf("%.2e", r.ham_drift),
                                     isnan(r.iters)     ? "—" : string(round(Int, r.iters)),
-                                    isnan(r.solve_secs) ? "—" : @sprintf("%.3f", r.solve_secs))
+                                    isnan(r.total_secs) ? "—" : @sprintf("%.3f", r.total_secs))
                             row = join((problem_name, string(T), csvnum(dt), "10", csvnum(R), csvnum(S),
                                         actlabel, strat.solver, strat.linesearch, ig.label, csvnum(Float64(λ)),
                                         r.status, csvnum(r.ref_err), csvnum(r.ham_drift), csvint(r.iters),
-                                        csvnum(r.solve_secs), csvnum(r.total_secs)), ",")
+                                        csvnum(r.total_secs)), ",")
                             println(io, row)
                             flush(io)
                         end

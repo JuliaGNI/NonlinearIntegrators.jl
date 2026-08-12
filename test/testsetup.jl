@@ -73,3 +73,24 @@ assert_no_upcast(q, ::Type{T}) where {T} = @test eltype(q[end]) == T
 # conditioned on every platform, so every other integration calls `integrate` directly and a
 # give-up is a real failure.
 const SOLVER_GAVE_UP = Union{SingularException,NonlinearSolverException}
+
+# `initial_trajectory_method` selects which `initial_trajectory!` method runs; `iguess` is the
+# extrapolation `GeometricIntegratorsBase.solutionstep!` actually applies, and its default
+# (`NoInitialGuess`) makes that call a no-op. So a Hermite row that passes only
+# `initial_trajectory_method = HermiteExtrapolation()` takes the Hermite code path but
+# extrapolates nothing. Passing both is what `benchmark/gml_benchmark_common.jl` does, and it is
+# what makes these rows measure something.
+hermite_kw(extrap) = extrap isa HermiteExtrapolation ? (; initialguess = HermiteExtrapolation()) : (;)
+
+# Newton iteration cap for the unit tests. Measured on the Hardcode accuracy guard: the solve
+# converges in 88 iterations, but with a 10000 cap some *earlier* step burns the whole budget,
+# costing 30s per case against 0.7s at 100 — for identical accuracy (2.6e-6 vs 3.1e-6 against a
+# 1e-4 threshold). The one-layer guards converge in 2–6 iterations and are unaffected.
+#
+# The extrapolation cross-products do not converge within two steps at all: they exhaust
+# whatever cap they are given. They assert dispatch and a finite result at the working type,
+# which is what `integrate` returns after exhausting the budget — deliberately not a
+# convergence claim (see `benchmark/gml_benchmark_common.jl`, which records the same situation
+# as a distinct `maxiter` status rather than as `ok`).
+const MAX_NEWTON_ITERATIONS = 100
+

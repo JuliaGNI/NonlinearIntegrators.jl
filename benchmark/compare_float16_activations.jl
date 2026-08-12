@@ -75,7 +75,7 @@ println("="^80)
 @printf("%-20s %-5s %-5s | %-10s %-12s\n", "problem", "dt", "act", "status", "ref_err")
 println("-"^60)
 
-# --- sweep, writing the standard 17-column CSV --------------------------------
+# --- sweep, writing the standard 16-column CSV --------------------------------
 open(CSVPATH, "w") do io
     println(io, CSV_HEADER)
     flush(io)
@@ -84,8 +84,9 @@ open(CSVPATH, "w") do io
         for (actlabel, act) in ACTS
             basis  = OneLayerNetwork_GML{T}(act, S)
             method = NonLinear_OneLayer_GML(basis, QuadratureRules.GaussLegendreQuadrature(T, R);
+                        show_status = false,
                         bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
-                        initial_trajectory = IG.extrap)
+                        initial_trajectory_method = IG.extrap)
             for dt in DTS
                 prob   = build_prob(T, (T(0), T(10 * dt)), T(dt))
                 params = prob.parameters
@@ -97,7 +98,7 @@ open(CSVPATH, "w") do io
                 row = join((name, string(T), csvnum(dt), "10", csvnum(R), csvnum(S),
                             actlabel, STRAT.solver, STRAT.linesearch, IG.label, csvnum(Float64(λ)),
                             r.status, csvnum(r.ref_err), csvnum(r.ham_drift), csvint(r.iters),
-                            csvnum(r.solve_secs), csvnum(r.total_secs)), ",")
+                            csvnum(r.total_secs)), ",")
                 println(io, row)
                 flush(io)
             end
