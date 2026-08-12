@@ -12,11 +12,14 @@ using GeometricSolutions: relative_maximum_error
 
 using QuadratureRules
 using CompactBasisFunctions
-# `basis`/`nbasis` are extended for the bases *and* for the methods, from several files.
-# Import them so that a bare definition anywhere extends CompactBasisFunctions rather than
-# silently creating a shadowing NonlinearIntegrators.nbasis — which is what turned every
-# internal `nbasis(method(int))` call site into a MethodError.
-import CompactBasisFunctions: basis, nbasis
+# `basis`, `nbasis` and `nnodes` are extended for the bases *and* for the methods, from
+# several files. Import them so that a bare definition anywhere extends the one generic
+# function per name rather than silently creating a shadowing NonlinearIntegrators.nbasis —
+# which is what turned every internal `nbasis(method(int))` call site into a MethodError.
+# `basis` and `nnodes` are declared method-free in GeometricBase and extended by both
+# CompactBasisFunctions and QuadratureRules; `nbasis` belongs to CompactBasisFunctions.
+import GeometricBase: basis, nnodes
+import CompactBasisFunctions: nbasis
 using Zygote
 using Random
 using Optimisers
