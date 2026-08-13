@@ -7,7 +7,7 @@ import GeometricIntegratorsBase: problem, method, parameters, SolverMethod, hist
 import GeometricIntegratorsBase: compute_vectorfields!, _extrapolate!, internal_variables, nlsolution, integrate!, IODEIntegratorCache, LODEMethod
 import GeometricBase: datatype, timetype, ntime
 import GeometricBase: initialtime, finaltime, timespan, timestep, periodicity, NullPeriodicity
-using GeometricSolutions: GeometricSolution
+using GeometricSolutions: GeometricSolution, timesteps
 
 using QuadratureRules
 using CompactBasisFunctions

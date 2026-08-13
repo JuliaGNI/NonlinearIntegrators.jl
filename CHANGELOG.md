@@ -63,8 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `GeometricProblems` moved from `[deps]` to the test target — its only use in `src/` was the
   dead `SINDy_methods/PR_Pretraining.jl`, now retired to `obsolete/script/`. That file was
   never `include`d and called into `Flux`, which was never a dependency.
-- Unused imports in `src/NonlinearIntegrators.jl`: `relative_maximum_error` (replaced by
-  `GeometricSolution`, which the source actually names), `Options`, `NonlinearSolver`,
+- Unused imports in `src/NonlinearIntegrators.jl`: `relative_maximum_error` (replaced by the
+  `GeometricSolution` and `timesteps` the source actually names), `Options`, `NonlinearSolver`,
   `DogLeg`, and a no-op `using Base`.
 
 ### Known issues
