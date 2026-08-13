@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already done — `basis` and `nnodes` come from `GeometricBase` and `nbasis` from
   `CompactBasisFunctions`, which is what the new versions require. RungeKutta 0.6 is satisfied
   vacuously: it is not a dependency of this package at all any more (see below).
+- Zygote compat widened to `0.6, 0.7`; the graph resolves to 0.7.12. Zygote remains a direct
+  dependency for `VNN_anstaz_zygote`, which supplies the velocity of the hardcoded ansatz in
+  `Hardcode_int` and `Time_Reversible_Hardcode`.
 - **`ImplicitMidpoint` now comes from `GeometricIntegratorsBase`** for the
   `IntegratorExtrapolation` warm start and `PR_Integrator`, and requires 0.6: the warm start
   integrates a LODE sub-problem and reads `p` back out of it to seed the momentum degree of

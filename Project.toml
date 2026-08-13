@@ -44,7 +44,7 @@ Statistics = "1"
 SymbolicNeuralNetworks = "0.3"
 Symbolics = "7"
 Test = "1"
-Zygote = "0.6"
+Zygote = "0.6, 0.7"
 julia = "1.10"
 
 # GeometricOptimizers is not in the General registry at the version required above, so it is taken
