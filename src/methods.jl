@@ -1,5 +1,5 @@
 
-using GeometricIntegrators: LODEMethod
+using GeometricIntegratorsBase: LODEMethod
 
 """
     NetworkIntegratorMethod <: LODEMethod
@@ -30,7 +30,7 @@ Abstract supertype for integrators whose ansatz is a three-layer dense network:
 """
 abstract type DenseNetMethod <: NetworkIntegratorMethod end
 
-using GeometricIntegrators: Extrapolation
+using GeometricIntegratorsBase: Extrapolation
 
 """
     IntegratorExtrapolation <: Extrapolation

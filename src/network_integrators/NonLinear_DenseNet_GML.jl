@@ -128,13 +128,13 @@ struct NonLinear_DenseNet_GMLCache{ST,S₁,S,NP,R,N} <: NetworkIntegratorCache{S
     end
 end
 
-function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML; kwargs...) where {ST}
     NonLinear_DenseNet_GMLCache{ST, method.basis.S₁, method.basis.S, method.basis.NP,
         nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML) =
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML) =
     NonLinear_DenseNet_GMLCache{ST, method.basis.S₁, method.basis.S, method.basis.NP,
         nnodes(method), extrapolation_substep(method)}
 
@@ -335,7 +335,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
 
 end
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {ST}
     # set some local variables for convenience and clarity
     local D = length(cache(int).q̃)
     local S₁ = int.method.basis.S₁
@@ -442,7 +442,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     end
 end
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST},sol, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {ST}
+function GeometricIntegratorsBase.residual!(b::Vector{ST},sol, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {ST}
     local D = length(cache(int).q̃)
     local S = int.method.basis.S
     local S₁ = int.method.basis.S₁

@@ -76,10 +76,9 @@ GeometricIntegratorsBase.issymmetric(::Union{NetworkIntegratorMethod, Type{<:Net
 GeometricIntegratorsBase.issymplectic(::Union{NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}}) = missing
 
 default_solver(::NetworkIntegratorMethod) = Newton()
-# Qualified to name the source: this is GeometricIntegratorsBase's implicit midpoint, whose
-# `IODEProblem`/`LODEProblem` methods are what `initial_trajectory!` below needs — it integrates a
-# LODE sub-problem and reads both `q` and `p` back out. (GeometricIntegrators' Runge-Kutta method
-# of the same construction is `ImplicitMidpointRK`, and solves for `q` alone.)
+# `initial_trajectory!` below integrates a LODE sub-problem and reads both `q` and `p` back out, so
+# this needs the `IODEProblem`/`LODEProblem` methods of `ImplicitMidpoint` rather than an
+# ODE-only or `q`-only implicit midpoint.
 default_iguess_integrator(::NetworkIntegratorMethod) = GeometricIntegratorsBase.ImplicitMidpoint()
 
 # `iguess` and `initial_trajectory_method` are two different vocabularies, and conflating them
@@ -104,15 +103,15 @@ default_iguess(::NetworkIntegratorMethod) = GeometricIntegratorsBase.NoInitialGu
 # Shared abstract cache type — concrete caches subtype this instead of IODEIntegratorCache directly.
 abstract type NetworkIntegratorCache{ST} <: IODEIntegratorCache{ST} end
 
-GeometricIntegrators.Integrators.nlsolution(cache::NetworkIntegratorCache) = cache.x
+GeometricIntegratorsBase.nlsolution(cache::NetworkIntegratorCache) = cache.x
 
-function GeometricIntegrators.Integrators.reset!(cache::NetworkIntegratorCache, _, q, p)
+function GeometricIntegratorsBase.reset!(cache::NetworkIntegratorCache, _, q, p)
     copyto!(cache.q̄, q)
     copyto!(cache.p̄, p)
 end
 
 # Unified initial_guess! for all NetworkIntegratorMethod subtypes.
-function GeometricIntegrators.Integrators.initial_guess!(
+function GeometricIntegratorsBase.initial_guess!(
         sol, history, params, int::GeometricIntegrator{<:NetworkIntegratorMethod})
     initial_trajectory!(sol, history, params, int, method(int).initial_trajectory_method)
     @debug "network inputs" method(int).network_inputs
@@ -201,17 +200,17 @@ function initial_trajectory!(
     end
 end
 
-function GeometricIntegrators.Integrators.residual!(
+function GeometricIntegratorsBase.residual!(
         b::AbstractVector{ST}, x::AbstractVector{ST}, sol, params,
         int::GeometricIntegrator{<:NetworkIntegratorMethod}) where {ST}
     @assert axes(x) == axes(b)
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
-    GeometricIntegrators.Integrators.residual!(b, sol, params, int)
+    GeometricIntegratorsBase.components!(x, sol, params, int)
+    GeometricIntegratorsBase.residual!(b, sol, params, int)
 end
 
 # Default DT-form update!: copy q̃/p̃ from cache into solution.
 # Hardcode_int and Time_Reversible_Hardcode override this with physics-specific momentum.
-function GeometricIntegrators.Integrators.update!(
+function GeometricIntegratorsBase.update!(
         sol, params, int::GeometricIntegrator{<:NetworkIntegratorMethod}, DT)
     sol.q .= cache(int, DT).q̃
     sol.p .= cache(int, DT).p̃
@@ -219,25 +218,25 @@ end
 
 # x-form update!: run components! then delegate to DT-form update!.
 # Identical across all NetworkIntegratorMethod subtypes.
-function GeometricIntegrators.Integrators.update!(
+function GeometricIntegratorsBase.update!(
         sol, params, x::AbstractVector{DT},
         int::GeometricIntegrator{<:NetworkIntegratorMethod}) where {DT}
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
-    GeometricIntegrators.Integrators.update!(sol, params, int, DT)
+    GeometricIntegratorsBase.components!(x, sol, params, int)
+    GeometricIntegratorsBase.update!(sol, params, int, DT)
 end
 
 # integrate_step!: Newton solve → record finer solution → final update.
 # record_finer_solution! runs before update! so that sol.q still holds q_n
 # (the start of the step) when the trajectory is recorded.
-function GeometricIntegrators.Integrators.integrate_step!(
+function GeometricIntegratorsBase.integrate_step!(
         sol, history, params,
         int::GeometricIntegrator{<:NetworkIntegratorMethod, <:AbstractProblemIODE})
     solve!(nlsolution(int), solver(int), solverstate(int), (sol, params, int))
     record_finer_solution!(sol, int)
-    GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
+    GeometricIntegratorsBase.update!(sol, params, nlsolution(int), int)
 end
 
-function GeometricIntegrators.Integrators.integrate!(
+function GeometricIntegratorsBase.integrate!(
         sol::GeometricSolution,
         int::GeometricIntegrator{<:NetworkIntegratorMethod},
         n₁::Int, n₂::Int)

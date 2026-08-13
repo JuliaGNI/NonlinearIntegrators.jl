@@ -8,7 +8,7 @@ AbstractNeuralNetworks = "60874f82-5ada-4c70-bd1c-fa6be7711c8a"
 CompactBasisFunctions = "a09551c4-f815-4143-809e-dd1986753ba7"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 GeometricBase = "9a0b12b7-583b-4f04-aa1f-d8551b6addc9"
-GeometricIntegrators = "dcce2d33-59f6-5b8d-9047-0defad88ae06"
+GeometricEquations = "c85262ba-a08a-430a-b926-d29770767bf2"
 GeometricIntegratorsBase = "71212ab4-08a2-48eb-a02b-4cbad0e9c44a"
 GeometricOptimizers = "fc236c15-5557-4942-aa65-b650f329279e"
 GeometricSolutions = "7843afe4-64f4-4df4-9231-049495c56661"
@@ -28,9 +28,7 @@ AbstractNeuralNetworks = "0.6"
 CompactBasisFunctions = "0.3"
 ForwardDiff = "1"
 GeometricBase = "0.14.8"
-GeometricIntegrators = "0.18.1"
-# The warm start in NetworkIntegratorCore.jl integrates a LODE sub-problem with
-# `GeometricIntegratorsBase.ImplicitMidpoint`, which requires 0.6.
+GeometricEquations = "0.21"
 GeometricIntegratorsBase = "0.6"
 GeometricOptimizers = "0.2"
 GeometricProblems = "0.8"
@@ -49,12 +47,10 @@ Test = "1"
 Zygote = "0.6"
 julia = "1.10"
 
-# The versions required above are not in the General registry yet, so they are taken from git.
-# A git [sources] entry blocks registration in General: remove this whole section, and only
+# GeometricOptimizers is not in the General registry at the version required above, so it is taken
+# from git. A git [sources] entry blocks registration in General: remove this section, and only
 # then can this package be tagged.
 [sources]
-GeometricIntegrators = {url = "https://github.com/JuliaGNI/GeometricIntegrators.jl", rev = "main"}
-GeometricIntegratorsBase = {url = "https://github.com/JuliaGNI/GeometricIntegratorsBase.jl", rev = "main"}
 GeometricOptimizers = {url = "https://github.com/JuliaGNI/GeometricOptimizers.jl", rev = "main"}
 
 [extras]

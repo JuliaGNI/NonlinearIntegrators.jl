@@ -131,12 +131,12 @@ struct Hardcode_intCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     end
 end
 
-function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Hardcode_int; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::Hardcode_int; kwargs...) where {ST}
     Hardcode_intCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Hardcode_int) =
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::Hardcode_int) =
     Hardcode_intCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}
 
 
@@ -237,7 +237,7 @@ VNN_anstaz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_ansta
 ∂VNN_anstaz_∂q̄(ps,S,activation,t,q̄,q)= -one(t)
 ∂VNN_anstaz_∂q(ps,S,activation,t,q̄,q) = one(t)
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Hardcode_int}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Hardcode_int}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local C = cache(int, ST)
@@ -351,7 +351,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 end
 
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:Hardcode_int}) where {ST}
+function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:Hardcode_int}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q
@@ -422,7 +422,7 @@ end
 
 
 
-function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:Hardcode_int}, DT)
+function GeometricIntegratorsBase.update!(sol, params, int::GeometricIntegrator{<:Hardcode_int}, DT)
     local D = length(cache(int).q̃)
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
     local P = cache(int).P

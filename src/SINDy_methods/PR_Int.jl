@@ -108,16 +108,16 @@ struct PR_IntegratorCache{ST,R} <: IODEIntegratorCache{ST}
     end
 end
 
-GeometricIntegrators.Integrators.nlsolution(cache::PR_IntegratorCache) = cache.x
+GeometricIntegratorsBase.nlsolution(cache::PR_IntegratorCache) = cache.x
 
 
-function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::PR_Integrator; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::PR_Integrator; kwargs...) where {ST}
     PR_IntegratorCache{ST,nnodes(method)}(method.basis.W_sizes, initial_conditions(problem); kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::PR_Integrator) = PR_IntegratorCache{ST,nnodes(method)}
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::PR_Integrator) = PR_IntegratorCache{ST,nnodes(method)}
 
-function GeometricIntegrators.Integrators.internal_variables(method::PR_Integrator, problem::AbstractProblemIODE)
+function GeometricIntegratorsBase.internal_variables(method::PR_Integrator, problem::AbstractProblemIODE)
     # intermidiate_x = [zeros(Int, length(x)) for x in method(int).init_w]
     S = sum(method.basis.W_sizes)
 
@@ -125,12 +125,12 @@ function GeometricIntegrators.Integrators.internal_variables(method::PR_Integrat
     (int_x=intermidiate_x,)
 end
 
-function GeometricIntegrators.Integrators.reset!(cache::PR_IntegratorCache, t, q, p)
+function GeometricIntegratorsBase.reset!(cache::PR_IntegratorCache, t, q, p)
     copyto!(cache.q̄, q)
     copyto!(cache.p̄, p)
 end
 
-function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, int::GeometricIntegrator{<:PR_Integrator})
+function GeometricIntegratorsBase.initial_guess!(sol, history, params, int::GeometricIntegrator{<:PR_Integrator})
     local S = sum(method(int).basis.W_sizes)
     local D = length(cache(int).q̃)
     local x = nlsolution(int)
@@ -154,7 +154,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
 
 end
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:PR_Integrator}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:PR_Integrator}) where {ST}
     local D = length(cache(int).q̃)
     local S = sum(method(int).basis.W_sizes)
     local W_sizes = method(int).basis.W_sizes
@@ -238,7 +238,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 end
 
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:PR_Integrator}) where {ST}
+function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:PR_Integrator}) where {ST}
     local D = length(cache(int).q̃)
     local S = sum(method(int).basis.W_sizes)
     local W_sizes = method(int).basis.W_sizes
@@ -279,19 +279,19 @@ function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, 
 end
 
 # Compute stages of Variational Partitioned Runge-Kutta methods.
-function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:PR_Integrator}) where {ST}
+function GeometricIntegratorsBase.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:PR_Integrator}) where {ST}
     # check that x and b are compatible
     @assert axes(x) == axes(b)
 
     # compute stages from nonlinear solver solution x
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
+    GeometricIntegratorsBase.components!(x, sol, params, int)
 
     # compute residual vector
-    GeometricIntegrators.Integrators.residual!(b, sol, params, int)
+    GeometricIntegratorsBase.residual!(b, sol, params, int)
 end
 
 
-function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:PR_Integrator}, DT)
+function GeometricIntegratorsBase.update!(sol, params, int::GeometricIntegrator{<:PR_Integrator}, DT)
     sol.q .= cache(int, DT).q̃
     sol.p .= cache(int, DT).p̃
 
@@ -300,18 +300,18 @@ function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricInt
     # sol.internal.int_x .= nlsolution(int)[1:S]
 end
 
-function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:PR_Integrator}) where {DT}
+function GeometricIntegratorsBase.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:PR_Integrator}) where {DT}
     # compute vector field at internal stages
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
+    GeometricIntegratorsBase.components!(x, sol, params, int)
 
     # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, int, DT)
+    GeometricIntegratorsBase.update!(sol, params, int, DT)
 end
 
 
-function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:PR_Integrator,<:AbstractProblemIODE})
+function GeometricIntegratorsBase.integrate_step!(sol, history, params, int::GeometricIntegrator{<:PR_Integrator,<:AbstractProblemIODE})
     # call nonlinear solver
-    # solve!(nlsolution(int), (b,x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))+
+    # solve!(nlsolution(int), (b,x) -> GeometricIntegratorsBase.residual!(b, x, sol, params, int), solver(int))+
     # Argument order is (x, solver, args), as in `CGVI_standard.jl` and the network
     # integrators' shared `integrate_step!`. It read `solve!(solver, x, args)` here, which
     # matches no `SimpleSolvers.solve!` method — a `MethodError` on the first step. It went
@@ -325,7 +325,7 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
     # check_solver_status(int.solver.status, int.solver.params)
 
     # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
+    GeometricIntegratorsBase.update!(sol, params, nlsolution(int), int)
     @debug "PR_Integrator solution after solving" nlsolution(int)
 
     record_finer_solution!(sol, int)
@@ -379,7 +379,7 @@ function create_boundary_derivative_vector(ST::Type, D::Int, W_sizes::Vector{Int
 end
 
 
-function GeometricIntegrators.Integrators.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:PR_Integrator}, n₁::Int, n₂::Int)
+function GeometricIntegratorsBase.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:PR_Integrator}, n₁::Int, n₂::Int)
     # check time steps range for consistency
     @assert n₁ ≥ 1
     @assert n₂ ≥ n₁

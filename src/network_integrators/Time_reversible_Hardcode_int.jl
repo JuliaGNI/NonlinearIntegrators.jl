@@ -139,12 +139,12 @@ struct Time_Reversible_HardcodeCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     end
 end
 
-function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Time_Reversible_Hardcode; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::Time_Reversible_Hardcode; kwargs...) where {ST}
     Time_Reversible_HardcodeCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_Reversible_Hardcode) =
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::Time_Reversible_Hardcode) =
     Time_Reversible_HardcodeCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}
 
 # The extrapolated trajectory has to land in `network_labels`, because that is what the OGA
@@ -243,7 +243,7 @@ end
 # ∂VNN_anstaz_∂q̄(ps,S,activation,t,q̄,q)= -1.0
 # ∂VNN_anstaz_∂q(ps,S,activation,t,q̄,q) = 1.0
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local C = cache(int, ST)
@@ -361,7 +361,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 end
 
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}) where {ST}
+function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q
@@ -431,7 +431,7 @@ end
 
 
 
-function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}, DT)
+function GeometricIntegratorsBase.update!(sol, params, int::GeometricIntegrator{<:Time_Reversible_Hardcode}, DT)
     local D = length(cache(int).q̃)
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
     local P = cache(int).P

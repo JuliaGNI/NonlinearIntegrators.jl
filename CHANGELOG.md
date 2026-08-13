@@ -9,21 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Upgraded to QuadratureRules 0.2, CompactBasisFunctions 0.3 and RungeKutta 0.6**, along with
-  GeometricIntegrators 0.18.1, GeometricIntegratorsBase 0.6 and SimpleSolvers 0.11. The source
-  side was already done — `basis` and `nnodes` come from `GeometricBase` and `nbasis` from
-  `CompactBasisFunctions`, which is what the new versions require. What unblocked it was
-  GeometricIntegrators 0.18: 0.17 pinned CompactBasisFunctions 0.2 / QuadratureRules 0.1 /
-  RungeKutta 0.5.23 and, being the only holder of those pins in the graph, made the environment
-  unresolvable. RungeKutta needs no compat entry here — it is not a direct dependency and reaches
-  the graph only through GeometricIntegrators, which now brings 0.6.
-- **`ImplicitMidpoint` now comes from `GeometricIntegratorsBase`**, not GeometricIntegrators, for
-  the `IntegratorExtrapolation` warm start and `PR_Integrator`. The call sites are qualified, since
-  GeometricIntegrators has a Runge-Kutta method of the same construction under the name
-  `ImplicitMidpointRK`. The two are not interchangeable here: the warm start integrates a LODE
-  sub-problem and reads `p` back out of it to seed the momentum degree of freedom, which needs the
-  `IODEProblem`/`LODEProblem` methods that GeometricIntegratorsBase 0.6 provides and the
-  Runge-Kutta one does not.
+- **Upgraded to QuadratureRules 0.2 and CompactBasisFunctions 0.3**, along with
+  GeometricIntegratorsBase 0.6, GeometricEquations 0.21 and SimpleSolvers 0.11. The source side was
+  already done — `basis` and `nnodes` come from `GeometricBase` and `nbasis` from
+  `CompactBasisFunctions`, which is what the new versions require. RungeKutta 0.6 is satisfied
+  vacuously: it is not a dependency of this package at all any more (see below).
+- **`ImplicitMidpoint` now comes from `GeometricIntegratorsBase`** for the
+  `IntegratorExtrapolation` warm start and `PR_Integrator`, and requires 0.6: the warm start
+  integrates a LODE sub-problem and reads `p` back out of it to seed the momentum degree of
+  freedom, which needs that release's `IODEProblem`/`LODEProblem` methods rather than an ODE-only
+  implicit midpoint.
 
 - **The network training loops now use `GeometricOptimizers` instead of
   `GeometricMachineLearning`.** The optimizer functionality has been retired from
@@ -47,6 +42,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **`GeometricIntegrators` is no longer a dependency**; the package builds on
+  `GeometricIntegratorsBase` alone. Every `GeometricIntegrators.Integrators.X` extension point was
+  already a `GeometricIntegratorsBase` generic imported into that module, so those call sites are
+  simply requalified. `GeometricEquations` replaces it in `[deps]` because GeometricIntegrators was
+  re-exporting it — that is where `AbstractProblemIODE`, `StateVariable` and `initial_conditions`
+  come from, and GeometricIntegratorsBase does not pass them on. `create_internal_stage_vector` was
+  the only genuinely GeometricIntegrators-local name and is now defined in
+  `src/network_integrators/utilities.jl`. Consequences: `RungeKutta` and `GenericLinearAlgebra`
+  leave the dependency graph entirely. Runge-Kutta reference integrators such as `Gauss(8)` are
+  only ever needed by the `benchmark/` and `scripts/` environments, which declare
+  GeometricIntegrators themselves.
 - **`GeometricMachineLearning` is no longer a dependency.** Once the optimizer calls moved to
   GeometricOptimizers, its only remaining use was `GeometricMachineLearning.NeuralNetwork`, which
   it `import`s straight from `AbstractNeuralNetworks` — the same object — so the call site now
@@ -63,13 +69,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known issues
 
-- `GeometricIntegrators` 0.18.1, `GeometricIntegratorsBase` 0.6.0 and `GeometricOptimizers` 0.2.0
-  are taken from git via `[sources]`, none of them being in the General registry yet. A git
-  `[sources]` entry blocks registration in General, so this package cannot be tagged until all
-  three are released; drop the `[sources]` section then.
-- Julia 1.13.0-rc2 cannot load this package: `GenericLinearAlgebra` overwrites a `LinearAlgebra`
-  method, which 1.13 forbids during precompilation, so `RungeKutta` and hence
-  `GeometricIntegrators` fail to precompile. Unrelated to this package; 1.10 and 1.12 are fine.
+- `GeometricOptimizers` 0.2.0 is taken from git via `[sources]`, the registry carrying only 0.1.0.
+  A git `[sources]` entry blocks registration in General, so this package cannot be tagged until
+  GeometricOptimizers is released; drop the `[sources]` section then, here and in
+  `benchmark/Project.toml` and `scripts/Project.toml`.
+
+### Fixed
+
+- The package loads on Julia 1.13 again. `GenericLinearAlgebra` overwrites a `LinearAlgebra`
+  method, which 1.13 forbids during precompilation, and that took `RungeKutta` and hence
+  `GeometricIntegrators` down with it. Both have left the dependency graph.
 
 ## [0.3.0] - 2026-08-11
 

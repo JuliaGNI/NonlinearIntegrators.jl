@@ -123,16 +123,16 @@ struct CGVI_standardCache{ST,S,R} <: IODEIntegratorCache{ST}
     end
 end
 
-GeometricIntegrators.Integrators.nlsolution(cache::CGVI_standardCache) = cache.x
+GeometricIntegratorsBase.nlsolution(cache::CGVI_standardCache) = cache.x
 
-function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::CGVI_standard; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::CGVI_standard; kwargs...) where {ST}
     CGVI_standardCache{ST,nbasis(method),nnodes(method)}(initial_conditions(problem); kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::CGVI_standard) = CGVI_standardCache{ST,nbasis(method),nnodes(method)}
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::CGVI_standard) = CGVI_standardCache{ST,nbasis(method),nnodes(method)}
 
 
-function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, int::GeometricIntegrator{<:CGVI_standard})
+function GeometricIntegratorsBase.initial_guess!(sol, history, params, int::GeometricIntegrator{<:CGVI_standard})
     # set some local variables for convenience
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
@@ -158,7 +158,7 @@ function GeometricIntegrators.Integrators.initial_guess!(sol, history, params, i
 end
 
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_standard}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_standard}) where {ST}
     # set some local variables for convenience and clarity
     local C = cache(int, ST)
     local D = length(cache(int).q̃)
@@ -207,7 +207,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 end
 
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_standard}) where {ST}
+function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_standard}) where {ST}
     # set some local variables for convenience and clarity
     local C = cache(int, ST)
     local D = length(cache(int).q̃)
@@ -238,19 +238,19 @@ end
 
 
 # Compute stages of Variational Partitioned Runge-Kutta methods.
-function GeometricIntegrators.Integrators.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_standard}) where {ST}
+function GeometricIntegratorsBase.residual!(b::AbstractVector{ST}, x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:CGVI_standard}) where {ST}
     # check that x and b are compatible
     @assert axes(x) == axes(b)
 
     # compute stages from nonlinear solver solution x
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
+    GeometricIntegratorsBase.components!(x, sol, params, int)
 
     # compute residual vector
-    GeometricIntegrators.Integrators.residual!(b, sol, params, int)
+    GeometricIntegratorsBase.residual!(b, sol, params, int)
 end
 
 
-function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:CGVI_standard}, DT)
+function GeometricIntegratorsBase.update!(sol, params, int::GeometricIntegrator{<:CGVI_standard}, DT)
    local C = cache(int, DT)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
@@ -268,18 +268,18 @@ function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricInt
     end
 end
 
-function GeometricIntegrators.Integrators.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:CGVI_standard}) where {DT}
+function GeometricIntegratorsBase.update!(sol, params, x::AbstractVector{DT}, int::GeometricIntegrator{<:CGVI_standard}) where {DT}
     # compute vector field at internal stages
-    GeometricIntegrators.Integrators.components!(x, sol, params, int)
+    GeometricIntegratorsBase.components!(x, sol, params, int)
 
     # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, int, DT)
+    GeometricIntegratorsBase.update!(sol, params, int, DT)
 end
 
 
-function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, int::GeometricIntegrator{<:CGVI_standard,<:AbstractProblemIODE})
+function GeometricIntegratorsBase.integrate_step!(sol, history, params, int::GeometricIntegrator{<:CGVI_standard,<:AbstractProblemIODE})
     # call nonlinear solver
-    # solve!(nlsolution(int), (b, x) -> GeometricIntegrators.Integrators.residual!(b, x, sol, params, int), solver(int))
+    # solve!(nlsolution(int), (b, x) -> GeometricIntegratorsBase.residual!(b, x, sol, params, int), solver(int))
     solve!(nlsolution(int),solver(int),  (sol, params, int))
 
     # print solver status
@@ -289,5 +289,5 @@ function GeometricIntegrators.Integrators.integrate_step!(sol, history, params, 
     # check_solver_status(int.solver.status, int.solver.params)
 
     # compute final update
-    GeometricIntegrators.Integrators.update!(sol, params, nlsolution(int), int)
+    GeometricIntegratorsBase.update!(sol, params, nlsolution(int), int)
 end

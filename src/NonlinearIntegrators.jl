@@ -1,7 +1,6 @@
 module NonlinearIntegrators
 
-using GeometricIntegrators
-using GeometricIntegrators.Integrators: create_internal_stage_vector
+using GeometricEquations
 using GeometricIntegratorsBase
 import GeometricIntegratorsBase: default_solver, default_options, initsolver, CacheDict, Cache, cache, CacheType, solutionstep, reset!, default_iguess, iguess
 import GeometricIntegratorsBase: problem, method, parameters, SolverMethod, history, solver, residual!, copy_internal_variables!, internal, current, update!, solverstate

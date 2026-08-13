@@ -1,3 +1,11 @@
+"""
+    create_internal_stage_vector(DT, D, S) -> Vector{Vector{DT}}
+
+`S` zero vectors of length `D`, one per internal stage of a `D`-dimensional problem. Used by the
+integrator caches to hold the stage values `Q`, `P`, `V` and `F`.
+"""
+create_internal_stage_vector(DT, D, S) = [zeros(DT, D) for _ in 1:S]
+
 function simpson_quadrature(N::Int, ::Type{T}=Float64) where {T}
     if N % 2 != 0
         error("N must be even for Simpson's rule.")

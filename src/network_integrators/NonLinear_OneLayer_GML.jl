@@ -149,13 +149,13 @@ struct NonLinear_OneLayer_GMLCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     end
 end
 
-function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML; kwargs...) where {ST}
     NonLinear_OneLayer_GMLCache{ST, nbasis(method), nnodes(method),
         extrapolation_substep(method),}(initial_conditions(problem);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML) =
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML) =
     NonLinear_OneLayer_GMLCache{ST, nbasis(method), nnodes(method),
         extrapolation_substep(method),}
 
@@ -206,7 +206,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
     @debug "Initial guess from network training" x
 end
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local C = cache(int, ST)
@@ -331,7 +331,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 end
 
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
+function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q

@@ -143,15 +143,15 @@ struct Time_reversible_OneLayerCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     end
 end
 
-function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::Time_reversible_OneLayer; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::Time_reversible_OneLayer; kwargs...) where {ST}
     Time_reversible_OneLayerCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::Time_reversible_OneLayer) =
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::Time_reversible_OneLayer) =
     Time_reversible_OneLayerCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local C = cache(int, ST)
@@ -280,7 +280,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 end
 
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}) where {ST}
+function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q
@@ -352,7 +352,7 @@ end
 
 
 
-function GeometricIntegrators.Integrators.update!(sol, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}, DT)
+function GeometricIntegratorsBase.update!(sol, params, int::GeometricIntegrator{<:Time_reversible_OneLayer}, DT)
     sol.q .= cache(int, DT).q̃
     sol.p .= cache(int, DT).p̃
 end
