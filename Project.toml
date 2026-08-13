@@ -6,13 +6,11 @@ authors = ["Michael Kraus <michael.kraus@ipp.mpg.de> and contributors"]
 [deps]
 AbstractNeuralNetworks = "60874f82-5ada-4c70-bd1c-fa6be7711c8a"
 CompactBasisFunctions = "a09551c4-f815-4143-809e-dd1986753ba7"
-ContinuumArrays = "7ae1f121-cc2c-504b-ac30-9b923412ae5c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 GeometricBase = "9a0b12b7-583b-4f04-aa1f-d8551b6addc9"
 GeometricIntegrators = "dcce2d33-59f6-5b8d-9047-0defad88ae06"
 GeometricIntegratorsBase = "71212ab4-08a2-48eb-a02b-4cbad0e9c44a"
-GeometricMachineLearning = "194d25b2-d3f5-49f0-af24-c124f4aa80cc"
-GeometricProblems = "18cb22b4-ad41-5c80-9c5f-710df63fbdc9"
+GeometricOptimizers = "fc236c15-5557-4942-aa65-b650f329279e"
 GeometricSolutions = "7843afe4-64f4-4df4-9231-049495c56661"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Optimisers = "3bd65402-5787-11e9-1adc-39752487f4e2"
@@ -28,12 +26,13 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 [compat]
 AbstractNeuralNetworks = "0.6"
 CompactBasisFunctions = "0.3"
-ContinuumArrays = "0.20"
 ForwardDiff = "1"
 GeometricBase = "0.14.8"
-GeometricIntegrators = "0.17"
-GeometricIntegratorsBase = "0.5"
-GeometricMachineLearning = "0.4"
+GeometricIntegrators = "0.18.1"
+# The warm start in NetworkIntegratorCore.jl integrates a LODE sub-problem with
+# `GeometricIntegratorsBase.ImplicitMidpoint`, which requires 0.6.
+GeometricIntegratorsBase = "0.6"
+GeometricOptimizers = "0.2"
 GeometricProblems = "0.8"
 GeometricSolutions = "0.6"
 LinearAlgebra = "1"
@@ -41,7 +40,7 @@ Logging = "1"
 Optimisers = "0.4"
 QuadratureRules = "0.2"
 Random = "1"
-SimpleSolvers = "0.10"
+SimpleSolvers = "0.11"
 StaticArrays = "1"
 Statistics = "1"
 SymbolicNeuralNetworks = "0.3"
@@ -50,9 +49,18 @@ Test = "1"
 Zygote = "0.6"
 julia = "1.10"
 
+# The versions required above are not in the General registry yet, so they are taken from git.
+# A git [sources] entry blocks registration in General: remove this whole section, and only
+# then can this package be tagged.
+[sources]
+GeometricIntegrators = {url = "https://github.com/JuliaGNI/GeometricIntegrators.jl", rev = "main"}
+GeometricIntegratorsBase = {url = "https://github.com/JuliaGNI/GeometricIntegratorsBase.jl", rev = "main"}
+GeometricOptimizers = {url = "https://github.com/JuliaGNI/GeometricOptimizers.jl", rev = "main"}
+
 [extras]
+GeometricProblems = "18cb22b4-ad41-5c80-9c5f-710df63fbdc9"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Logging", "Test"]
+test = ["GeometricProblems", "Logging", "Test"]

@@ -50,6 +50,49 @@ function flatten_params(params::NeuralNetworkParameters)
 end
 
 
+"""
+    optimizer_params(ps) -> NamedTuple
+
+Flatten the layer nesting of the network parameters `ps`, joining each layer and field name into
+one key: `L1.W` becomes `L1_W`.
+
+This is the shape GeometricOptimizers' `Optimizer` requires — its `OptimizerSolution` is an
+`AbstractVector`, a `Manifold`, or a *flat* `NamedTuple` of arrays, whereas network parameters are
+one level deeper, `(L1 = (W = …, b = …), L2 = (W = …,))`. Both `NeuralNetworkParameters` and a
+plain `NamedTuple` of layers are accepted, the latter for optimising a subset of the layers.
+
+Does **not** copy: the result aliases the same arrays, so the optimizer's in-place updates are
+visible through the original `ps`.
+
+See [`network_params`](@ref) for the inverse.
+"""
+function optimizer_params(ps)
+    layers = map(lname -> NamedTuple{map(f -> Symbol(lname, :_, f), keys(ps[lname]))}(values(ps[lname])),
+                 keys(ps))
+    merge(layers...)
+end
+
+"""
+    network_params(flat, template) -> typeof(template)
+
+Rebuild the layer nesting that [`optimizer_params`](@ref) removed, taking the key structure from
+`template` and the arrays from the flat `NamedTuple` `flat`.
+
+The loss handed to `Optimizer` is called on the flat parameters while the network wants them
+nested, so it needs this on the way in. The result is a `NeuralNetworkParameters` exactly when
+`template` is one.
+"""
+function network_params(flat, template::NeuralNetworkParameters)
+    NeuralNetworkParameters(network_params(flat, AbstractNeuralNetworks.params(template)))
+end
+
+function network_params(flat, template::NamedTuple)
+    NamedTuple{keys(template)}(map(
+        lname -> NamedTuple{keys(template[lname])}(map(
+            f -> flat[Symbol(lname, :_, f)], keys(template[lname]))),
+        keys(template)))
+end
+
 function box_init_plain(input_dim::Int, output_dim::Int, ::Type{T}=Float32;Random_rng = Random.seed!(1)) where {T}
     W = zeros(T, output_dim, input_dim)
     b = zeros(T, output_dim)

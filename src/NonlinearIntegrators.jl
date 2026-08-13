@@ -8,7 +8,7 @@ import GeometricIntegratorsBase: problem, method, parameters, SolverMethod, hist
 import GeometricIntegratorsBase: compute_vectorfields!, _extrapolate!, internal_variables, nlsolution, integrate!, IODEIntegratorCache, LODEMethod
 import GeometricBase: datatype, timetype, ntime
 import GeometricBase: initialtime, finaltime, timespan, timestep, periodicity, NullPeriodicity
-using GeometricSolutions: relative_maximum_error
+using GeometricSolutions: GeometricSolution
 
 using QuadratureRules
 using CompactBasisFunctions
@@ -24,10 +24,12 @@ using Zygote
 using Random
 using Optimisers
 using Statistics
-using Base
 using StaticArrays
-using SimpleSolvers: Newton, Options, NonlinearSolver, solve!, DogLeg
-import GeometricMachineLearning
+using SimpleSolvers: Newton, solve!
+# `import`, not `using`: GeometricOptimizers re-exports SimpleSolvers' `solve!` and `Newton` (the
+# same generics, which it `import`s), so qualifying its names keeps each call site explicit about
+# which package it means.
+import GeometricOptimizers
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks
 using LinearAlgebra

@@ -28,7 +28,7 @@ issymplectic(::Union{PR_Integrator,Type{<:PR_Integrator}}) = missing
 
 default_solver(::PR_Integrator) = Newton()
 extrapolation_substep(method::PR_Integrator) = method.extrapolation_substep
-default_iguess_integrator(::PR_Integrator) = ImplicitMidpoint()
+default_iguess_integrator(::PR_Integrator) = GeometricIntegratorsBase.ImplicitMidpoint()
 
 struct PR_IntegratorCache{ST,R} <: IODEIntegratorCache{ST}
     x::Vector{ST}

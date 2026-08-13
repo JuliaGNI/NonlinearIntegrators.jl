@@ -76,7 +76,11 @@ GeometricIntegratorsBase.issymmetric(::Union{NetworkIntegratorMethod, Type{<:Net
 GeometricIntegratorsBase.issymplectic(::Union{NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}}) = missing
 
 default_solver(::NetworkIntegratorMethod) = Newton()
-default_iguess_integrator(::NetworkIntegratorMethod) = ImplicitMidpoint()
+# Qualified to name the source: this is GeometricIntegratorsBase's implicit midpoint, whose
+# `IODEProblem`/`LODEProblem` methods are what `initial_trajectory!` below needs — it integrates a
+# LODE sub-problem and reads both `q` and `p` back out. (GeometricIntegrators' Runge-Kutta method
+# of the same construction is `ImplicitMidpointRK`, and solves for `q` alone.)
+default_iguess_integrator(::NetworkIntegratorMethod) = GeometricIntegratorsBase.ImplicitMidpoint()
 
 # `iguess` and `initial_trajectory_method` are two different vocabularies, and conflating them
 # was a bug. `initial_trajectory_method` is *ours*: it picks which `initial_trajectory!` runs.

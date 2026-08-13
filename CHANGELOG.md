@@ -5,6 +5,72 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Upgraded to QuadratureRules 0.2, CompactBasisFunctions 0.3 and RungeKutta 0.6**, along with
+  GeometricIntegrators 0.18.1, GeometricIntegratorsBase 0.6 and SimpleSolvers 0.11. The source
+  side was already done — `basis` and `nnodes` come from `GeometricBase` and `nbasis` from
+  `CompactBasisFunctions`, which is what the new versions require. What unblocked it was
+  GeometricIntegrators 0.18: 0.17 pinned CompactBasisFunctions 0.2 / QuadratureRules 0.1 /
+  RungeKutta 0.5.23 and, being the only holder of those pins in the graph, made the environment
+  unresolvable. RungeKutta needs no compat entry here — it is not a direct dependency and reaches
+  the graph only through GeometricIntegrators, which now brings 0.6.
+- **`ImplicitMidpoint` now comes from `GeometricIntegratorsBase`**, not GeometricIntegrators, for
+  the `IntegratorExtrapolation` warm start and `PR_Integrator`. The call sites are qualified, since
+  GeometricIntegrators has a Runge-Kutta method of the same construction under the name
+  `ImplicitMidpointRK`. The two are not interchangeable here: the warm start integrates a LODE
+  sub-problem and reads `p` back out of it to seed the momentum degree of freedom, which needs the
+  `IODEProblem`/`LODEProblem` methods that GeometricIntegratorsBase 0.6 provides and the
+  Runge-Kutta one does not.
+
+- **The network training loops now use `GeometricOptimizers` instead of
+  `GeometricMachineLearning`.** The optimizer functionality has been retired from
+  GeometricMachineLearning into GeometricOptimizers, so `Optimizer` /
+  `AdamOptimizerWithDecay` / `GradientOptimizer` / `optimization_step!` are replaced by
+  `Optimizer(ps, loss; algorithm, linesearch)` plus `solver_step!`/`update!`, with `Adam` and
+  `GradientMethod` supplying only a *direction* and the learning rate living in the line
+  search. The learning-rate schedule is preserved:
+  `DecayingStatic(T; η₁ = 1e-3, η₂ = 5e-5, n = nepochs)` matches
+  `AdamOptimizerWithDecay(nepochs, 1e-3, 5e-5)`, both decaying the step size as `γ^t · η₁` with the
+  same `γ = exp(log(η₂/η₁)/n)`. The optimizer method and line search are now built at the
+  parameter element type, where the old call passed Float64 constants regardless. Trained weights
+  are nevertheless not bit-identical to previous releases': the bias-correction algebra inside the
+  Adam moment update differs, and gradients now come from the optimizer's own `GradientAutodiff`
+  rather than from explicit `Zygote.gradient` calls in the loops.
+- New internal helpers `optimizer_params` / `network_params`
+  (`src/network_integrators/utilities.jl`) convert between the nested per-layer parameters of
+  `AbstractNeuralNetworks` and the flat `NamedTuple` of arrays that GeometricOptimizers
+  accepts. They alias rather than copy, so the optimizer's in-place updates remain visible
+  through `PNN.params`.
+
+### Removed
+
+- **`GeometricMachineLearning` is no longer a dependency.** Once the optimizer calls moved to
+  GeometricOptimizers, its only remaining use was `GeometricMachineLearning.NeuralNetwork`, which
+  it `import`s straight from `AbstractNeuralNetworks` — the same object — so the call site now
+  names `AbstractNeuralNetworks.NeuralNetwork` directly. The `_GML` suffixes on the basis and
+  integrator types are kept for source compatibility.
+- `ContinuumArrays` is no longer a dependency; it had no use in `src/`. The quasi-array indexing
+  and `grid` come from `CompactBasisFunctions`, which carries `ContinuumArrays` itself.
+- `GeometricProblems` moved from `[deps]` to the test target — its only use in `src/` was the
+  dead `SINDy_methods/PR_Pretraining.jl`, now retired to `obsolete/script/`. That file was
+  never `include`d and called into `Flux`, which was never a dependency.
+- Unused imports in `src/NonlinearIntegrators.jl`: `relative_maximum_error` (replaced by
+  `GeometricSolution`, which the source actually names), `Options`, `NonlinearSolver`,
+  `DogLeg`, and a no-op `using Base`.
+
+### Known issues
+
+- `GeometricIntegrators` 0.18.1, `GeometricIntegratorsBase` 0.6.0 and `GeometricOptimizers` 0.2.0
+  are taken from git via `[sources]`, none of them being in the General registry yet. A git
+  `[sources]` entry blocks registration in General, so this package cannot be tagged until all
+  three are released; drop the `[sources]` section then.
+- Julia 1.13.0-rc2 cannot load this package: `GenericLinearAlgebra` overwrites a `LinearAlgebra`
+  method, which 1.13 forbids during precompilation, so `RungeKutta` and hence
+  `GeometricIntegrators` fail to precompile. Unrelated to this package; 1.10 and 1.12 are fine.
+
 ## [0.3.0] - 2026-08-11
 
 ### Breaking

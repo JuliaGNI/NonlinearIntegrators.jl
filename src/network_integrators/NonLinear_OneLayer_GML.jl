@@ -178,12 +178,22 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
         labels = reshape(network_labels[:, k], 1, extrapolation_substep + 1)
 
         PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
-        # opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
-        opt = GeometricMachineLearning.Optimizer(GeometricMachineLearning.AdamOptimizerWithDecay(nepochs, 1e-3, 5e-5), PNN.params)
-        λ = GeometricMachineLearning.GlobalSection(PNN.params)
+        # `Adam` and the line search are built at the parameter element type: `Optimizer` does not
+        # convert `Adam`, so an `Adam{Float64}` handed `Float32` parameters would not dispatch.
+        # `ps_flat` aliases the network's arrays (see `optimizer_params`), so the in-place updates
+        # in the loop below are visible through `PNN.params`. `Adam` supplies only a direction, so
+        # the learning rate is the line search, decaying from 1e-3 to 5e-5 over the epoch budget.
+        local PT = eltype(PNN.params[1].W)
+        ps_flat = optimizer_params(PNN.params)
+        loss(p) = mse_loss(network_inputs, labels, NN, network_params(p, PNN.params))
+        opt = GeometricOptimizers.Optimizer(ps_flat, loss;
+            algorithm  = GeometricOptimizers.Adam(PT),
+            linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
+        state = GeometricOptimizers.OptimizerState(GeometricOptimizers.Adam(PT), ps_flat)
         for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs, labels, NN, p), PNN.params)[1]
-            GeometricMachineLearning.optimization_step!(opt, λ, PNN.params, gs)
+            GeometricOptimizers.increase_iteration_number!(state)
+            GeometricOptimizers.solver_step!(ps_flat, state, opt)
+            GeometricOptimizers.update!(state, opt, ps_flat)
         end
         @debug "dimension" k "final loss:" mse_loss(network_inputs, labels, NN, PNN.params) "in" nepochs "epochs"
 
