@@ -420,3 +420,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dict_amount` overflowed `T(dict_amount)` to `Inf`.
 - Removed a stray `global xk_low` from the OGA fit in
   `Time_reversible_Hardcode_int.jl`.
+
+## Open Issues
+
+Not a release section: this is a standing list of known defects that are understood but not
+fixed, so that reviewing the same code twice does not rediscover them. Entries move into a
+release's `Fixed` when they are dealt with.
+
+### Environment
+
+The first three are described in full under [Unreleased] → *Known issues*; they are listed here
+only so that this section is the complete index.
+
+- **The git `[sources]` pin blocks registration in General.** Clears when GeometricOptimizers
+  0.2 is registered.
+- **Julia 1.10 cannot install the package**, `[sources]` being a Pkg 1.11 feature. Clears at the
+  same moment, for the same reason.
+- **Julia 1.12 spends hours in type inference** on the GeometricOptimizers-driven initial-guess
+  methods. This one does not clear itself, and is the only one of the three that is a genuine
+  defect rather than a consequence of depending on an unregistered package.
+- **The Julia 1.13 CI test phase roughly doubled**, from about 10 minutes for the whole job on
+  `main` to 19m57s of tests here, and nothing found so far explains it. No local baseline is
+  available to compare against: `main`'s environment no longer resolves, which is what this
+  branch exists to fix, so the only local number is 8m19s for this branch — which matches what
+  the branch reports and says nothing about the delta. Worth re-measuring once `main` carries
+  these changes and a `main` baseline can be taken again.
+
+### Upstream
+
+- **`GeometricOptimizers.GradientMethod` cannot be used with a searching line search** on
+  Euclidean parameters: `_trial_slope` calls `gradient(cache)` while the first-order caches
+  expose `gradient_array`, so it throws `MethodError: no method matching
+  gradient(::GradientCache)` — including via the `default_linesearch` that `Optimizer` picks
+  when none is given. Recorded under *Not fixed here* in
+  [GeometricOptimizers#35](https://github.com/JuliaGNI/GeometricOptimizers.jl/pull/35). The
+  LSGD loop in `NonLinear_DenseNet_GML.jl` works only because it passes `Static` explicitly,
+  and there is a comment at that call site saying so.
+
+### Training loops and losses
+
+All of these predate the move to GeometricOptimizers; none is a regression.
+
+- **`mse_loss` is not the mean squared error.** It returns `mean(abs, y_pred - y)`, the mean
+  *absolute* error — as its own docstring says. Renaming it touches every training call site,
+  so it is left alone rather than changed silently; whichever way it is resolved, the name and
+  the formula should agree.
+- **`mse_loss`'s `μ` keyword is unused**, and its `λ` defaults to `0.0`, which switches off the
+  boundary penalty `λ * |NN(x[1], ps) - y[1]|²` that is the only thing `λ` and `μ` are there
+  for. No call site passes either, so the penalty is dead code at present.
+- **The early-exit thresholds are Float64 literals**: `err < 5e-8` for `TrainingMethod` and
+  `err < 5e-5` for `LSGD` in `NonLinear_DenseNet_GML.jl`. Neither is scaled to the working
+  precision, so at `Float32` — where `eps` is 1.2e-7 — the `TrainingMethod` exit is below the
+  accuracy a network fit can reach and the loop always runs the full epoch budget. They should
+  derive from `eps(PT)` the way the OGA guards now do.
+- **`NonLinear_OneLayer_GML`'s `TrainingMethod` has no early exit at all**, where the DenseNet
+  one does. That may well be deliberate, but the asymmetry is undocumented.
+- **`box_init_plain` defaults to `Float32`** and the three LSGD call sites take that default,
+  so a `Float64` DenseNet is seeded from `Float32` random draws that are then widened on
+  assignment. The suite's no-silent-upcast gate does not catch it, being a downcast of the
+  *seed* rather than of the solution. It should take the working precision, as
+  `simpson_quadrature` and the OGA dictionaries do.
+- **`NonLinear_DenseNet_GML`'s `TrainingMethod` passes the whole `NeuralNetwork` to
+  `mse_loss`** where the one-layer integrator passes the bare model, so the loss closure
+  captures more than it needs. Both work; they should agree.
+
+### Loops and allocation
+
+- **Four loop-invariant assignments sit inside `for i in 1:S₁`** in
+  `NonLinear_DenseNet_GML.jl`, in both `initial_params!` methods, in `components!` and in
+  `record_finer_solution!`. Only the `ps[k].L2.W[:, i]` line depends on `i`; the other four
+  slices are rewritten identically `S₁` times. `components!` runs on every residual evaluation,
+  so this is on the Newton path.
+- **`flatten_params` accumulates into an untyped `Vector{Any}`** and finishes with
+  `vcat(flat_list...)`, a splat whose length is not known to the compiler. `components!` calls
+  it `2 + 2R` times per dimension, `R` being the number of quadrature nodes — also on the
+  Newton path.
