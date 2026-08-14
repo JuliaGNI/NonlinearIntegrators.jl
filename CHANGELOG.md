@@ -12,42 +12,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`ShallowNetBasis{T}(σ, S; symbolic = false)`** builds the network without compiling the
   symbolic derivatives. `ShallowNetAutodiff` and `ShallowNetAutodiffReversible` differentiate
   their ansatz with `ForwardDiff` at run time and never read `dqdθ`, `V_func` or `dvdθ`, so
-  for them the build was pure overhead — 0.095 s against 0.003 s for `tanh` at `S = 8`,
-  Float64. The three integrators that *do* read those fields (`ShallowNet`,
-  `ShallowNetReversible`, `DenseNet`) now reject such a basis in their constructor instead of
-  failing on a `nothing` call inside `components!`. The new predicate
+  for them the build was pure overhead — 15 ms against 29 ns for `tanh` at `S = 8`, Float64,
+  once the code generation itself has been compiled. The three integrators that *do* read those
+  fields (`ShallowNet`, `ShallowNetReversible`, `DenseNet`) now reject such a basis in their
+  constructor instead of failing on a `nothing` call inside `components!`. The new predicate
   `has_symbolic_derivatives(basis)` is exported.
 
 - **`cse` and `inplace` keywords on `ShallowNetBasis` and `DenseNetBasis`**, forwarded to
   `SymbolicNeuralNetworks.build_nn_function`. Both default to `true`, which is also what that
   package uses — pinned here rather than left implicit, so an upstream change cannot silently
   change the code generation — and they exist to be turned *off*:
-  `cse = false, inplace = false` is the code generation of `SymbolicNeuralNetworks` 0.3.x,
-  which is how the new benchmark measures what 0.4.0 bought. `inplace = false` is also what a
-  caller who wants to differentiate the kernels with `Zygote` would need, since the in-place
-  form mutates its output.
+  `cse = false, inplace = false` re-emits the forward pass shared by the gradient blocks once
+  per block and evaluates a batch out of place, which is what the new benchmark measures the
+  two settings against each other for. `inplace = false` is also what a caller who wants to
+  differentiate the kernels with `Zygote` would need, since the in-place form mutates its
+  output.
 
 - **`benchmark/compare_derivative_backends.jl`**, comparing `ShallowNet` /
   `ShallowNetReversible` (symbolic derivatives) against `ShallowNetAutodiff` /
   `ShallowNetAutodiffReversible` (`ForwardDiff`), with the symbolic pair run under both
   code-generation settings. Three measurements: the one-off basis build, the end-to-end solve
   split into a cold and a warm run, and the derivative kernels timed in isolation. Measured at
-  Float64, `tanh`, per call:
+  Float64, `tanh`, median time and bytes per call:
 
-  | S | `cse+inplace` | `plain` | `ForwardDiff` |
-  |---|---|---|---|
-  | 4 | 0.083 µs / 528 B | 0.083 µs / 528 B | 1.38 µs / 6448 B |
-  | 8 | 0.084 µs / 720 B | 0.125 µs / 720 B | 2.96 µs / 16784 B |
-  | 16 | 0.166 µs / 1136 B | 0.792 µs / 2304 B | 7.92 µs / 54096 B |
+  | S | kernel | `cse+inplace` | `plain` | `ForwardDiff` |
+  |---|---|---|---|---|
+  | 4 | `dqdθ` | 0.042 µs / 528 B | 0.083 µs / 528 B | 1.375 µs / 6448 B |
+  | 4 | `dvdθ` | 0.083 µs / 528 B | 0.125 µs / 528 B | 1.500 µs / 8128 B |
+  | 8 | `dqdθ` | 0.083 µs / 720 B | 0.125 µs / 720 B | 2.792 µs / 16784 B |
+  | 8 | `dvdθ` | 0.083 µs / 720 B | 0.250 µs / 720 B | 3.416 µs / 22928 B |
+  | 16 | `dqdθ` | 0.125 µs / 1136 B | 0.792 µs / 2304 B | 7.791 µs / 54096 B |
+  | 16 | `dvdθ` | 0.167 µs / 1136 B | 1.042 µs / 2304 B | 9.291 µs / 77136 B |
 
-  The compiled kernels run 17–74× faster than `ForwardDiff` and allocate 12–68× less; within
-  the symbolic backend, 0.4.0's code generation pulls ahead of the old one as the network
-  widens (1.0× at `S = 4`, 4.8–6.0× at `S = 16`).
+  The compiled kernels run 18–62× faster than `ForwardDiff` and allocate 12–68× less; within
+  the symbolic backend, `cse+inplace` pulls ahead of `plain` as the network widens (1.5–2.0×
+  at `S = 4`, 6.2–6.3× at `S = 16`). Timer resolution is ~0.042 µs, so the narrow rows are one
+  tick apart and should be read as such.
 
   Note what the file does *not* claim. The two backends use different ansätze (raw network
   vs. boundary-interpolating) and different default OGA seeds, so accuracy and iteration
   counts compare methods, not backends. And while the two codegen settings agree to machine
-  epsilon at the kernel level (3e-17 at Float64), they do *not* agree end to end: the residual
+  epsilon at the kernel level (≤8e-17 at Float64), they do *not* agree end to end: the residual
   stalls near the round-off floor, so a last-bit difference decides which iterate Newton
   accepts. The report measures that amplification rather than asserting it away. See
   `benchmark/README.md`.
@@ -62,10 +67,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `benchmark/compare_derivative_backends.jl`, which reaches them through the `NI.` prefix
   and was updated with them.
 
+- **`SymbolicNeuralNetworks` 0.4 → 0.5**, and with it `AbstractNeuralNetworks` ≥ 0.6.4, which
+  is where 0.5 takes `input_dimension`/`output_dimension` from. 0.5 is a refactor of the whole
+  package below its exported surface, with no deprecation shims, but only one of its breaking
+  changes reaches this package: `symbolic_pullback` is now `symbolic_parameter_gradient`, and
+  for a *scalar* expression it returns the parameter-shaped gradient directly instead of a
+  one-element array holding it. Both bases were differentiating a scalar somewhere and
+  unwrapping the array afterwards, so the unwrapping went away with it.
+
+  Everything else the release changes is invisible here. `nn.input` became a `Vector{Num}`
+  rather than a `Symbolics.Arr` — this package only ever passes it through, and
+  `build_nn_function` accepts either. `build_nn_function` now returns an
+  `InPlaceBatchedFunction`/`OutOfPlaceBatchedFunction` instead of a closure, which makes
+  `NetworkBasisCore`'s `QWFT`/`VT`/`VWFT` type parameters concrete and inferable at no source
+  cost. `Jacobian` flattens a non-vector argument with `vec`, which our one-element case never
+  notices. Verified kernel by kernel against `ForwardDiff`: `dqdθ`, `dvdθ` and `V_func` agree
+  to round-off for both bases (≤ 5.6e-17 at Float64).
+
+  `DenseNetBasis` now builds `dvdθ` the way `ShallowNetBasis` does, by differentiating the
+  scalar entry of the 1×1 Jacobian rather than the whole array. The two bases had drifted
+  apart, and under 0.5 the array form wraps a one-element array of equation-set functions in
+  an extra indirection for nothing. `DVDθ` in `DenseNet.components!` consequently returns a
+  parameter set like `DQDθ` does, and the `[1,1]` that used to unwrap it is gone.
+
+  `benchmark/compare_derivative_backends.jl` was re-run against 0.5 and the tables above are
+  its output; the two codegen settings still agree to round-off (≤8e-17 at Float64, ≤8e-8 at
+  Float32) and `cse` still buys about 4× on the `DenseNetBasis` build. The absolute build
+  times quoted in the docstrings moved with the release and were re-measured with it.
+
 - **`SymbolicNeuralNetworks` 0.3 → 0.4.** A performance release with a source-compatible API:
   code generation now performs common-subexpression elimination, batches are evaluated by an
   in-place kernel writing into a single preallocated array, and an equation *set* (which is
-  what `symbolic_pullback` returns) is generated as one function rather than one per leaf.
+  what a symbolic parameter gradient is) is generated as one function rather than one per leaf.
   Measured here: `ShallowNetBasis` construction 1.6–2.0× faster, `DenseNetBasis` 4.1×
   (3.22 s → 0.79 s — the deeper network is where re-emitting the shared forward pass hurt
   most). No call site changed; the new `cse` and `inplace` keywords are set to the fast path,

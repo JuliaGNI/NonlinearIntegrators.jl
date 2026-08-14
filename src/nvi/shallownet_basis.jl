@@ -22,19 +22,21 @@ via `SymbolicNeuralNetworks.jl`, unless `symbolic = false`.
 `symbolic = false` exists for [`ShallowNetAutodiff`](@ref) and
 [`ShallowNetAutodiffReversible`](@ref): those two differentiate their ansatz with
 `ForwardDiff` at run time and never read the compiled derivatives, so building them is
-pure overhead — 0.095 s against 0.003 s for `tanh` at `S = 8`, Float64. The integrators that
+pure overhead — 15 ms against 29 ns for `tanh` at `S = 8`, Float64, once the code generation
+itself has been compiled; the basis is then just a `Chain`. The integrators that
 *do* read them ([`ShallowNet`](@ref), [`ShallowNetReversible`](@ref), [`DenseNet`](@ref))
 reject such a basis in their constructor; see [`has_symbolic_derivatives`](@ref).
 
 `cse` (common-subexpression elimination during code generation) and `inplace` (evaluate a
 batch through a kernel writing into one preallocated array) both default to `true`, which is
-also what `SymbolicNeuralNetworks` 0.4 uses. They are pinned here rather than left to the
+also what `SymbolicNeuralNetworks` 0.5 uses. They are pinned here rather than left to the
 upstream default so that a change there cannot silently change this package's code
-generation. They are exposed to be turned *off*: `cse = false, inplace = false` is the code
-generation `SymbolicNeuralNetworks` performed before 0.4.0, which is how
-`benchmark/compare_derivative_backends.jl` measures what that release bought. Note that
-`inplace = true` mutates its output and so cannot be differentiated with `Zygote`; nothing
-in this package does that, but a caller who wants to needs `inplace = false`.
+generation. They are exposed to be turned *off*: `cse = false, inplace = false` emits the
+whole shared forward pass once per gradient block and evaluates a batch out of place, one
+allocation per sample, which is what `benchmark/compare_derivative_backends.jl` measures the
+two settings against each other for. Note that `inplace = true` mutates its output and so
+cannot be differentiated with `Zygote`; nothing in this package does that, but a caller who
+wants to needs `inplace = false`.
 
 # Example
 
@@ -83,13 +85,17 @@ function build_shallownet_derivatives(NN; cse::Bool = true, inplace::Bool = true
     SNN = SymbolicNeuralNetwork(NN)
     build(eq) = build_nn_function(eq, SNN.params, SNN.input; cse = cse, inplace = inplace)
 
+    # The network maps a scalar to a scalar, so its output and its Jacobian are both
+    # one-element arrays. Differentiating the scalar entry rather than the array is what makes
+    # `symbolic_parameter_gradient` return the parameter-shaped gradient itself instead of an
+    # array holding one of them, which is the shape `components!` reads.
     soutput = SNN.model(SNN.input, SNN.params)
-    dqdθ_built = build(SymbolicNeuralNetworks.symbolic_pullback(soutput, SNN)[1,1])
+    dqdθ_built = build(SymbolicNeuralNetworks.symbolic_parameter_gradient(soutput[1], SNN))
 
     VNN = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Jacobian(SNN))
     V_built = build(VNN)
 
-    dvdθ_built = build(SymbolicNeuralNetworks.symbolic_pullback(VNN[1,1], SNN)[1])
+    dvdθ_built = build(SymbolicNeuralNetworks.symbolic_parameter_gradient(VNN[1,1], SNN))
 
     return SNN, dqdθ_built, V_built, dvdθ_built
 end
