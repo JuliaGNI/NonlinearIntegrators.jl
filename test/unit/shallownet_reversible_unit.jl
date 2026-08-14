@@ -24,13 +24,13 @@
 end
 
 # Cross-product: OGA1d × extrapolation variants, short run, finite check.
-const TROL_EXTRAPOLATIONS = [
+const REVERSIBLE_EXTRAPOLATIONS = [
     (NoExtrapolation(),          "NoExtrapolation"),
     (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
     (HermiteExtrapolation(),     "HermiteExtrapolation"),
 ]
 
-for T in TEST_TYPES, (extrap, extrap_name) in TROL_EXTRAPOLATIONS
+for T in TEST_TYPES, (extrap, extrap_name) in REVERSIBLE_EXTRAPOLATIONS
     @testset "ShallowNetReversible OGA1d × $extrap_name ($T)" begin
         prob = ho_problem(T; timespan = (T(0.0), T(0.2)), timestep = T(0.1))
         method = ShallowNetReversible(build_shallownet_basis(T; S = 4), gauss(T, 8);

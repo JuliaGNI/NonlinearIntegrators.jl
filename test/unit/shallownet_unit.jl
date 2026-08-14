@@ -4,7 +4,7 @@
 # on a short two-step run (finite-state check only). The Float16 dictionary regression
 # test is kept separate. The tight-accuracy Float64 guard lives in test/integration.
 
-build_ol_method(::Type{T}; R = 8, S = 4, k = 3, dict_amount = 400,
+build_shallownet_method(::Type{T}; R = 8, S = 4, k = 3, dict_amount = 400,
         init_method  = OGA1d(),
         extrap = IntegratorExtrapolation()) where {T} =
     ShallowNet(build_shallownet_basis(T; S = S, k = k), gauss(T, R);
@@ -20,7 +20,7 @@ build_ol_method(::Type{T}; R = 8, S = 4, k = 3, dict_amount = 400,
     prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];
         timespan = (T(0.0), T(1.0)), timestep = T(0.1), parameters = params)
 
-    sol, _ = integrate(prob, build_ol_method(T); regularization_factor = T(1e-5), max_iterations = MAX_NEWTON_ITERATIONS)
+    sol, _ = integrate(prob, build_shallownet_method(T); regularization_factor = T(1e-5), max_iterations = MAX_NEWTON_ITERATIONS)
 
     assert_no_upcast(sol.q, T)
     qend = collect(sol.q[:, 1])[end]
@@ -37,14 +37,14 @@ end
 # both element types, which looked like the κ(Φ)² conditioning of its Gram solve — but the
 # real cause was the Hermite path leaving `network_labels` at zero, which made the Gram
 # matrix rank-deficient for *any* fit. With that fixed it behaves like the rest.
-const OL_INIT_METHODS = [
+const SHALLOWNET_INIT_METHODS = [
     (OGA1d(),                "OGA1d"),
     (OGA1dNormalized(),      "OGA1dNormalized"),
     (OGA1dStable(),          "OGA1dStable"),
     (OGA1dNormalEquations(), "OGA1dNormalEquations"),
 ]
 
-const OL_EXTRAPOLATIONS = [
+const SHALLOWNET_EXTRAPOLATIONS = [
     (NoExtrapolation(),          "NoExtrapolation"),
     (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
     (HermiteExtrapolation(),     "HermiteExtrapolation"),
@@ -52,8 +52,8 @@ const OL_EXTRAPOLATIONS = [
 ]
 
 for T in TEST_TYPES,
-    (init_method, init_name) in OL_INIT_METHODS,
-    (extrap, extrap_name) in OL_EXTRAPOLATIONS
+    (init_method, init_name) in SHALLOWNET_INIT_METHODS,
+    (extrap, extrap_name) in SHALLOWNET_EXTRAPOLATIONS
 
     @testset "ShallowNet $init_name × $extrap_name ($T)" begin
         prob = ho_problem(T; timespan = (T(0.0), T(0.2)), timestep = T(0.1))
@@ -62,7 +62,7 @@ for T in TEST_TYPES,
         # accurate the seed is. The accuracy guards above and in test/integration use
         # the larger dictionaries.
         sol, _ = integrate(prob,
-            build_ol_method(T; init_method = init_method, extrap = extrap);
+            build_shallownet_method(T; init_method = init_method, extrap = extrap);
             regularization_factor = T(1e-5), max_iterations = MAX_NEWTON_ITERATIONS, hermite_kw(extrap)...)
         assert_no_upcast(sol.q, T)
         @test all(isfinite, collect(sol.q[:, 1])[end])
@@ -98,7 +98,7 @@ end
     # ---- end to end: only that the failure mode is one of the documented ones --
     prob = HarmonicOscillator.lodeproblem([Float16(0.5)], [Float16(0.0)];
         timespan = (Float16(0.0), Float16(0.2)), timestep = Float16(0.1))
-    method = build_ol_method(Float16; dict_amount = 70000)
+    method = build_shallownet_method(Float16; dict_amount = 70000)
 
     err = nothing
     try

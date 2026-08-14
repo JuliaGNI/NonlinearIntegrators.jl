@@ -180,10 +180,13 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
         C.X[1][d] = q̄[d]
     end
 
-    # copy x to X
-    for d in 1:D
-        for s in 1:S-1
-            C.X[s+1][d] = x[D*(d-1)+s]
+    # Copy x to X. The nonlinear solution vector holds the `S-1` free basis coefficients
+    # `X[2] … X[S]` with the degree of freedom running fastest: coefficient `s+1` of degree of
+    # freedom `d` sits at `x[D*(s-1)+d]`. That is the layout `initial_guess!` writes and the one
+    # `residual!` assumes for `b`; all three have to agree or the Jacobian picks up a zero column.
+    for s in 1:S-1
+        for d in 1:D
+            C.X[s+1][d] = x[D*(s-1)+d]
         end
     end
 
@@ -267,7 +270,12 @@ function GeometricIntegratorsBase.update!(sol, params, int::GeometricIntegrator{
     local S = nbasis(method(int))
     local h = timestep(int)
 
-    sol.q .= nlsolution(int)[end]
+    # The basis is interpolatory with a node at the end of the interval, so the last coefficient
+    # *is* the new position — one value per degree of freedom. Read it off `C.X`, which
+    # `components!` has just filled, rather than indexing into the flat solution vector.
+    for k in 1:D
+        sol.q[k] = C.X[S][k]
+    end
 
     for k in 1:D
         z = zero(DT)

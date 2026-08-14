@@ -1,5 +1,5 @@
-# Per-precision unit tests for ShallowNetAutodiff: the hardcoded-ansatz integrator that
-# builds derivatives with ForwardDiff rather than symbolic-network derivatives.
+# Per-precision unit tests for ShallowNetAutodiff: the integrator that differentiates a
+# hand-written ansatz with ForwardDiff rather than using symbolic-network derivatives.
 # The interval boundary points t=0/t=1 must stay at the (plain) quadrature element
 # type rather than the solver's Dual type — the main reason this was precision-fragile.
 # ShallowNetAutodiffReversible tests live in shallownet_autodiff_reversible_unit.jl.
@@ -28,13 +28,13 @@ end
 # Cross-product: the default seed × extrapolation variants, short run, finite check.
 #
 # See `hermite_kw` in testsetup.jl for why the Hermite row also passes `initialguess`.
-const HC_EXTRAPOLATIONS = [
+const AUTODIFF_EXTRAPOLATIONS = [
     (NoExtrapolation(),          "NoExtrapolation"),
     (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
     (HermiteExtrapolation(),     "HermiteExtrapolation"),
 ]
 
-for T in TEST_TYPES, (extrap, extrap_name) in HC_EXTRAPOLATIONS
+for T in TEST_TYPES, (extrap, extrap_name) in AUTODIFF_EXTRAPOLATIONS
     @testset "ShallowNetAutodiff OGA1dNormalized × $extrap_name ($T)" begin
         prob = ho_problem(T; timespan = (T(0.0), T(0.2)), timestep = T(0.1))
         method = ShallowNetAutodiff(build_shallownet_basis(T; S = 4), gauss(T, 8);

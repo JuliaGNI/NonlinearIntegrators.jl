@@ -1,5 +1,5 @@
-# Per-precision unit tests for ShallowNetAutodiffReversible: the time-reversible variant
-# of the hardcoded-ansatz integrator. The accuracy guard uses the default
+# Per-precision unit tests for ShallowNetAutodiffReversible: the time-reversible variant of
+# the ForwardDiff-on-a-hand-written-ansatz integrator. The accuracy guard uses the default
 # OGA1d × IntegratorExtrapolation combination. The cross-product loop covers the
 # extrapolation variants (only the OGA seeds are supported as init methods).
 
@@ -23,13 +23,13 @@
 end
 
 # Cross-product: OGA1d × extrapolation variants, short run, finite check.
-const TRHC_EXTRAPOLATIONS = [
+const AUTODIFF_REVERSIBLE_EXTRAPOLATIONS = [
     (NoExtrapolation(),          "NoExtrapolation"),
     (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
     (HermiteExtrapolation(),     "HermiteExtrapolation"),
 ]
 
-for T in TEST_TYPES, (extrap, extrap_name) in TRHC_EXTRAPOLATIONS
+for T in TEST_TYPES, (extrap, extrap_name) in AUTODIFF_REVERSIBLE_EXTRAPOLATIONS
     @testset "ShallowNetAutodiffReversible OGA1d × $extrap_name ($T)" begin
         prob = ho_problem(T; timespan = (T(0.0), T(0.2)), timestep = T(0.1))
         method = ShallowNetAutodiffReversible(build_shallownet_basis(T; S = 4), gauss(T, 8);

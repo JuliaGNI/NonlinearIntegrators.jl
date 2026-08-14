@@ -17,7 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `src/network_integrators/` merge into `src/nvi/` (network variational integrators),
   `src/CGVI_standard/` becomes `src/cgvi/`, and `src/SINDy_methods/` becomes `src/vise/`,
   joining the existing `src/oga/`. Test, script, benchmark and documentation files follow the
-  same scheme.
+  same scheme. Within a directory each file is named after what it defines — `shallownet.jl`,
+  `shallownet_basis.jl`, `densenet.jl`, `densenet_basis.jl`, `vise.jl`, `vise_basis.jl`,
+  `cgvi.jl` — so the `Linear`/`NonLinear` and `_Int` markers disappear along with the type
+  names that carried them.
 
   Integrators keep the bare family name and carry the variant as a suffix:
 
@@ -143,27 +146,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known issues
 
-- **`CGVINodal` (formerly `CGVI_standard`) cannot integrate a problem with more than one degree
-  of freedom.** Found while diffing it against `GeometricIntegrators.CGVI` for the rename above;
-  pre-existing and not introduced here, and not fixed here either — this release changes names
-  only. A `D = 2` run (Hénon–Heiles, Lagrange basis on 4 Lobatto nodes) dies in the first step
-  with `SingularException: Zero pivot found at index 6`, against `D*(S-1) = 6` unknowns.
-
-  Three layout mistakes, all of which collapse to the identity at `D = 1`:
-
-  - `components!` unpacks the nonlinear solution as `C.X[s+1][d] = x[D*(d-1)+s]` — a stride of
-    `D` per degree of freedom, but `S-1` values stored per degree of freedom. At `D = 2, S = 4`
-    that reads `x[3]` twice and never reads `x[6]`, leaving column 6 of the Jacobian identically
-    zero. That is the zero pivot.
-  - `residual!` uses the opposite ordering, `b[D + D*(i-1) + k]`, with the degree of freedom
-    fastest — so the residual and the unknown vector disagree about the layout.
-  - `update!` assigns `sol.q .= nlsolution(int)[end]`, broadcasting one scalar across all `D`
-    components, where it should read one endpoint coefficient per degree of freedom.
-
-  The unit test (`test/unit/cgvi_unit.jl`) exercises the `D = 1` harmonic oscillator only, which
-  is why this passes CI. A fix needs to settle on one layout, apply it in all three places, and
-  add a `D > 1` regression test. Only this reference integrator is affected; the network
-  integrators and `VISE` handle `D > 1` and are covered at `D = 2` by the benchmark suite.
 - `GeometricOptimizers` 0.2.0 is taken from git via `[sources]`, the registry carrying only 0.1.0.
   A git `[sources]` entry blocks registration in General, so this package cannot be tagged until
   GeometricOptimizers is released; drop the `[sources]` section then.
@@ -193,6 +175,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`CGVINodal` (formerly `CGVI_standard`) can integrate problems with more than one degree of
+  freedom.** Found while diffing it against `GeometricIntegrators.CGVI` for the rename above, and
+  pre-existing rather than introduced by it: a `D = 2` run (Lagrange basis on 4 Lobatto nodes)
+  died in the first step with `SingularException: Zero pivot found at index 6`, against
+  `D*(S-1) = 6` unknowns.
+
+  Four places index the flat vector of `S-1` free basis coefficients per degree of freedom, and
+  two of them — `initial_guess!` (`x[D*(i-1)+k]`) and `residual!` (`b[D + D*(i-1)+k]`) — already
+  agreed on *degree of freedom fastest, basis index slowest*. The other two did not:
+
+  - `components!` unpacked the solution as `C.X[s+1][d] = x[D*(d-1)+s]`, which is neither
+    convention. At `D = 2, S = 4` that read `x[3]` twice and never read `x[6]`, leaving column 6
+    of the Jacobian identically zero — the zero pivot. It now reads `x[D*(s-1)+d]`.
+  - `update!` assigned `sol.q .= nlsolution(int)[end]`, broadcasting one scalar across all `D`
+    components of `q`. It now takes the last basis coefficient per degree of freedom from `C.X`,
+    which the basis being interpolatory at the end of the interval makes the new position.
+
+  Both corrections are the identity at `D = 1`, so the existing `D = 1` guards are unchanged to
+  the last bit. `test/unit/cgvi_unit.jl` gains a `D = 2` regression test built on
+  `CoupledHarmonicOscillator` with the coupling parameter set to zero, which decouples it into two
+  independent oscillators with different frequencies and different initial conditions, so each
+  degree of freedom is checked against its own closed-form solution and a layout mistake cannot
+  hide behind a merely worse number. Only this reference integrator was affected; the network
+  integrators and `VISE` already handled `D > 1`.
 - The package loads on Julia 1.13 again. `GenericLinearAlgebra` overwrites a `LinearAlgebra`
   method, which 1.13 forbids during precompilation, and that took `RungeKutta` and hence
   `GeometricIntegrators` down with it. Both have left the dependency graph.

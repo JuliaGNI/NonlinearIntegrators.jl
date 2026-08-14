@@ -41,7 +41,7 @@ end
 # function Base.show(io::IO,basis::VISEBasis)
 #     print(io, "\n")
 #     print(io, "  =====================================", "\n")
-#     print(io, "  ======PR Basis by Symbolics======", "\n")
+#     print(io, "  =====VISE Basis by Symbolics=====", "\n")
 #     print(io, "  =====================================", "\n")
 #     print(io, "\n")
 # end

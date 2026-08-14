@@ -78,8 +78,8 @@ export ShallowNetBasis
 # The Lux and vector-valued network variants, and the BSpline bases and integrators, are
 # retired: they live under `obsolete/` and are not part of the package.
 
-include("nvi/shallownet_nonlinear.jl")
-include("nvi/densenet_nonlinear.jl")
+include("nvi/shallownet.jl")
+include("nvi/densenet.jl")
 export ShallowNet, DenseNet
 
 include("nvi/shallownet_autodiff.jl")
@@ -95,7 +95,7 @@ include("oga/normal_equations.jl")
 
 # Variational integrators with a symbolic expression as the ansatz.
 using Symbolics
-include("vise/vise_integrator.jl")
+include("vise/vise.jl")
 include("vise/vise_basis.jl")
 export VISE, VISEBasis
 

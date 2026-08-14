@@ -36,7 +36,7 @@ include("testsetup.jl")
         include("unit/shallownet_autodiff_reversible_unit.jl")
         include("unit/densenet_unit.jl")
         include("unit/dispatch_variants_unit.jl")
-        include("unit/vise_integrator_unit.jl")
+        include("unit/vise_unit.jl")
     end
 
     @testset "integration" begin

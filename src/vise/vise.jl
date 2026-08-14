@@ -312,10 +312,10 @@ end
 function GeometricIntegratorsBase.integrate_step!(sol, history, params, int::GeometricIntegrator{<:VISE,<:AbstractProblemIODE})
     # call nonlinear solver
     # solve!(nlsolution(int), (b,x) -> GeometricIntegratorsBase.residual!(b, x, sol, params, int), solver(int))+
-    # Argument order is (x, solver, args), as in `CGVINodal.jl` and the network
+    # Argument order is (x, solver, args), as in `cgvi/cgvi.jl` and the network
     # integrators' shared `integrate_step!`. It read `solve!(solver, x, args)` here, which
     # matches no `SimpleSolvers.solve!` method — a `MethodError` on the first step. It went
-    # unnoticed because `test/unit/vise_integrator_unit.jl` was written but never included.
+    # unnoticed because `test/unit/vise_unit.jl` was written but never included.
     solve!(nlsolution(int), solver(int), (sol, params, int))
 
     # print solver status
