@@ -748,6 +748,14 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   those four sites or drop them. Surfaced while renaming `*_anstaz_*` to `*_ansatz_*`, which
   had to touch all four.
 
+  Two details that bear on which way it goes. Their signature is the reason nothing calls
+  them: all four take `(ps, S, activation, t, q̄, q)` and read only `t`, so at the four sites
+  above a six-argument call would replace an expression as short as `1 - t`, five of whose
+  arguments are there to be discarded. Reviving them means fixing the signature first. And
+  `∂NN_ansatz_∂q̄` is written `one(t) .- t`, broadcasting where its three scalar siblings do
+  not — harmless on a scalar `t`, but it is the kind of drift a definition nothing exercises
+  accumulates.
+
 - **`src/nvi/shallownet_autodiff_reversible.jl:218-244` is a commented-out duplicate** of the
   ansatz definitions that live, uncommented, in `shallownet_autodiff.jl:212-238`. It is
   already stale: it still spells the boundary factors `1.0 - t` where the live copy uses
@@ -755,6 +763,23 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   it were ever uncommented. It also has to be hand-edited to keep it in step — the
   `*_anstaz_*` rename did exactly that, for a block no compiler checks. It should be deleted;
   the reversible integrator gets these functions from the module, not from this block.
+
+- **`ShallowNetAutodiff` and `ShallowNetAutodiffReversible` have drifted apart in two spots
+  where they should read identically.** The two integrators are near-copies of each other, so
+  every gratuitous difference is a place a reader has to stop and work out whether it is
+  meaningful. Neither of these is:
+
+  - `update!` initialises its accumulator as `zero(eltype(sol.p))` in
+    `src/nvi/shallownet_autodiff.jl:434` and as `zero(DT)` in
+    `src/nvi/shallownet_autodiff_reversible.jl:443`. Same type, two spellings; `zero(DT)` is
+    the one that says where the type comes from.
+  - The two `show_status ? println(...)` residual dumps at the end of `residual!` are live in
+    `shallownet_autodiff_reversible.jl:428-429` and commented out in
+    `shallownet_autodiff.jl:419-420`. `show_status` defaults to `false`, so nothing prints
+    either way, but the pair should agree on whether the facility exists.
+
+  Both surfaced while reviewing the `*_anstaz_*` → `*_ansatz_*` rename, which read the two
+  files side by side.
 
 - **`docs/src/index.md` renders past Documenter's `size_threshold_warn`** (117 KiB against
   100 KiB), warning on every build. Still well under the 200 KiB hard threshold. It wants
