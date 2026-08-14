@@ -22,7 +22,7 @@ struct NetworkIntegratorCore{T, NNODES, basisType <: Basis{T},
         initial_guess_method      :: IPMT = OGA1d(),
         record_grid_points        :: Int  = 41,
     ) where {T, ET <: Extrapolation, IPMT <: InitialParametersMethod}
-        NNODES = QuadratureRules.nnodes(quadrature)
+        NNODES = nnodes(quadrature)
         b = SVector{NNODES, T}(QuadratureRules.weights(quadrature))
         c = SVector{NNODES, T}(QuadratureRules.nodes(quadrature))
         network_inputs = reshape(
@@ -57,7 +57,7 @@ Base.propertynames(m::NetworkIntegratorMethod, private::Bool = false) =
 basis(m::NetworkIntegratorMethod)  = m.basis
 nbasis(m::NetworkIntegratorMethod) = m.basis.S
 quadrature(m::NetworkIntegratorMethod)                   = m.quadrature
-nnodes(m::NetworkIntegratorMethod)                       = QuadratureRules.nnodes(m.quadrature)
+nnodes(m::NetworkIntegratorMethod)                       = nnodes(m.quadrature)
 activation(m::NetworkIntegratorMethod)                   = m.basis.activation
 extrapolation_substep(m::NetworkIntegratorMethod)         = m.common.extrapolation_substep
 training_epochs(m::NetworkIntegratorMethod)              = m.common.training_epochs

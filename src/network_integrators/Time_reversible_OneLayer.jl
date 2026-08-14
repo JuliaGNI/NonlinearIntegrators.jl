@@ -47,7 +47,7 @@ struct Time_reversible_OneLayer{T, NNODES, basisType <: Basis{T},
             initial_trajectory_method=initial_trajectory_method,
             initial_guess_method=initial_guess_method,
             record_grid_points = record_grid_points)
-        new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(
+        new{T, nnodes(quadrature), typeof(basis), ET, IPMT}(
             common, SVector{2,T}(bias_interval), dict_amount)
     end
 end

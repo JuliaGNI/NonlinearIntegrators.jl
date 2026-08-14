@@ -41,7 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`src/network_integrators/utilities.jl`) convert between the nested per-layer parameters of
   `AbstractNeuralNetworks` and the flat `NamedTuple` of arrays that GeometricOptimizers
   accepts. They alias rather than copy, so the optimizer's in-place updates remain visible
-  through `PNN.params`.
+  through `PNN.params`. Both are `@generated`: written as ordinary code they build their key
+  set with `Symbol(lname, :_, f)` at run time, which inference cannot fold, so
+  `optimizer_params` returned an abstract `NamedTuple` and `network_params` — which runs inside
+  the differentiated loss on every gradient evaluation — was inferred no better.
 
 ### Removed
 
@@ -69,13 +72,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unused imports in `src/NonlinearIntegrators.jl`: `relative_maximum_error` (replaced by the
   `GeometricSolution` and `timesteps` the source actually names), `Options`, `NonlinearSolver`,
   `DogLeg`, and a no-op `using Base`.
+- `Optimisers` is no longer a dependency. It was carried as a bare `using` with no call site
+  anywhere in `src/`; the training loops it once served moved to GeometricMachineLearning long
+  before this release and now to GeometricOptimizers.
 
 ### Known issues
 
 - `GeometricOptimizers` 0.2.0 is taken from git via `[sources]`, the registry carrying only 0.1.0.
   A git `[sources]` entry blocks registration in General, so this package cannot be tagged until
-  GeometricOptimizers is released; drop the `[sources]` section then, here and in
-  `benchmark/Project.toml` and `scripts/Project.toml`.
+  GeometricOptimizers is released; drop the `[sources]` section then.
+- **Julia 1.10 cannot install this package while that `[sources]` pin is present.** `[sources]`
+  is a Pkg 1.11 feature; 1.10 ignores the table, so `GeometricOptimizers = "0.2"` has no
+  candidate and `Pkg` fails with *"Unsatisfiable requirements detected for package
+  GeometricOptimizers … restricted to versions 0.2 by NonlinearIntegrators — no versions left"*.
+  This is a resolver limitation and not a source incompatibility: the `julia = "1.10"` compat
+  entry is accurate for the code and is deliberately left in place, and 1.10 starts working
+  again the moment the `[sources]` section can be dropped. The three Julia 1.10 CI jobs are
+  expected to be red until then.
+- **The test suite takes hours on Julia 1.12** — 287 minutes in CI against ~20 on 1.13 and ~10
+  on `main` before this release. Measured locally, a two-step `NonLinear_OneLayer_GML` run with
+  `initial_guess_method = TrainingMethod()` takes over 30 minutes on 1.12 and 28.8 seconds on
+  1.13; the same integrator with `OGA1d()`, which never touches GeometricOptimizers, takes 28.0
+  seconds on 1.12. `LSGD` is affected as well, so it is not specific to `Adam`. The process sits
+  in `jl_type_infer`, and `--trace-compile` stops emitting — an inference blowup, not numerical
+  work.
+
+  Not the same bug as GeometricOptimizers
+  [#35](https://github.com/JuliaGNI/GeometricOptimizers.jl/pull/35), which is in the manifest
+  and does not help here. Standalone reproductions of the optimizer usage — construction and
+  `solver_step!` in one body, `Adam` + `DecayingStatic`, the loss evaluating an
+  `AbstractNeuralNetworks.Chain` at `NeuralNetworkParameters` under the default ForwardDiff
+  gradient — all run in about 2 seconds on 1.12. The blowup only appears once that call sits
+  inside the `integrate` call graph. Unresolved; 1.13 and 1.10 are unaffected.
 
 ### Fixed
 

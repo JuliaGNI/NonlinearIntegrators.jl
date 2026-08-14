@@ -47,7 +47,7 @@ struct NonLinear_DenseNet_GML{T, NNODES, basisType <: Basis{T},
             initial_trajectory_method=initial_trajectory_method,
             initial_guess_method=initial_guess_method,
             record_grid_points = record_grid_points)
-        new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(common)
+        new{T, nnodes(quadrature), typeof(basis), ET, IPMT}(common)
     end
 end
 
@@ -228,11 +228,11 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
         local PT = eltype(PNN.params[1].W)
         ps_flat = optimizer_params(PNN.params)
         loss(p) = mse_loss(network_inputs, labels, PNN, network_params(p, PNN.params))
-        opt = GeometricOptimizers.Optimizer(ps_flat, loss;
-            algorithm  = GeometricOptimizers.Adam(PT),
+        algorithm = GeometricOptimizers.Adam(PT)
+        opt = GeometricOptimizers.Optimizer(ps_flat, loss; algorithm = algorithm,
             linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
-        state = GeometricOptimizers.OptimizerState(GeometricOptimizers.Adam(PT), ps_flat)
-        err = 0
+        state = GeometricOptimizers.OptimizerState(algorithm, ps_flat)
+        err = zero(PT)
         for ep in 1:nepochs
             GeometricOptimizers.increase_iteration_number!(state)
             GeometricOptimizers.solver_step!(ps_flat, state, opt)
@@ -296,11 +296,17 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
         tem_flat = optimizer_params(tem_ps)
         loss(p) = lsgd_loss(network_inputs, labels, NN,
             NeuralNetworkParameters(merge(network_params(p, tem_ps), (L3 = PNN.params.L3,))))
-        opt = GeometricOptimizers.Optimizer(tem_flat, loss;
-            algorithm  = GeometricOptimizers.GradientMethod(),
+        algorithm = GeometricOptimizers.GradientMethod()
+        # The `Static` line search is not a style choice: `GradientMethod` with any *searching*
+        # line search throws `MethodError: no method matching gradient(::GradientCache)` on
+        # Euclidean parameters, because `_trial_slope` wants `gradient(cache)` and the
+        # first-order caches expose `gradient_array`. That makes even the default line search
+        # `Optimizer` would pick unusable here. See the "Not fixed here" section of
+        # https://github.com/JuliaGNI/GeometricOptimizers.jl/pull/35.
+        opt = GeometricOptimizers.Optimizer(tem_flat, loss; algorithm = algorithm,
             linesearch = GeometricOptimizers.Static(PT(1e-3)))
-        state = GeometricOptimizers.OptimizerState(GeometricOptimizers.GradientMethod(), tem_flat)
-        err = 0
+        state = GeometricOptimizers.OptimizerState(algorithm, tem_flat)
+        err = zero(PT)
 
         for ep in 1:nepochs
             Φ = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)(network_inputs,tem_ps)

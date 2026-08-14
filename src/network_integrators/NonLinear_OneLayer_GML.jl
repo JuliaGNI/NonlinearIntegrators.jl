@@ -57,7 +57,7 @@ struct NonLinear_OneLayer_GML{T, NNODES, basisType <: Basis{T},
             initial_trajectory_method=initial_trajectory_method,
             initial_guess_method=initial_guess_method,
             record_grid_points =  record_grid_points)
-        new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(
+        new{T, nnodes(quadrature), typeof(basis), ET, IPMT}(
             common, SVector{2,T}(bias_interval), dict_amount)
     end
 end
@@ -186,10 +186,10 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
         local PT = eltype(PNN.params[1].W)
         ps_flat = optimizer_params(PNN.params)
         loss(p) = mse_loss(network_inputs, labels, NN, network_params(p, PNN.params))
-        opt = GeometricOptimizers.Optimizer(ps_flat, loss;
-            algorithm  = GeometricOptimizers.Adam(PT),
+        algorithm = GeometricOptimizers.Adam(PT)
+        opt = GeometricOptimizers.Optimizer(ps_flat, loss; algorithm = algorithm,
             linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
-        state = GeometricOptimizers.OptimizerState(GeometricOptimizers.Adam(PT), ps_flat)
+        state = GeometricOptimizers.OptimizerState(algorithm, ps_flat)
         for ep in 1:nepochs
             GeometricOptimizers.increase_iteration_number!(state)
             GeometricOptimizers.solver_step!(ps_flat, state, opt)

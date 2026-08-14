@@ -27,7 +27,7 @@ struct CGVI_standard{T,NBASIS,NNODES,NDOF,basisType<:Basis{T}} <: LODEMethod
 
     function CGVI_standard(basis::Basis{T}, quadrature::QuadratureRule{T}) where {T}
         # get number of quadrature nodes and number of basis functions
-        NNODES = QuadratureRules.nnodes(quadrature)
+        NNODES = nnodes(quadrature)
         NBASIS = CompactBasisFunctions.nbasis(basis)
 
         # get quadrature nodes and weights

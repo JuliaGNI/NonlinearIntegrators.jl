@@ -21,7 +21,6 @@ import GeometricBase: basis, nnodes
 import CompactBasisFunctions: nbasis
 using Zygote
 using Random
-using Optimisers
 using Statistics
 using StaticArrays
 using SimpleSolvers: Newton, solve!

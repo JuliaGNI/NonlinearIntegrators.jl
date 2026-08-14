@@ -12,14 +12,14 @@ struct PR_Integrator{T,NNODES,basisType<:Basis{T}} <: LODEMethod
         extrapolation_substep::Int=10) where {T}
         quad_weights = quadrature.weights
         quad_nodes = quadrature.nodes
-        NNODES = QuadratureRules.nnodes(quadrature)
+        NNODES = nnodes(quadrature)
         new{T,NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, init_w, extrapolation_substep)
     end
 end
 
 basis(method::PR_Integrator) = method.basis
 quadrature(method::PR_Integrator) = method.quadrature
-nnodes(method::PR_Integrator) = QuadratureRules.nnodes(method.quadrature)
+nnodes(method::PR_Integrator) = nnodes(method.quadrature)
 
 isexplicit(::Union{PR_Integrator,Type{<:PR_Integrator}}) = false
 isimplicit(::Union{PR_Integrator,Type{<:PR_Integrator}}) = true
