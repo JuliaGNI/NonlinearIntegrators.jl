@@ -54,6 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The hardcoded-ansatz helpers of `ShallowNetAutodiff` / `ShallowNetAutodiffReversible`
+  spell "ansatz" correctly.** `NN_anstaz`, `VNN_anstaz`, `VNN_anstaz_zygote`,
+  `∂NN_anstaz_∂params`, `∂VNN_anstaz_∂params`, `∂NN_anstaz_∂q̄`, `∂NN_anstaz_∂q`,
+  `∂VNN_anstaz_∂q̄` and `∂VNN_anstaz_∂q` became `*_ansatz_*`. Names only; no behaviour
+  changed. None of them is exported, and the only call site outside `src/` was
+  `benchmark/compare_derivative_backends.jl`, which reaches them through the `NI.` prefix
+  and was updated with them.
+
 - **`SymbolicNeuralNetworks` 0.3 → 0.4.** A performance release with a source-compatible API:
   code generation now performs common-subexpression elimination, batches are evaluated by an
   in-place kernel writing into a single preallocated array, and an equation *set* (which is
@@ -70,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole 4.1×.
 
   Two things to know. The in-place result cannot be differentiated with `Zygote`, which is
-  fine here — the only `Zygote.gradient` in the package (`VNN_anstaz_zygote`) differentiates
+  fine here — the only `Zygote.gradient` in the package (`VNN_ansatz_zygote`) differentiates
   a hand-written ansatz, and the generated kernels only ever see `ForwardDiff.Dual`. And the
   output element type is now promoted over the *inputs* rather than inferred from the
   expression, so a `Float32`/`Float16` network whose generated code contains a `Float64`
@@ -152,7 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CompactBasisFunctions`, which is what the new versions require. RungeKutta 0.6 is satisfied
   vacuously: it is not a dependency of this package at all any more (see below).
 - Zygote compat widened to `0.6, 0.7`; the graph resolves to 0.7.12. Zygote remains a direct
-  dependency for `VNN_anstaz_zygote`, which supplies the velocity of the hardcoded ansatz in
+  dependency for `VNN_ansatz_zygote`, which supplies the velocity of the hardcoded ansatz in
   `ShallowNetAutodiff` and `ShallowNetAutodiffReversible`.
 - **`ImplicitMidpoint` now comes from `GeometricIntegratorsBase`** for the
   `IntegratorExtrapolation` warm start and `VISE`, and requires 0.6: the warm start
@@ -243,6 +251,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   inside the `integrate` call graph. Unresolved; 1.13 and 1.10 are unaffected.
 
 ### Fixed
+
+- **The `residual!` of the autodiff pair no longer accumulates in `Float64` at reduced
+  precision.** Three `Float64` literals sat in the `p̄` row of the residual — `(1.0 -
+  quad_nodes[j])` and `(-1.0)` in `src/nvi/shallownet_autodiff.jl:390-391`, `(-1.0)` in
+  `src/nvi/shallownet_autodiff_reversible.jl:401` — where they stand in for the analytic
+  boundary derivatives `∂q_h/∂q̄ = 1-t` and `∂v_h/∂q̄ = -1`. The accumulator `z` starts as
+  `zero(ST)`, and during the Newton solve `ST` is a `ForwardDiff.Dual`; multiplying by a
+  `Float64` literal promotes it, so at `Float32` the residual was summed as
+  `Dual{…,Float64}` and only rounded back on the write into `b::Vector{ST}`. That is a
+  silent upcast the suite cannot see — `assert_no_upcast` checks the eltype of the final
+  state, which is converted back — and it retypes `z` mid-loop on the Newton path. They are
+  now integer literals, `(1 - quad_nodes[j])` and `(-1)`, which is the idiom
+  `shallownet_autodiff_reversible.jl:400` already used and which takes the precision of the
+  operand instead of imposing one. `Float64` results are bit-identical; `Float32` moves by
+  round-off. Found while reviewing the `*_anstaz_*` → `*_ansatz_*` rename, which is what
+  drew attention to these hand-written copies of the boundary derivatives.
 
 - **`CGVINodal` (formerly `CGVI_standard`) can integrate problems with more than one degree of
   freedom.** Found while diffing it against `GeometricIntegrators.CGVI` for the rename above, and
@@ -675,14 +699,14 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   (`m × (n·N)`, column-major) worked into the slicing.
 
 - **The autodiff pair computes the velocity with `Zygote` and its parameter gradient with
-  `ForwardDiff`,** for the same expression. `VNN_anstaz_zygote`
+  `ForwardDiff`,** for the same expression. `VNN_ansatz_zygote`
   (`src/nvi/shallownet_autodiff.jl:228`) is what fills `V` at the quadrature nodes
   (`shallownet_autodiff.jl:341`, `shallownet_autodiff_reversible.jl:351`), while
-  `∂VNN_anstaz_∂params` differentiates the `ForwardDiff` version, `VNN_anstaz`
+  `∂VNN_ansatz_∂params` differentiates the `ForwardDiff` version, `VNN_ansatz`
   (`shallownet_autodiff.jl:230-232`). Both compute `dq_h/dt`. Reverse mode for a
   scalar-in/scalar-out derivative is the wrong tool, and the mismatch is at odds with the
   `Autodiff` name, which the 0.3.0 rename introduced to mean `ForwardDiff`. Switching the
-  value to `VNN_anstaz` looks like a one-line change; it is untested and would move the
+  value to `VNN_ansatz` looks like a one-line change; it is untested and would move the
   numbers, so it is not one to make blind.
 
 ### Nonlinear solve conditioning
@@ -709,6 +733,53 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   `scripts/`, `benchmark/` or `docs/` reads it. The values duplicate the defaults the
   constructors already carry, so it is documentation in code form that nothing keeps honest.
   Either wire it into the constructors as *the* source of the default, or drop it.
+
+- **The four analytic boundary derivatives of the hardcoded ansatz are called nowhere.**
+  `∂NN_ansatz_∂q̄`, `∂NN_ansatz_∂q`, `∂VNN_ansatz_∂q̄` and `∂VNN_ansatz_∂q`
+  (`src/nvi/shallownet_autodiff.jl:234-238`) return `1-t`, `t`, `-1` and `1` — the exact
+  derivatives of `q_h` and `dq_h/dt` with respect to the two endpoint unknowns — and nothing
+  in `src/`, `test/`, `scripts/`, `benchmark/` or `docs/` reads them. All four are written out
+  by hand elsewhere: `residual!` spells the two `∂/∂q̄` ones into the `p̄` row of the residual
+  (`shallownet_autodiff.jl:390-391`, `shallownet_autodiff_reversible.jl:400-401`) and
+  `update!` spells the two `∂/∂q` ones into the momentum update
+  (`shallownet_autodiff.jl:437-438`, `shallownet_autodiff_reversible.jl:446-447`, where the
+  `∂VNN/∂q = 1` factor is left implicit). Neither is `components!`, and neither assembles a
+  Jacobian — the solver differentiates one out of `residual!`. Either call the helpers at
+  those four sites or drop them. Surfaced while renaming `*_anstaz_*` to `*_ansatz_*`, which
+  had to touch all four.
+
+  Two details that bear on which way it goes. Their signature is the reason nothing calls
+  them: all four take `(ps, S, activation, t, q̄, q)` and read only `t`, so at the four sites
+  above a six-argument call would replace an expression as short as `1 - t`, five of whose
+  arguments are there to be discarded. Reviving them means fixing the signature first. And
+  `∂NN_ansatz_∂q̄` is written `one(t) .- t`, broadcasting where its three scalar siblings do
+  not — harmless on a scalar `t`, but it is the kind of drift a definition nothing exercises
+  accumulates.
+
+- **`src/nvi/shallownet_autodiff_reversible.jl:218-244` is a commented-out duplicate** of the
+  ansatz definitions that live, uncommented, in `shallownet_autodiff.jl:212-238`. It is
+  already stale: it still spells the boundary factors `1.0 - t` where the live copy uses
+  `one(t) - t`, so it predates the precision-generic refactor and would silently upcast if
+  it were ever uncommented. It also has to be hand-edited to keep it in step — the
+  `*_anstaz_*` rename did exactly that, for a block no compiler checks. It should be deleted;
+  the reversible integrator gets these functions from the module, not from this block.
+
+- **`ShallowNetAutodiff` and `ShallowNetAutodiffReversible` have drifted apart in two spots
+  where they should read identically.** The two integrators are near-copies of each other, so
+  every gratuitous difference is a place a reader has to stop and work out whether it is
+  meaningful. Neither of these is:
+
+  - `update!` initialises its accumulator as `zero(eltype(sol.p))` in
+    `src/nvi/shallownet_autodiff.jl:434` and as `zero(DT)` in
+    `src/nvi/shallownet_autodiff_reversible.jl:443`. Same type, two spellings; `zero(DT)` is
+    the one that says where the type comes from.
+  - The two `show_status ? println(...)` residual dumps at the end of `residual!` are live in
+    `shallownet_autodiff_reversible.jl:428-429` and commented out in
+    `shallownet_autodiff.jl:419-420`. `show_status` defaults to `false`, so nothing prints
+    either way, but the pair should agree on whether the facility exists.
+
+  Both surfaced while reviewing the `*_anstaz_*` → `*_ansatz_*` rename, which read the two
+  files side by side.
 
 - **`docs/src/index.md` renders past Documenter's `size_threshold_warn`** (117 KiB against
   100 KiB), warning on every build. Still well under the 200 KiB hard threshold. It wants

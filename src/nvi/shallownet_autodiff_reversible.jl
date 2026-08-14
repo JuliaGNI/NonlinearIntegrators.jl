@@ -226,22 +226,22 @@ end
 #     return z2
 # end
 
-# function NN_anstaz(ps, S::Int, activation, t, q̄, q)
+# function NN_ansatz(ps, S::Int, activation, t, q̄, q)
 #     # q_h(t) = (1-t)q_n + t*q_{n+1} + t(1-t)NN(t)
 #     return (1.0 - t) * q̄ + t * q + t * (1.0 - t) * apply_NN(t, ps, S, activation)
 # end
 
-# VNN_anstaz_zygote(ps, S, activation, t, q̄, q) = Zygote.gradient(tt -> NN_anstaz(ps, S, activation, tt, q̄, q),t)[1]
+# VNN_ansatz_zygote(ps, S, activation, t, q̄, q) = Zygote.gradient(tt -> NN_ansatz(ps, S, activation, tt, q̄, q),t)[1]
 
-# VNN_anstaz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_anstaz(ps, S, activation, tt, q̄, q), t)
-# ∂NN_anstaz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> NN_anstaz(p, S, activation, t, q̄, q), ps)
-# ∂VNN_anstaz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> VNN_anstaz(p, S, activation, t, q̄, q), ps)
+# VNN_ansatz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_ansatz(ps, S, activation, tt, q̄, q), t)
+# ∂NN_ansatz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> NN_ansatz(p, S, activation, t, q̄, q), ps)
+# ∂VNN_ansatz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> VNN_ansatz(p, S, activation, t, q̄, q), ps)
 
-# ∂NN_anstaz_∂q̄(ps,S,activation,t,q̄,q) = 1.0 .- t
-# ∂NN_anstaz_∂q(ps,S,activation,t,q̄,q) = t
+# ∂NN_ansatz_∂q̄(ps,S,activation,t,q̄,q) = 1.0 .- t
+# ∂NN_ansatz_∂q(ps,S,activation,t,q̄,q) = t
 
-# ∂VNN_anstaz_∂q̄(ps,S,activation,t,q̄,q)= -1.0
-# ∂VNN_anstaz_∂q(ps,S,activation,t,q̄,q) = 1.0
+# ∂VNN_ansatz_∂q̄(ps,S,activation,t,q̄,q)= -1.0
+# ∂VNN_ansatz_∂q(ps,S,activation,t,q̄,q) = 1.0
 
 function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:ShallowNetAutodiffReversible}) where {ST}
     local D = length(cache(int).q̃)
@@ -304,12 +304,12 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
 
         for j in eachindex(quad_nodes)
             # @infiltrate
-            g = ∂NN_anstaz_∂params(ps_vec,S,activation,quad_nodes[j],q̄[d],cache(int).q̃[d])
+            g = ∂NN_ansatz_∂params(ps_vec,S,activation,quad_nodes[j],q̄[d],cache(int).q̃[d])
             dqdW2c[j, :, d] = g[1:S]
             dqdW1c[j, :, d] = g[S+1:2S]
             dqdbc[j, :, d] = g[2S+1:3S]
 
-            gv = ∂VNN_anstaz_∂params(ps_vec,S,activation,quad_nodes[j],q̄[d],cache(int).q̃[d])
+            gv = ∂VNN_ansatz_∂params(ps_vec,S,activation,quad_nodes[j],q̄[d],cache(int).q̃[d])
             dvdW1c[j, :, d] = gv[S+1:2S]
             dvdbc[j, :, d] = gv[2S+1:3S]
             dvdW2c[j, :, d] = gv[1:S]
@@ -317,14 +317,14 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
 
         # Boundary points t=0 and t=1 must share the (plain) element type of the
         # quadrature nodes, NOT the solver type ST: during the Newton solve ST is a
-        # ForwardDiff.Dual, and ∂NN_anstaz_∂params itself nests a ForwardDiff.gradient,
+        # ForwardDiff.Dual, and ∂NN_ansatz_∂params itself nests a ForwardDiff.gradient,
         # so passing a Dual `t` triggers a Dual-tag ordering error.
-        g0 = ∂NN_anstaz_∂params(ps_vec,S,activation,zero(eltype(quad_nodes)),q̄[d],cache(int).q̃[d])
+        g0 = ∂NN_ansatz_∂params(ps_vec,S,activation,zero(eltype(quad_nodes)),q̄[d],cache(int).q̃[d])
         dqdW1r₀[:, d] = g0[S+1:2S]
         dqdbr₀[:, d] = g0[2S+1:3S]
         dqdW2r₀[:, d] = g0[1:S]
 
-        g1 = ∂NN_anstaz_∂params(ps_vec,S,activation,one(eltype(quad_nodes)),q̄[d],cache(int).q̃[d])
+        g1 = ∂NN_ansatz_∂params(ps_vec,S,activation,one(eltype(quad_nodes)),q̄[d],cache(int).q̃[d])
         dqdW1r₁[:, d] = g1[S+1:2S]
         dqdbr₁[:, d] = g1[2S+1:3S]
         dqdW2r₁[:, d] = g1[1:S]
@@ -337,7 +337,7 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
         ps_vec[S+1:2S] = ps[d][1].W[:]
         ps_vec[2S+1:3S] = ps[d][1].b[:]
         for i in eachindex(quad_nodes)
-            Q[i][d] = NN_anstaz(ps_vec, S, activation, quad_nodes[i], q̄[d], q[d])
+            Q[i][d] = NN_ansatz(ps_vec, S, activation, quad_nodes[i], q̄[d], q[d])
         end
     end
 
@@ -348,7 +348,7 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
         ps_vec[S+1:2S] = ps[d][1].W[:]
         ps_vec[2S+1:3S] = ps[d][1].b[:]
         for i in eachindex(quad_nodes)
-            V[i][d] = VNN_anstaz_zygote(ps_vec,S,activation,quad_nodes[i],q̄[d],q[d]) / timestep(int)
+            V[i][d] = VNN_ansatz_zygote(ps_vec,S,activation,quad_nodes[i],q̄[d],q[d]) / timestep(int)
         end
     end
 
@@ -398,7 +398,7 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
         z = zero(ST)
         for j in eachindex(P, F)
             z += timestep(int) * method(int).b[j] * F[j][k] * (1-quad_nodes[j])
-            z += method(int).b[j] * P[j][k] * (-1.0)
+            z += method(int).b[j] * P[j][k] * (-1)
         end
         b[D*S+k] = p̄[k] + z
     end
@@ -492,7 +492,7 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNetAutodi
         ps_vec[2S+1:3S] = ps[k][1].b[:]
 
         for i in eachindex(network_inputs)
-            stage_values[i, k] = NN_anstaz(ps_vec, S, activation, network_inputs[i], q̄[k], q[k])
+            stage_values[i, k] = NN_ansatz(ps_vec, S, activation, network_inputs[i], q̄[k], q[k])
         end
 
         if show_status

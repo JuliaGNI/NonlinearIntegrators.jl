@@ -112,7 +112,7 @@ Three measurements:
    ForwardDiff tape (autodiff); the second is the steady-state cost and is what the
    accuracy, drift, iteration and timing columns report.
 3. **Derivative kernels in isolation** — `basis.dqdθ` / `basis.dvdθ` under both codegen
-   settings, against `∂NN_anstaz_∂params` / `∂VNN_anstaz_∂params`, per call, over `S` and
+   settings, against `∂NN_ansatz_∂params` / `∂VNN_ansatz_∂params`, per call, over `S` and
    precision. The two codegen settings are also compared *numerically* here, which is the
    one place that comparison is meaningful — see below.
 
