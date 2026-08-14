@@ -105,3 +105,73 @@ end
     assert_no_upcast(sol.q, T)
     @test all(isfinite, collect(sol.q[:, 1])[end])
 end
+
+# The inverse of `NI.flatten_params`: walk the layers and their fields in the same order.
+# That order is not incidental — `components!` writes the flattened gradient into
+# `dqdθc[j, :, d]` and indexes the Newton unknowns by the same layout — so a reference
+# reconstructed this way pins the layout as well as the values.
+function rebuild_params(v, template)
+    offset = 0
+    layers = ()
+    for lname in keys(template)
+        layer  = template[lname]
+        fields = ()
+        for fname in keys(layer)
+            a = layer[fname]
+            fields = (fields..., reshape(v[(offset + 1):(offset + length(a))], size(a)))
+            offset += length(a)
+        end
+        layers = (layers..., NamedTuple{keys(layer)}(fields))
+    end
+    AbstractNeuralNetworks.NeuralNetworkParameters(NamedTuple{keys(template)}(layers))
+end
+
+# The compiled kernels against an *independent* reference. The testset above compares
+# `cse+inplace` against `plain`, which is one symbolic expression under two code-generation
+# settings: it catches a wrong code path but not a wrong expression. Nothing else in the suite
+# differentiates the network by another route, so until this testset existed the only guard
+# against a mis-shaped or mis-differentiated `dqdθ`/`dvdθ` was an integration test failing
+# somewhere downstream.
+#
+# That gap is not hypothetical. `SymbolicNeuralNetworks` 0.5 made `symbolic_parameter_gradient`
+# return the parameter-shaped gradient itself for a *scalar* expression, and indexing that
+# return value with `[1]` — which is what the 0.4 call sites did to unwrap the one-element
+# array around it — yields the first parameter *leaf* rather than an error. Carried over
+# unchanged, it would have compiled a silently truncated gradient.
+#
+# `ForwardDiff` over a flattened parameter vector is the reference: it reaches the network
+# through `basis.NN`, so it shares no code with the symbolic path beyond the network itself,
+# and unlike `NI.∂NN_ansatz_∂params` it does not require the hand-written ansatz to match.
+# Only the default codegen is checked here — the testset above ties `plain` to it.
+@testset "compiled derivatives vs ForwardDiff ($T)" for T in TEST_TYPES
+    Random.seed!(1234)
+    shallow = build_shallownet_basis(T; S = 4)
+    dense   = build_densenet_basis(T)
+
+    @testset "$label" for (label, basis, np) in
+            (("ShallowNetBasis", shallow, 3 * shallow.S), ("DenseNetBasis", dense, dense.NP))
+        NN = basis.NN
+        ps = AbstractNeuralNetworks.params(AbstractNeuralNetworks.NeuralNetwork(NN, T))
+        θ  = NI.flatten_params(ps)
+        t  = T(0.37)
+
+        # The position and the velocity at `t`, both as functions of the flat parameter
+        # vector. `v` differentiates `q` in time under whatever number type it is handed, so
+        # `ForwardDiff.gradient(v, ·)` nests one dual inside the other.
+        q(w, s) = NN([s], rebuild_params(w, ps))[1]
+        v(w)    = ForwardDiff.derivative(s -> q(w, s), t)
+
+        @test length(θ) == np
+        @test eltype(θ) == T
+
+        dqdθ = NI.flatten_params(basis.dqdθ([t], ps))
+        @test length(dqdθ) == np
+        @test dqdθ ≈ ForwardDiff.gradient(w -> q(w, t), θ) rtol = 1024 * eps(T)
+
+        dvdθ = NI.flatten_params(basis.dvdθ([t], ps))
+        @test length(dvdθ) == np
+        @test dvdθ ≈ ForwardDiff.gradient(v, θ) rtol = 1024 * eps(T)
+
+        @test basis.V_func([t], ps)[1] ≈ v(θ) rtol = 1024 * eps(T)
+    end
+end

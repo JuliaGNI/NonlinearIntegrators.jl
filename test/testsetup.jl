@@ -9,10 +9,17 @@
 
 using Test
 using NonlinearIntegrators
-# `import`, not `using`: only `NeuralNetworkParameters` is needed (to call the compiled
-# derivative kernels directly in dispatch_variants_unit.jl), and importing the module keeps
-# the rest of its exports out of the way of the Geometric* ones.
+# `import`, not `using`: only `NeuralNetworkParameters`, `NeuralNetwork` and `params` are
+# needed (to call the compiled derivative kernels directly in dispatch_variants_unit.jl), and
+# importing the module keeps the rest of its exports out of the way of the Geometric* ones.
 import AbstractNeuralNetworks
+# `import`, not `using`: `ForwardDiff.derivative` and `ForwardDiff.gradient` are the
+# independent reference the compiled kernels are checked against in
+# dispatch_variants_unit.jl, and both names are too generic to bring into scope unqualified.
+import ForwardDiff
+# The reference check draws one random parameter set per basis; seeded so a failure is
+# reproducible rather than a different point every run.
+import Random
 using QuadratureRules
 using CompactBasisFunctions
 using GeometricIntegratorsBase

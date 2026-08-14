@@ -28,6 +28,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   differentiate the kernels with `Zygote` would need, since the in-place form mutates its
   output.
 
+- **A `ForwardDiff` cross-check of the compiled derivatives**, in
+  `test/unit/dispatch_variants_unit.jl`, over both bases and both `TEST_TYPES`. `dqdθ`, `dvdθ`
+  and `V_func` are compared against `ForwardDiff` over a flattened parameter vector, which
+  reaches the network through `basis.NN` and so shares no code with the symbolic path beyond
+  the network itself — and, unlike `NI.∂NN_ansatz_∂params`, does not require the hand-written
+  ansatz to match. The flattened lengths are asserted too (`3S`, and `NP` for `DenseNetBasis`),
+  which pins the layout `components!` slices out of.
+
+  Until this, the only kernel-level assertion was `cse+inplace` against `plain` — one symbolic
+  expression under two code-generation settings, which catches a wrong code path but not a
+  wrong expression. That is what made the `symbolic_pullback` → `symbolic_parameter_gradient`
+  move riskier than it reads: the scalar return shape changed with the name, and indexing the
+  new return value with `[1]` yields the first parameter *leaf* rather than an error, so a
+  version of the update that kept the index would have compiled a silently truncated gradient.
+  The check that caught that by hand now runs in CI.
+
 - **`benchmark/compare_derivative_backends.jl`**, comparing `ShallowNet` /
   `ShallowNetReversible` (symbolic derivatives) against `ShallowNetAutodiff` /
   `ShallowNetAutodiffReversible` (`ForwardDiff`), with the symbolic pair run under both
@@ -52,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Note what the file does *not* claim. The two backends use different ansätze (raw network
   vs. boundary-interpolating) and different default OGA seeds, so accuracy and iteration
   counts compare methods, not backends. And while the two codegen settings agree to machine
-  epsilon at the kernel level (≤8e-17 at Float64), they do *not* agree end to end: the residual
+  epsilon at the kernel level (≤ 8e-17 at Float64), they do *not* agree end to end: the residual
   stalls near the round-off floor, so a last-bit difference decides which iterate Newton
   accepts. The report measures that amplification rather than asserting it away. See
   `benchmark/README.md`.
@@ -90,8 +106,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an extra indirection for nothing. `DVDθ` in `DenseNet.components!` consequently returns a
   parameter set like `DQDθ` does, and the `[1,1]` that used to unwrap it is gone.
 
+  That left the two constructors' derivative blocks identical up to which network they are
+  handed, so they are now one function: `build_shallownet_derivatives` became
+  `build_network_derivatives` and moved beside `NetworkBasisCore`, whose four symbolic slots
+  it fills. Both bases call it. Unexported, and the only reference outside `src/` was a
+  comment in `benchmark/compare_derivative_backends.jl`.
+
   `benchmark/compare_derivative_backends.jl` was re-run against 0.5 and the tables above are
-  its output; the two codegen settings still agree to round-off (≤8e-17 at Float64, ≤8e-8 at
+  its output; the two codegen settings still agree to round-off (≤ 8e-17 at Float64, ≤ 8e-8 at
   Float32) and `cse` still buys about 4× on the `DenseNetBasis` build. The absolute build
   times quoted in the docstrings moved with the release and were re-measured with it.
 
@@ -822,31 +844,14 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
 
 Surfaced while updating to `SymbolicNeuralNetworks` 0.5.
 
-- **Nothing in the test suite checks the compiled derivatives against an independent
-  reference.** The only kernel-level assertion is in `test/unit/dispatch_variants_unit.jl`,
-  which compares `cse+inplace` against `plain` — the *same* symbolic expression under two
-  code-generation settings. That cannot catch a wrong expression, only a wrong code path, so
-  the guard against a mis-shaped or mis-differentiated `dqdθ`/`dvdθ` is currently the
-  integration tests failing somewhere downstream. The 0.5 update was verified by hand against
-  `ForwardDiff.gradient` of the network output and of its time derivative — ≤ 5.6e-17 at
-  Float64 for both bases — and that check belongs in the suite, at both bases and both
-  `TEST_TYPES`. `ShallowNetBasis(…; symbolic = false)` plus `NI.∂VNN_ansatz_∂params` gives one
-  reference; `ForwardDiff` over a flattened parameter vector gives another, and does not need
-  the ansatz to match.
-
-  This is what made the `symbolic_pullback` → `symbolic_parameter_gradient` rename riskier
-  than it reads: the scalar return shape changed at the same time, and indexing the new return
-  value with `[1]` yields the *first parameter leaf* rather than an error, so a version of the
-  update that kept the index would have produced a silently truncated gradient.
-
 - **The first basis construction in a process costs about 9.3 s**, with `cse`/`inplace` on or
   off (9.31 s against 9.63 s for `DenseNetBasis{Float64}(tanh, 3, 3)`). Practically all of it
   is compiling the code-generation machinery rather than generating code: the same build warm
   is 27 ms with the defaults and 110 ms without them. That latency is upstream and not
-  something this package can fix, but it
-  dominates what a user actually pays for the first basis, and it is two orders of magnitude
-  above the warm figures the docstrings quote. The docstrings now say they are warm
-  measurements; a note in the user-facing documentation would be more use than a note here.
+  something this package can fix, but it dominates what a user actually pays for the first
+  basis, and it is two orders of magnitude above the warm figures the docstrings quote. The
+  docstrings now say they are warm measurements; a note in the user-facing documentation
+  would be more use than a note here.
 
 - **The 0.5 kernel numbers were measured in `quick` mode only.** That tier sweeps Float64 and
   Float32 over two problems, so 0.5's effect at Float16 and on the double pendulum is
@@ -863,11 +868,12 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.5.
   above. Left as written, since it is the record of what was measured then; re-stating it would
   be inventing a measurement that was never taken.
 
-- **`V_func` returns a 1×1 matrix and every call site immediately indexes `[1]`.** The shape is
-  an honest consequence of the Jacobian of a scalar-in/scalar-out network being 1×1, but it
-  carries no information, and the single call site that consumes it
-  (`src/nvi/densenet.jl:440`) has to strip it. `ShallowNetBasis` builds the slot as well, and
-  no integrator reads that one at all. Either build it from `VNN[1,1]` like the two gradients
-  now are,
-  which would make it return a scalar, or leave it and note why — but the three derivative
-  slots should not disagree about whether they are scalars.
+- **`V_func` returns a 1×1 matrix that both of its call sites immediately unwrap.** The shape
+  is an honest consequence of the Jacobian of a scalar-in/scalar-out network being 1×1, but it
+  carries no information: the one integrator that consumes it (`src/nvi/densenet.jl:440`)
+  strips it with `[1]`, and so do both kernel testsets in
+  `test/unit/dispatch_variants_unit.jl`, one with `vec` and one with `[1]`.
+  `ShallowNetBasis` builds the slot as well, and no integrator reads that one at all. Either
+  build it from `VNN[1,1]` like the two gradients now are, which would make it return a scalar
+  — `build_nn_function` does accept a scalar expression — or leave it and note why; but the
+  three derivative slots should not disagree about whether they are scalars.
