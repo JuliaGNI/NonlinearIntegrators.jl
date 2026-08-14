@@ -40,18 +40,9 @@ struct DenseNetBasis{T, AT, NT, BT, SNNT, QWFT, VT, VWFT} <: AbstractDenseNetBas
             AbstractNeuralNetworks.Dense(S₁, S, activation),
             AbstractNeuralNetworks.Dense(S, 1, identity, use_bias=false))
         NP = parameterlength(NN)
-        SNN = SymbolicNeuralNetwork(NN)
-        build(eq) = build_nn_function(eq, SNN.params, SNN.input; cse = cse, inplace = inplace)
 
-        # As in `build_shallownet_derivatives`: the scalar entry, not the one-element array
-        # around it, so that both gradients come back parameter-shaped.
-        soutput = SNN.model(SNN.input, SNN.params)
-        dqdθ_built = build(SymbolicNeuralNetworks.symbolic_parameter_gradient(soutput[1], SNN))
-
-        VNN = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Jacobian(SNN))
-        V_built = build(VNN)
-
-        dvdθ_built = build(SymbolicNeuralNetworks.symbolic_parameter_gradient(VNN[1,1], SNN))
+        SNN, dqdθ_built, V_built, dvdθ_built =
+            build_network_derivatives(NN; cse = cse, inplace = inplace)
 
         core = NetworkBasisCore(activation, NN, backend, SNN, dqdθ_built, V_built, dvdθ_built)
         new{T, typeof(activation), typeof(NN), typeof(backend), typeof(SNN),

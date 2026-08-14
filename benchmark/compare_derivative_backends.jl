@@ -163,7 +163,7 @@ end
 # Bases are shared across dt and problem, as in `run_sweep`, and their build time is one of
 # the three things measured. The timed build is preceded by an untimed one at S = 2 for the
 # same (T, activation, symbolic, cse, inplace) so that Julia's compilation of
-# `build_shallownet_derivatives` and of Symbolics' code generation lands there instead of in
+# `build_network_derivatives` and of Symbolics' code generation lands there instead of in
 # the number we report; what is left is the codegen work itself.
 
 const BASIS_CACHE = Dict{Any,Any}()
