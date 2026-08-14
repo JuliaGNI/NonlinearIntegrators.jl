@@ -10,8 +10,23 @@
         @test net isa AbstractShallowNetBasis{T}
         @test net isa CompactBasisFunctions.Basis{T}
         @test net.S == 4
+        @test has_symbolic_derivatives(net)
         @test sprint(show, net) isa String
         @debug "ShallowNetBasis{$T} ok" S=net.S
+    end
+
+    # `symbolic = false` skips the SymbolicNeuralNetworks build entirely. The network
+    # itself is unaffected — it is only the four derivative slots that stay `nothing`.
+    @testset "ShallowNetBasis (symbolic = false)" begin
+        net = ShallowNetBasis{T}(relu_k(3), 4; symbolic = false)
+        @test net isa AbstractShallowNetBasis{T}
+        @test net.S == 4
+        @test !has_symbolic_derivatives(net)
+        @test net.SNN === nothing
+        @test net.dqdθ === nothing
+        @test net.V_func === nothing
+        @test net.dvdθ === nothing
+        @test sprint(show, net) isa String
     end
 
     @testset "DenseNetBasis" begin

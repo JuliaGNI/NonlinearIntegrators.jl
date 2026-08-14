@@ -68,6 +68,7 @@ export NetworkBasisCore
 
 include("nvi/network_basis.jl")
 export NetworkBasis, AbstractDenseNetBasis, AbstractShallowNetBasis
+export has_symbolic_derivatives
 
 include("nvi/densenet_basis.jl")
 export DenseNetBasis

@@ -105,18 +105,21 @@ function plot_success_bars(rows, keyfn, xlabel, title, path)
     return true
 end
 
-# Heatmap of success rate: solver strategy (rows) × precision (cols).
-function plot_success_heatmap(rows, path)
+# Heatmap of success rate: some categorical key (rows) × precision (cols). `keyfn` defaults
+# to the solver strategy, which is what the sweep reports vary; the derivative-backend
+# comparison passes `r -> r.method` instead, since there the solver is held fixed and the
+# integrator is the axis.
+function plot_success_heatmap(rows, path; keyfn = strategy_label, keylabel = "solver")
     isempty(rows) && return false
-    strategies = sort(unique(strategy_label.(rows)))
+    strategies = sort(unique(keyfn.(rows)))
     precisions = sort(unique(r.T for r in rows))
     M = fill(NaN, length(strategies), length(precisions))
     for (i, s) in enumerate(strategies), (j, p) in enumerate(precisions)
-        sub = [r for r in rows if strategy_label(r) == s && r.T == p]
+        sub = [r for r in rows if keyfn(r) == s && r.T == p]
         isempty(sub) || (M[i, j] = group_stats(sub).frac)
     end
     fig = Figure(size = (150 * length(precisions) + 300, 90 * length(strategies) + 150))
-    ax = Axis(fig[1, 1]; title = "Convergence: success rate by solver × precision",
+    ax = Axis(fig[1, 1]; title = "Convergence: success rate by $(keylabel) × precision",
               xticks = (1:length(precisions), precisions),
               yticks = (1:length(strategies), strategies))
     hm = heatmap!(ax, 1:length(precisions), 1:length(strategies), permutedims(M);

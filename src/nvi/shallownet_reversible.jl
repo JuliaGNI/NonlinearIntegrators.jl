@@ -39,6 +39,7 @@ struct ShallowNetReversible{T, NNODES, basisType <: Basis{T},
             "ShallowNetReversible requires a basis with an even number of neurons, " *
             "got S = $(basis.S). Neurons come in mirrored pairs and only the S/2 independent " *
             "hidden parameters are stored in the nonlinear solution vector."))
+        require_symbolic_derivatives(basis, "ShallowNetReversible")
 
         common = NetworkIntegratorCore(basis, quadrature;
             extrapolation_substep=extrapolation_substep,
