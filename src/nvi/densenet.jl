@@ -40,6 +40,7 @@ struct DenseNet{T, NNODES, basisType <: Basis{T},
         initial_trajectory_method :: ET   = IntegratorExtrapolation(),
         initial_guess_method  :: IPMT = LSGD(),
         record_grid_points        :: Int  = 41,) where {T, ET, IPMT}
+        require_symbolic_derivatives(basis, "DenseNet")
         common = NetworkIntegratorCore(basis, quadrature;
             extrapolation_substep=extrapolation_substep,
             training_epochs=training_epochs,

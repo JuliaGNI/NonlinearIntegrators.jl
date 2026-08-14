@@ -10,8 +10,23 @@
         @test net isa AbstractShallowNetBasis{T}
         @test net isa CompactBasisFunctions.Basis{T}
         @test net.S == 4
+        @test has_symbolic_derivatives(net)
         @test sprint(show, net) isa String
         @debug "ShallowNetBasis{$T} ok" S=net.S
+    end
+
+    # `symbolic = false` skips the SymbolicNeuralNetworks build entirely. The network
+    # itself is unaffected — it is only the four derivative slots that stay `nothing`.
+    @testset "ShallowNetBasis (symbolic = false)" begin
+        net = ShallowNetBasis{T}(relu_k(3), 4; symbolic = false)
+        @test net isa AbstractShallowNetBasis{T}
+        @test net.S == 4
+        @test !has_symbolic_derivatives(net)
+        @test net.SNN === nothing
+        @test net.dqdθ === nothing
+        @test net.V_func === nothing
+        @test net.dvdθ === nothing
+        @test sprint(show, net) isa String
     end
 
     @testset "DenseNetBasis" begin
@@ -21,7 +36,21 @@
         @test dnet.S == 3
         @test dnet.S₁ == 3
         @test sprint(show, dnet) isa String
+        @test has_symbolic_derivatives(dnet)
         @debug "DenseNetBasis{$T} ok" S=dnet.S S₁=dnet.S₁ NP=dnet.NP
+    end
+
+    # `cse = false, inplace = false` is the pre-0.4 code generation. It changes the emitted
+    # code, not what the basis carries, so the only thing to check here is that the build
+    # still goes through — this is the basis whose `cse = false` build the CHANGELOG measures
+    # at 3.22 s, hence the minimum width. The numerical agreement between the two settings is
+    # checked on `ShallowNetBasis` in dispatch_variants_unit.jl.
+    @testset "DenseNetBasis (plain codegen)" begin
+        dnet = DenseNetBasis{T}(tanh, 2, 2; cse = false, inplace = false)
+        @test dnet isa AbstractDenseNetBasis{T}
+        @test dnet.S == 2
+        @test dnet.S₁ == 2
+        @test has_symbolic_derivatives(dnet)
     end
 
     @testset "VISEBasis" begin

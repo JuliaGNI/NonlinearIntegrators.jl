@@ -9,6 +9,10 @@
 
 using Test
 using NonlinearIntegrators
+# `import`, not `using`: only `NeuralNetworkParameters` is needed (to call the compiled
+# derivative kernels directly in dispatch_variants_unit.jl), and importing the module keeps
+# the rest of its exports out of the way of the Geometric* ones.
+import AbstractNeuralNetworks
 using QuadratureRules
 using CompactBasisFunctions
 using GeometricIntegratorsBase

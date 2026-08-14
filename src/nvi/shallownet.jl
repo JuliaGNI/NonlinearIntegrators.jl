@@ -50,6 +50,7 @@ struct ShallowNet{T, NNODES, basisType <: Basis{T},
         record_grid_points = 41,
         bias_interval = [-pi, pi],
         dict_amount   :: Int = 50000,) where {T, ET, IPMT}
+        require_symbolic_derivatives(basis, "ShallowNet")
         common = NetworkIntegratorCore(basis, quadrature;
             extrapolation_substep=extrapolation_substep,
             training_epochs=training_epochs,

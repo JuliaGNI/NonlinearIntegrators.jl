@@ -35,3 +35,38 @@ end
 activation(b::NetworkBasis) = b.common.activation
 backend(b::NetworkBasis)    = b.common.backend
 nbasis(b::NetworkBasis)     = b.S
+
+"""
+    has_symbolic_derivatives(basis) -> Bool
+
+Whether `basis` carries the derivatives (`dqdθ`, `V_func`, `dvdθ`) that
+`SymbolicNeuralNetworks.jl` compiles at construction time.
+
+`false` only for a [`ShallowNetBasis`](@ref) built with `symbolic = false`, which is the
+form the `ForwardDiff`-based integrators want — they differentiate their ansatz at run
+time and never read these fields. Every other basis builds them unconditionally.
+"""
+has_symbolic_derivatives(b::NetworkBasis) = b.dqdθ !== nothing
+
+"""
+    require_symbolic_derivatives(basis, method_name)
+
+Throw an `ArgumentError` unless `basis` carries compiled symbolic derivatives.
+
+Called from the constructors of the integrators whose `components!` evaluates them, so a
+basis built with `symbolic = false` is rejected where the mistake was made rather than
+several call levels down as a `nothing` being called on the first Newton iteration.
+"""
+function require_symbolic_derivatives(b::NetworkBasis, method_name::AbstractString)
+    has_symbolic_derivatives(b) || throw(ArgumentError(
+        "$(method_name) evaluates the symbolically compiled derivatives of its basis, but " *
+        "the basis was built with `symbolic = false`. Rebuild it without that keyword. " *
+        "`symbolic = false` is for ShallowNetAutodiff and ShallowNetAutodiffReversible, " *
+        "which differentiate their ansatz with ForwardDiff and never read these fields."))
+    return nothing
+end
+
+# The integrator constructors accept any `Basis`, not only a `NetworkBasis`. A basis that
+# has no notion of compiled derivatives has nothing to check, so it passes — the guard is
+# about the `symbolic = false` opt-out, not about narrowing the accepted basis types.
+require_symbolic_derivatives(::Basis, ::AbstractString) = nothing
