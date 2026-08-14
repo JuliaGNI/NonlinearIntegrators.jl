@@ -14,13 +14,13 @@ Till now, several options for nonlinear basis are available, but only neural net
 
 - [x] One Hidden Layer Neural Network (Shallow Neural Network)
     - [x] Implemented with Lux
-    - [x] Implemented with [GeometricMachineLearning.jl](https://github.com/JuliaGNI/GeometricMachineLearning.jl) and [SymbolicNeuralNetwork.jl](https://juliagni.github.io/SymbolicNeuralNetworks.jl)
+    - [x] Implemented with [AbstractNeuralNetworks.jl](https://github.com/JuliaGNI/AbstractNeuralNetworks.jl) and [SymbolicNeuralNetwork.jl](https://juliagni.github.io/SymbolicNeuralNetworks.jl), trained with [GeometricOptimizers.jl](https://github.com/JuliaGNI/GeometricOptimizers.jl)
 - [x] Deep Neural Networks.
 - [x] Nested Sindy
 
 
 ## installation
-GeometricIntegrators.jl and all of its dependencies can be installed via the Julia REPL by typing
+NonlinearIntegrators.jl and all of its dependencies can be installed via the Julia REPL by typing
 ```
 ]add NonlinearIntegrators.jl
 ```

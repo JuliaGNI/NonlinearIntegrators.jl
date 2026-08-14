@@ -6,16 +6,13 @@ authors = ["Michael Kraus <michael.kraus@ipp.mpg.de> and contributors"]
 [deps]
 AbstractNeuralNetworks = "60874f82-5ada-4c70-bd1c-fa6be7711c8a"
 CompactBasisFunctions = "a09551c4-f815-4143-809e-dd1986753ba7"
-ContinuumArrays = "7ae1f121-cc2c-504b-ac30-9b923412ae5c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 GeometricBase = "9a0b12b7-583b-4f04-aa1f-d8551b6addc9"
-GeometricIntegrators = "dcce2d33-59f6-5b8d-9047-0defad88ae06"
+GeometricEquations = "c85262ba-a08a-430a-b926-d29770767bf2"
 GeometricIntegratorsBase = "71212ab4-08a2-48eb-a02b-4cbad0e9c44a"
-GeometricMachineLearning = "194d25b2-d3f5-49f0-af24-c124f4aa80cc"
-GeometricProblems = "18cb22b4-ad41-5c80-9c5f-710df63fbdc9"
+GeometricOptimizers = "fc236c15-5557-4942-aa65-b650f329279e"
 GeometricSolutions = "7843afe4-64f4-4df4-9231-049495c56661"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-Optimisers = "3bd65402-5787-11e9-1adc-39752487f4e2"
 QuadratureRules = "a08977f5-a20d-4b99-b11f-f5ea535e0575"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SimpleSolvers = "36b790f5-6434-4fbe-b711-1f64a1e2f6a2"
@@ -27,32 +24,37 @@ Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
 AbstractNeuralNetworks = "0.6"
-CompactBasisFunctions = "0.2"
-ContinuumArrays = "0.20"
+CompactBasisFunctions = "0.3"
 ForwardDiff = "1"
-GeometricBase = "0.14"
-GeometricIntegrators = "0.17"
-GeometricIntegratorsBase = "0.5"
-GeometricMachineLearning = "0.4"
+GeometricBase = "0.14.8"
+GeometricEquations = "0.21"
+GeometricIntegratorsBase = "0.6"
+GeometricOptimizers = "0.2"
 GeometricProblems = "0.8"
 GeometricSolutions = "0.6"
 LinearAlgebra = "1"
 Logging = "1"
-Optimisers = "0.4"
-QuadratureRules = "0.1"
+QuadratureRules = "0.2"
 Random = "1"
-SimpleSolvers = "0.10"
+SimpleSolvers = "0.11"
 StaticArrays = "1"
 Statistics = "1"
 SymbolicNeuralNetworks = "0.3"
 Symbolics = "7"
 Test = "1"
-Zygote = "0.6"
+Zygote = "0.6, 0.7"
 julia = "1.10"
 
+# GeometricOptimizers is not in the General registry at the version required above, so it is taken
+# from git. A git [sources] entry blocks registration in General: remove this section, and only
+# then can this package be tagged.
+[sources]
+GeometricOptimizers = {url = "https://github.com/JuliaGNI/GeometricOptimizers.jl", rev = "main"}
+
 [extras]
+GeometricProblems = "18cb22b4-ad41-5c80-9c5f-710df63fbdc9"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Logging", "Test"]
+test = ["GeometricProblems", "Logging", "Test"]

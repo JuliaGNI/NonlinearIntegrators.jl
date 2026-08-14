@@ -47,7 +47,7 @@ struct NonLinear_DenseNet_GML{T, NNODES, basisType <: Basis{T},
             initial_trajectory_method=initial_trajectory_method,
             initial_guess_method=initial_guess_method,
             record_grid_points = record_grid_points)
-        new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(common)
+        new{T, nnodes(quadrature), typeof(basis), ET, IPMT}(common)
     end
 end
 
@@ -128,13 +128,13 @@ struct NonLinear_DenseNet_GMLCache{ST,S₁,S,NP,R,N} <: NetworkIntegratorCache{S
     end
 end
 
-function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML; kwargs...) where {ST}
     NonLinear_DenseNet_GMLCache{ST, method.basis.S₁, method.basis.S, method.basis.NP,
         nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML) =
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_DenseNet_GML) =
     NonLinear_DenseNet_GMLCache{ST, method.basis.S₁, method.basis.S, method.basis.NP,
         nnodes(method), extrapolation_substep(method)}
 
@@ -220,14 +220,23 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
 
         labels = reshape(network_labels[:,k],1,extrapolation_substep+1)
 
-        PNN = GeometricMachineLearning.NeuralNetwork(NN)
-        # opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
-        opt = GeometricMachineLearning.Optimizer(GeometricMachineLearning.AdamOptimizerWithDecay(nepochs,1e-3, 5e-5), PNN)
-        err = 0
-        λ = GeometricMachineLearning.GlobalSection(PNN.params)
+        PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
+        # `optimizer_params` gives the optimizer the flat parameter view it requires, aliasing the
+        # network's arrays so its in-place updates show up in `PNN.params`. `Adam` and the line
+        # search are built at the parameter element type, and supply direction and learning rate
+        # respectively — the rate decaying from 1e-3 to 5e-5 over the epoch budget.
+        local PT = eltype(PNN.params[1].W)
+        ps_flat = optimizer_params(PNN.params)
+        loss(p) = mse_loss(network_inputs, labels, PNN, network_params(p, PNN.params))
+        algorithm = GeometricOptimizers.Adam(PT)
+        opt = GeometricOptimizers.Optimizer(ps_flat, loss; algorithm = algorithm,
+            linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
+        state = GeometricOptimizers.OptimizerState(algorithm, ps_flat)
+        err = zero(PT)
         for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs,labels,PNN,p),PNN.params)[1]
-            GeometricMachineLearning.optimization_step!(opt,λ, PNN.params, gs)
+            GeometricOptimizers.increase_iteration_number!(state)
+            GeometricOptimizers.solver_step!(ps_flat, state, opt)
+            GeometricOptimizers.update!(state, opt, ps_flat)
             err = mse_loss(network_inputs,labels,PNN,PNN.params)
 
             if err < 5e-8
@@ -280,19 +289,33 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
         PNN.params.L2.W[:], PNN.params.L2.b[:] = box_init_plain(S₁, S)
         PNN.params.L3.W[:], _ = box_init_plain(S, 1)
         tem_ps = (L1 = PNN.params.L1, L2 = PNN.params.L2)
-        opt = GeometricMachineLearning.Optimizer(GeometricMachineLearning.GradientOptimizer(.001), tem_ps)
-        err = 0
-        λ = GeometricMachineLearning.GlobalSection(tem_ps)
+        local PT = eltype(PNN.params.L1.W)
+        # Only L1 and L2 are optimised; L3 is re-solved by least squares inside the loop
+        # below. The flat view aliases L1/L2, so the optimizer writes through to `PNN.params`,
+        # and the loss reads the *current* L3 through the closure.
+        tem_flat = optimizer_params(tem_ps)
+        loss(p) = lsgd_loss(network_inputs, labels, NN,
+            NeuralNetworkParameters(merge(network_params(p, tem_ps), (L3 = PNN.params.L3,))))
+        algorithm = GeometricOptimizers.GradientMethod()
+        # The `Static` line search is not a style choice: `GradientMethod` with any *searching*
+        # line search throws `MethodError: no method matching gradient(::GradientCache)` on
+        # Euclidean parameters, because `_trial_slope` wants `gradient(cache)` and the
+        # first-order caches expose `gradient_array`. That makes even the default line search
+        # `Optimizer` would pick unusable here. See the "Not fixed here" section of
+        # https://github.com/JuliaGNI/GeometricOptimizers.jl/pull/35.
+        opt = GeometricOptimizers.Optimizer(tem_flat, loss; algorithm = algorithm,
+            linesearch = GeometricOptimizers.Static(PT(1e-3)))
+        state = GeometricOptimizers.OptimizerState(algorithm, tem_flat)
+        err = zero(PT)
 
         for ep in 1:nepochs
             Φ = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)(network_inputs,tem_ps)
             # Φ = NN(network_inputs, PNN.params)
             # PNN.params.L3.W[:] = labels/Φ
             PNN.params.L3.W[:] = (Φ' \ labels')'
-            gs = Zygote.gradient(p -> lsgd_loss(network_inputs,labels,NN,p),PNN.params)[1]
-            tem_ps = (L1 = PNN.params.L1, L2 = PNN.params.L2)
-            tem_gs = (L1 = gs.L1, L2 = gs.L2)
-            GeometricMachineLearning.optimization_step!(opt,λ, tem_ps, tem_gs)
+            GeometricOptimizers.increase_iteration_number!(state)
+            GeometricOptimizers.solver_step!(tem_flat, state, opt)
+            GeometricOptimizers.update!(state, opt, tem_flat)
             err = lsgd_loss(network_inputs,labels,NN,PNN.params)
               if err < 5e-5
                 @debug "dimension $k,final loss: $err by $ep epochs"
@@ -318,7 +341,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_DenseNet_GML}, Ini
 
 end
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {ST}
     # set some local variables for convenience and clarity
     local D = length(cache(int).q̃)
     local S₁ = int.method.basis.S₁
@@ -425,7 +448,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
     end
 end
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST},sol, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {ST}
+function GeometricIntegratorsBase.residual!(b::Vector{ST},sol, params, int::GeometricIntegrator{<:NonLinear_DenseNet_GML}) where {ST}
     local D = length(cache(int).q̃)
     local S = int.method.basis.S
     local S₁ = int.method.basis.S₁

@@ -7,7 +7,7 @@ using CompactBasisFunctions
 using NonlinearIntegrators
 using QuadratureRules
 using GeometricProblems
-using GeometricIntegrators
+using GeometricIntegratorsBase
 ```
 Additional package would be required if we want to use Nested Sindy expression.
 ```

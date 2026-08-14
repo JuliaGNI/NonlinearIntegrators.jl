@@ -12,5 +12,10 @@ QuadratureRules = "a08977f5-a20d-4b99-b11f-f5ea535e0575"
 SimpleSolvers = "36b790f5-6434-4fbe-b711-1f64a1e2f6a2"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
+# The GeometricOptimizers git pin is *not* repeated here. Pkg propagates `[sources]` out of a
+# path dependency, so the one in ../Project.toml already reaches this environment — and a
+# `[sources]` entry for a package that appears in neither `[deps]` nor `[extras]` is a hard
+# error ("Sources for `GeometricOptimizers` not listed in `deps` or `extras` section"), which
+# is what it was before.
 [sources]
 NonlinearIntegrators = {path = ".."}

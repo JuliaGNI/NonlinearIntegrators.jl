@@ -1,5 +1,5 @@
 
-using GeometricIntegrators: LODEMethod
+using GeometricIntegratorsBase: LODEMethod
 
 """
     NetworkIntegratorMethod <: LODEMethod
@@ -30,7 +30,7 @@ Abstract supertype for integrators whose ansatz is a three-layer dense network:
 """
 abstract type DenseNetMethod <: NetworkIntegratorMethod end
 
-using GeometricIntegrators: Extrapolation
+using GeometricIntegratorsBase: Extrapolation
 
 """
     IntegratorExtrapolation <: Extrapolation
@@ -55,8 +55,9 @@ abstract type InitialParametersMethod end
 """
     TrainingMethod <: InitialParametersMethod
 
-Initialise network parameters by gradient descent (via `Optimisers.jl`) against an
-MSE target built from the extrapolated trajectory. Applies to both
+Initialise network parameters by gradient descent (`GeometricOptimizers.Adam` with a
+`DecayingStatic` line search) against an MSE target built from the extrapolated
+trajectory. Applies to both
 `NonLinear_OneLayer_GML` and `NonLinear_DenseNet_GML`; controlled by the
 `training_epochs` constructor kwarg.
 """

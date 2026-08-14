@@ -5,6 +5,112 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Upgraded to QuadratureRules 0.2 and CompactBasisFunctions 0.3**, along with
+  GeometricIntegratorsBase 0.6, GeometricEquations 0.21 and SimpleSolvers 0.11. The source side was
+  already done — `basis` and `nnodes` come from `GeometricBase` and `nbasis` from
+  `CompactBasisFunctions`, which is what the new versions require. RungeKutta 0.6 is satisfied
+  vacuously: it is not a dependency of this package at all any more (see below).
+- Zygote compat widened to `0.6, 0.7`; the graph resolves to 0.7.12. Zygote remains a direct
+  dependency for `VNN_anstaz_zygote`, which supplies the velocity of the hardcoded ansatz in
+  `Hardcode_int` and `Time_Reversible_Hardcode`.
+- **`ImplicitMidpoint` now comes from `GeometricIntegratorsBase`** for the
+  `IntegratorExtrapolation` warm start and `PR_Integrator`, and requires 0.6: the warm start
+  integrates a LODE sub-problem and reads `p` back out of it to seed the momentum degree of
+  freedom, which needs that release's `IODEProblem`/`LODEProblem` methods rather than an ODE-only
+  implicit midpoint.
+
+- **The network training loops now use `GeometricOptimizers` instead of
+  `GeometricMachineLearning`.** The optimizer functionality has been retired from
+  GeometricMachineLearning into GeometricOptimizers, so `Optimizer` /
+  `AdamOptimizerWithDecay` / `GradientOptimizer` / `optimization_step!` are replaced by
+  `Optimizer(ps, loss; algorithm, linesearch)` plus `solver_step!`/`update!`, with `Adam` and
+  `GradientMethod` supplying only a *direction* and the learning rate living in the line
+  search. The learning-rate schedule is preserved:
+  `DecayingStatic(T; η₁ = 1e-3, η₂ = 5e-5, n = nepochs)` matches
+  `AdamOptimizerWithDecay(nepochs, 1e-3, 5e-5)`, both decaying the step size as `γ^t · η₁` with the
+  same `γ = exp(log(η₂/η₁)/n)`. The optimizer method and line search are now built at the
+  parameter element type, where the old call passed Float64 constants regardless. Trained weights
+  are nevertheless not bit-identical to previous releases': the bias-correction algebra inside the
+  Adam moment update differs, and gradients now come from the optimizer's own `GradientAutodiff`
+  rather than from explicit `Zygote.gradient` calls in the loops.
+- New internal helpers `optimizer_params` / `network_params`
+  (`src/network_integrators/utilities.jl`) convert between the nested per-layer parameters of
+  `AbstractNeuralNetworks` and the flat `NamedTuple` of arrays that GeometricOptimizers
+  accepts. They alias rather than copy, so the optimizer's in-place updates remain visible
+  through `PNN.params`. Both are `@generated`: written as ordinary code they build their key
+  set with `Symbol(lname, :_, f)` at run time, which inference cannot fold, so
+  `optimizer_params` returned an abstract `NamedTuple` and `network_params` — which runs inside
+  the differentiated loss on every gradient evaluation — was inferred no better.
+
+### Removed
+
+- **`GeometricIntegrators` is no longer a dependency**; the package builds on
+  `GeometricIntegratorsBase` alone. Every `GeometricIntegrators.Integrators.X` extension point was
+  already a `GeometricIntegratorsBase` generic imported into that module, so those call sites are
+  simply requalified. `GeometricEquations` replaces it in `[deps]` because GeometricIntegrators was
+  re-exporting it — that is where `AbstractProblemIODE`, `StateVariable` and `initial_conditions`
+  come from, and GeometricIntegratorsBase does not pass them on. `create_internal_stage_vector` was
+  the only genuinely GeometricIntegrators-local name and is now defined in
+  `src/network_integrators/utilities.jl`. Consequences: `RungeKutta` and `GenericLinearAlgebra`
+  leave the dependency graph entirely. Runge-Kutta reference integrators such as `Gauss(8)` are
+  only ever needed by the `benchmark/` and `scripts/` environments, which declare
+  GeometricIntegrators themselves.
+- **`GeometricMachineLearning` is no longer a dependency.** Once the optimizer calls moved to
+  GeometricOptimizers, its only remaining use was `GeometricMachineLearning.NeuralNetwork`, which
+  it `import`s straight from `AbstractNeuralNetworks` — the same object — so the call site now
+  names `AbstractNeuralNetworks.NeuralNetwork` directly. The `_GML` suffixes on the basis and
+  integrator types are kept for source compatibility.
+- `ContinuumArrays` is no longer a dependency; it had no use in `src/`. The quasi-array indexing
+  and `grid` come from `CompactBasisFunctions`, which carries `ContinuumArrays` itself.
+- `GeometricProblems` moved from `[deps]` to the test target — its only use in `src/` was the
+  dead `SINDy_methods/PR_Pretraining.jl`, now retired to `obsolete/script/`. That file was
+  never `include`d and called into `Flux`, which was never a dependency.
+- Unused imports in `src/NonlinearIntegrators.jl`: `relative_maximum_error` (replaced by the
+  `GeometricSolution` and `timesteps` the source actually names), `Options`, `NonlinearSolver`,
+  `DogLeg`, and a no-op `using Base`.
+- `Optimisers` is no longer a dependency. It was carried as a bare `using` with no call site
+  anywhere in `src/`; the training loops it once served moved to GeometricMachineLearning long
+  before this release and now to GeometricOptimizers.
+
+### Known issues
+
+- `GeometricOptimizers` 0.2.0 is taken from git via `[sources]`, the registry carrying only 0.1.0.
+  A git `[sources]` entry blocks registration in General, so this package cannot be tagged until
+  GeometricOptimizers is released; drop the `[sources]` section then.
+- **Julia 1.10 cannot install this package while that `[sources]` pin is present.** `[sources]`
+  is a Pkg 1.11 feature; 1.10 ignores the table, so `GeometricOptimizers = "0.2"` has no
+  candidate and `Pkg` fails with *"Unsatisfiable requirements detected for package
+  GeometricOptimizers … restricted to versions 0.2 by NonlinearIntegrators — no versions left"*.
+  This is a resolver limitation and not a source incompatibility: the `julia = "1.10"` compat
+  entry is accurate for the code and is deliberately left in place, and 1.10 starts working
+  again the moment the `[sources]` section can be dropped. The three Julia 1.10 CI jobs are
+  expected to be red until then.
+- **The test suite takes hours on Julia 1.12** — 287 minutes in CI against ~20 on 1.13 and ~10
+  on `main` before this release. Measured locally, a two-step `NonLinear_OneLayer_GML` run with
+  `initial_guess_method = TrainingMethod()` takes over 30 minutes on 1.12 and 28.8 seconds on
+  1.13; the same integrator with `OGA1d()`, which never touches GeometricOptimizers, takes 28.0
+  seconds on 1.12. `LSGD` is affected as well, so it is not specific to `Adam`. The process sits
+  in `jl_type_infer`, and `--trace-compile` stops emitting — an inference blowup, not numerical
+  work.
+
+  Not the same bug as GeometricOptimizers
+  [#35](https://github.com/JuliaGNI/GeometricOptimizers.jl/pull/35), which is in the manifest
+  and does not help here. Standalone reproductions of the optimizer usage — construction and
+  `solver_step!` in one body, `Adam` + `DecayingStatic`, the loss evaluating an
+  `AbstractNeuralNetworks.Chain` at `NeuralNetworkParameters` under the default ForwardDiff
+  gradient — all run in about 2 seconds on 1.12. The blowup only appears once that call sits
+  inside the `integrate` call graph. Unresolved; 1.13 and 1.10 are unaffected.
+
+### Fixed
+
+- The package loads on Julia 1.13 again. `GenericLinearAlgebra` overwrites a `LinearAlgebra`
+  method, which 1.13 forbids during precompilation, and that took `RungeKutta` and hence
+  `GeometricIntegrators` down with it. Both have left the dependency graph.
+
 ## [0.3.0] - 2026-08-11
 
 ### Breaking
@@ -314,3 +420,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dict_amount` overflowed `T(dict_amount)` to `Inf`.
 - Removed a stray `global xk_low` from the OGA fit in
   `Time_reversible_Hardcode_int.jl`.
+
+## Open Issues
+
+Not a release section: this is a standing list of known defects that are understood but not
+fixed, so that reviewing the same code twice does not rediscover them. Entries move into a
+release's `Fixed` when they are dealt with.
+
+### Environment
+
+The first three are described in full under [Unreleased] → *Known issues*; they are listed here
+only so that this section is the complete index.
+
+- **The git `[sources]` pin blocks registration in General.** Clears when GeometricOptimizers
+  0.2 is registered.
+- **Julia 1.10 cannot install the package**, `[sources]` being a Pkg 1.11 feature. Clears at the
+  same moment, for the same reason.
+- **Julia 1.12 spends hours in type inference** on the GeometricOptimizers-driven initial-guess
+  methods. This one does not clear itself, and is the only one of the three that is a genuine
+  defect rather than a consequence of depending on an unregistered package.
+- **The Julia 1.13 CI test phase roughly doubled**, from about 10 minutes for the whole job on
+  `main` to 19m57s of tests here, and nothing found so far explains it. No local baseline is
+  available to compare against: `main`'s environment no longer resolves, which is what this
+  branch exists to fix, so the only local number is 8m19s for this branch — which matches what
+  the branch reports and says nothing about the delta. Worth re-measuring once `main` carries
+  these changes and a `main` baseline can be taken again.
+
+### Upstream
+
+- **`GeometricOptimizers.GradientMethod` cannot be used with a searching line search** on
+  Euclidean parameters: `_trial_slope` calls `gradient(cache)` while the first-order caches
+  expose `gradient_array`, so it throws `MethodError: no method matching
+  gradient(::GradientCache)` — including via the `default_linesearch` that `Optimizer` picks
+  when none is given. Recorded under *Not fixed here* in
+  [GeometricOptimizers#35](https://github.com/JuliaGNI/GeometricOptimizers.jl/pull/35). The
+  LSGD loop in `NonLinear_DenseNet_GML.jl` works only because it passes `Static` explicitly,
+  and there is a comment at that call site saying so.
+
+### Training loops and losses
+
+All of these predate the move to GeometricOptimizers; none is a regression.
+
+- **`mse_loss` is not the mean squared error.** It returns `mean(abs, y_pred - y)`, the mean
+  *absolute* error — as its own docstring says. Renaming it touches every training call site,
+  so it is left alone rather than changed silently; whichever way it is resolved, the name and
+  the formula should agree.
+- **`mse_loss`'s `μ` keyword is unused**, and its `λ` defaults to `0.0`, which switches off the
+  boundary penalty `λ * |NN(x[1], ps) - y[1]|²` that is the only thing `λ` and `μ` are there
+  for. No call site passes either, so the penalty is dead code at present.
+- **The early-exit thresholds are Float64 literals**: `err < 5e-8` for `TrainingMethod` and
+  `err < 5e-5` for `LSGD` in `NonLinear_DenseNet_GML.jl`. Neither is scaled to the working
+  precision, so at `Float32` — where `eps` is 1.2e-7 — the `TrainingMethod` exit is below the
+  accuracy a network fit can reach and the loop always runs the full epoch budget. They should
+  derive from `eps(PT)` the way the OGA guards now do.
+- **`NonLinear_OneLayer_GML`'s `TrainingMethod` has no early exit at all**, where the DenseNet
+  one does. That may well be deliberate, but the asymmetry is undocumented.
+- **`box_init_plain` defaults to `Float32`** and the three LSGD call sites take that default,
+  so a `Float64` DenseNet is seeded from `Float32` random draws that are then widened on
+  assignment. The suite's no-silent-upcast gate does not catch it, being a downcast of the
+  *seed* rather than of the solution. It should take the working precision, as
+  `simpson_quadrature` and the OGA dictionaries do.
+- **`NonLinear_DenseNet_GML`'s `TrainingMethod` passes the whole `NeuralNetwork` to
+  `mse_loss`** where the one-layer integrator passes the bare model, so the loss closure
+  captures more than it needs. Both work; they should agree.
+
+### Loops and allocation
+
+- **Four loop-invariant assignments sit inside `for i in 1:S₁`** in
+  `NonLinear_DenseNet_GML.jl`, in both `initial_params!` methods, in `components!` and in
+  `record_finer_solution!`. Only the `ps[k].L2.W[:, i]` line depends on `i`; the other four
+  slices are rewritten identically `S₁` times. `components!` runs on every residual evaluation,
+  so this is on the Newton path.
+- **`flatten_params` accumulates into an untyped `Vector{Any}`** and finishes with
+  `vcat(flat_list...)`, a splat whose length is not known to the compiler. `components!` calls
+  it `2 + 2R` times per dimension, `R` being the number of quadrature nodes — also on the
+  Newton path.

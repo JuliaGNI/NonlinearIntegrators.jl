@@ -1,30 +1,33 @@
 module NonlinearIntegrators
 
-using GeometricIntegrators
-using GeometricIntegrators.Integrators: create_internal_stage_vector
+using GeometricEquations
 using GeometricIntegratorsBase
 import GeometricIntegratorsBase: default_solver, default_options, initsolver, CacheDict, Cache, cache, CacheType, solutionstep, reset!, default_iguess, iguess
 import GeometricIntegratorsBase: problem, method, parameters, SolverMethod, history, solver, residual!, copy_internal_variables!, internal, current, update!, solverstate
 import GeometricIntegratorsBase: compute_vectorfields!, _extrapolate!, internal_variables, nlsolution, integrate!, IODEIntegratorCache, LODEMethod
 import GeometricBase: datatype, timetype, ntime
 import GeometricBase: initialtime, finaltime, timespan, timestep, periodicity, NullPeriodicity
-using GeometricSolutions: relative_maximum_error
+using GeometricSolutions: GeometricSolution, timesteps
 
 using QuadratureRules
 using CompactBasisFunctions
-# `basis`/`nbasis` are extended for the bases *and* for the methods, from several files.
-# Import them so that a bare definition anywhere extends CompactBasisFunctions rather than
-# silently creating a shadowing NonlinearIntegrators.nbasis — which is what turned every
-# internal `nbasis(method(int))` call site into a MethodError.
-import CompactBasisFunctions: basis, nbasis
+# `basis`, `nbasis` and `nnodes` are extended for the bases *and* for the methods, from
+# several files. Import them so that a bare definition anywhere extends the one generic
+# function per name rather than silently creating a shadowing NonlinearIntegrators.nbasis —
+# which is what turned every internal `nbasis(method(int))` call site into a MethodError.
+# `basis` and `nnodes` are declared method-free in GeometricBase and extended by both
+# CompactBasisFunctions and QuadratureRules; `nbasis` belongs to CompactBasisFunctions.
+import GeometricBase: basis, nnodes
+import CompactBasisFunctions: nbasis
 using Zygote
 using Random
-using Optimisers
 using Statistics
-using Base
 using StaticArrays
-using SimpleSolvers: Newton, Options, NonlinearSolver, solve!, DogLeg
-import GeometricMachineLearning
+using SimpleSolvers: Newton, solve!
+# `import`, not `using`: GeometricOptimizers re-exports SimpleSolvers' `solve!` and `Newton` (the
+# same generics, which it `import`s), so qualifying its names keeps each call site explicit about
+# which package it means.
+import GeometricOptimizers
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks
 using LinearAlgebra

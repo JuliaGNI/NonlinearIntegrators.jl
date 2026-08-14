@@ -1,3 +1,11 @@
+"""
+    create_internal_stage_vector(DT, D, S) -> Vector{Vector{DT}}
+
+`S` zero vectors of length `D`, one per internal stage of a `D`-dimensional problem. Used by the
+integrator caches to hold the stage values `Q`, `P`, `V` and `F`.
+"""
+create_internal_stage_vector(DT, D, S) = [zeros(DT, D) for _ in 1:S]
+
 function simpson_quadrature(N::Int, ::Type{T}=Float64) where {T}
     if N % 2 != 0
         error("N must be even for Simpson's rule.")
@@ -49,6 +57,71 @@ function flatten_params(params::NeuralNetworkParameters)
     return vcat(flat_list...)
 end
 
+
+"""
+    optimizer_params(ps) -> NamedTuple
+
+Flatten the layer nesting of the network parameters `ps`, joining each layer and field name into
+one key: `L1.W` becomes `L1_W`.
+
+This is the shape GeometricOptimizers' `Optimizer` requires — its `OptimizerSolution` is an
+`AbstractVector`, a `Manifold`, or a *flat* `NamedTuple` of arrays, whereas network parameters are
+one level deeper, `(L1 = (W = …, b = …), L2 = (W = …,))`. Both `NeuralNetworkParameters` and a
+plain `NamedTuple` of layers are accepted, the latter for optimising a subset of the layers.
+
+Does **not** copy: the result aliases the same arrays, so the optimizer's in-place updates are
+visible through the original `ps`.
+
+See [`network_params`](@ref) for the inverse.
+
+# Implementation
+
+`@generated` so that the joined key set is computed from the *type* of `ps`. Written as
+ordinary code — `Symbol(lname, :_, f)` inside a `map` over `keys(ps)` — the key tuple is built
+at run time, inference cannot fold it, and the return type degrades to `NamedTuple`. The
+training loops then hand `Optimizer` an argument of unknown type, and inferring the
+constructor plus `solver_step!` from there costs minutes per specialization on Julia 1.12.
+"""
+optimizer_params(ps::NeuralNetworkParameters) = optimizer_params(AbstractNeuralNetworks.params(ps))
+
+@generated function optimizer_params(ps::NamedTuple{LN,LT}) where {LN,LT}
+    names = Symbol[]
+    entries = Expr[]
+    for (i, lname) in enumerate(LN)
+        for f in fieldnames(LT.parameters[i])
+            push!(names, Symbol(lname, :_, f))
+            push!(entries, :(ps.$lname.$f))
+        end
+    end
+    :(NamedTuple{$(Tuple(names))}(($(entries...),)))
+end
+
+"""
+    network_params(flat, template) -> typeof(template)
+
+Rebuild the layer nesting that [`optimizer_params`](@ref) removed, taking the key structure from
+`template` and the arrays from the flat `NamedTuple` `flat`.
+
+The loss handed to `Optimizer` is called on the flat parameters while the network wants them
+nested, so it needs this on the way in. The result is a `NeuralNetworkParameters` exactly when
+`template` is one.
+
+`@generated` for the same reason as [`optimizer_params`](@ref), and more pressingly: this one
+runs inside the differentiated loss, on every function and gradient evaluation.
+"""
+function network_params(flat, template::NeuralNetworkParameters)
+    NeuralNetworkParameters(network_params(flat, AbstractNeuralNetworks.params(template)))
+end
+
+@generated function network_params(flat::NamedTuple, template::NamedTuple{LN,LT}) where {LN,LT}
+    layers = Expr[]
+    for (i, lname) in enumerate(LN)
+        fields = fieldnames(LT.parameters[i])
+        entries = [:(flat.$(Symbol(lname, :_, f))) for f in fields]
+        push!(layers, :(NamedTuple{$fields}(($(entries...),))))
+    end
+    :(NamedTuple{$LN}(($(layers...),)))
+end
 
 function box_init_plain(input_dim::Int, output_dim::Int, ::Type{T}=Float32;Random_rng = Random.seed!(1)) where {T}
     W = zeros(T, output_dim, input_dim)

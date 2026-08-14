@@ -57,7 +57,7 @@ struct NonLinear_OneLayer_GML{T, NNODES, basisType <: Basis{T},
             initial_trajectory_method=initial_trajectory_method,
             initial_guess_method=initial_guess_method,
             record_grid_points =  record_grid_points)
-        new{T, QuadratureRules.nnodes(quadrature), typeof(basis), ET, IPMT}(
+        new{T, nnodes(quadrature), typeof(basis), ET, IPMT}(
             common, SVector{2,T}(bias_interval), dict_amount)
     end
 end
@@ -149,13 +149,13 @@ struct NonLinear_OneLayer_GMLCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
     end
 end
 
-function GeometricIntegrators.Integrators.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML; kwargs...) where {ST}
     NonLinear_OneLayer_GMLCache{ST, nbasis(method), nnodes(method),
         extrapolation_substep(method),}(initial_conditions(problem);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegrators.Integrators.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML) =
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::NonLinear_OneLayer_GML) =
     NonLinear_OneLayer_GMLCache{ST, nbasis(method), nnodes(method),
         extrapolation_substep(method),}
 
@@ -178,12 +178,22 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
         labels = reshape(network_labels[:, k], 1, extrapolation_substep + 1)
 
         PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
-        # opt = GeometricMachineLearning.Optimizer(AdamOptimizer(0.001, 0.9, 0.99, 1e-8), ps[k])
-        opt = GeometricMachineLearning.Optimizer(GeometricMachineLearning.AdamOptimizerWithDecay(nepochs, 1e-3, 5e-5), PNN.params)
-        λ = GeometricMachineLearning.GlobalSection(PNN.params)
+        # `Adam` and the line search are built at the parameter element type: `Optimizer` does not
+        # convert `Adam`, so an `Adam{Float64}` handed `Float32` parameters would not dispatch.
+        # `ps_flat` aliases the network's arrays (see `optimizer_params`), so the in-place updates
+        # in the loop below are visible through `PNN.params`. `Adam` supplies only a direction, so
+        # the learning rate is the line search, decaying from 1e-3 to 5e-5 over the epoch budget.
+        local PT = eltype(PNN.params[1].W)
+        ps_flat = optimizer_params(PNN.params)
+        loss(p) = mse_loss(network_inputs, labels, NN, network_params(p, PNN.params))
+        algorithm = GeometricOptimizers.Adam(PT)
+        opt = GeometricOptimizers.Optimizer(ps_flat, loss; algorithm = algorithm,
+            linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
+        state = GeometricOptimizers.OptimizerState(algorithm, ps_flat)
         for ep in 1:nepochs
-            gs = Zygote.gradient(p -> mse_loss(network_inputs, labels, NN, p), PNN.params)[1]
-            GeometricMachineLearning.optimization_step!(opt, λ, PNN.params, gs)
+            GeometricOptimizers.increase_iteration_number!(state)
+            GeometricOptimizers.solver_step!(ps_flat, state, opt)
+            GeometricOptimizers.update!(state, opt, ps_flat)
         end
         @debug "dimension" k "final loss:" mse_loss(network_inputs, labels, NN, PNN.params) "in" nepochs "epochs"
 
@@ -196,7 +206,7 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, ini
     @debug "Initial guess from network training" x
 end
 
-function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local C = cache(int, ST)
@@ -321,7 +331,7 @@ function GeometricIntegrators.Integrators.components!(x::AbstractVector{ST}, sol
 end
 
 
-function GeometricIntegrators.Integrators.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
+function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:NonLinear_OneLayer_GML}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q

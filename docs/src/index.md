@@ -3,7 +3,7 @@
 
 **NonlinearIntegrators.jl** provides structure-preserving variational integrators for
 Lagrangian mechanical systems whose ansatz is a neural network rather than a polynomial.
-The package is built on top of [GeometricIntegrators.jl](https://github.com/JuliaGNI/GeometricIntegrators.jl)
+The package is built on top of [GeometricIntegratorsBase.jl](https://github.com/JuliaGNI/GeometricIntegratorsBase.jl)
 and accepts any `AbstractProblemIODE` (implicit ODE in Lagrangian form).
 
 ## Abstract type hierarchy
