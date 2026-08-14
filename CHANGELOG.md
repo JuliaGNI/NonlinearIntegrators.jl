@@ -877,3 +877,52 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.5.
   build it from `VNN[1,1]` like the two gradients now are, which would make it return a scalar
   — `build_nn_function` does accept a scalar expression — or leave it and note why; but the
   three derivative slots should not disagree about whether they are scalars.
+
+### Reviewing the 0.5 update
+
+Surfaced while reviewing the `SymbolicNeuralNetworks` 0.5 update, after the fixes that review
+did make. None of these is a defect in the update: the compiled kernels were checked against
+`ForwardDiff` off the integrator and agree to round-off at both bases, both codegen settings
+and both precisions (≤ 7.2e-16 at Float64, ≤ 9.4e-8 at Float32, with `dvdθ` flattening to
+exactly `NP`), which is the check now in `test/unit/dispatch_variants_unit.jl`.
+
+- **The `29 ns` that the `symbolic = false` build is measured at is a measurement of nothing.**
+  `ShallowNetBasis{Float64}(tanh, 8; symbolic = false)` allocates 0 bytes, and a million
+  constructions in a loop take 2.9 µs in total — the compiler elides them. `Dense` carries its
+  dimensions in type parameters and stores only the activation, so a derivative-free basis puts
+  nothing on the heap; the parameters do not exist until `NeuralNetwork(NN, T)` is called. The
+  figure is therefore harness overhead, and it sits an order of magnitude below the ~0.042 µs
+  timer resolution the kernel table already flags. What the docstring
+  (`src/nvi/shallownet_basis.jl`) and the *Added* entry above should say is that the build costs
+  15 ms and the opt-out costs nothing at all — the "pure overhead" claim they make is right, it
+  is only the second number that pretends to be a cost. Left as measured rather than silently
+  restated.
+
+- **The *0.3 → 0.4* comparability note above names only the `DenseNetBasis` pair.** The same
+  applies to the other figures in that entry — `ShallowNetBasis` construction "1.6–2.0× faster",
+  and 0.24 s against 0.017 s for generating the in-place kernel at `S = 8` — which are quoted
+  with no record of how they were taken either, and which the warm re-measurement puts three
+  orders of magnitude away. The entry should either scope its caveat to the whole 0.3 → 0.4
+  entry or the figures should be re-taken as a set.
+
+- **`benchmark/results/` is gitignored, so the CSV the *Nonlinear solve conditioning* entry
+  cites is not in the repository.** `benchmark/results/.gitignore` is `*` plus `!.gitignore`,
+  which is right — those files are generated — but it makes
+  `benchmark/results/derivative_backends_codegen_agreement.csv` a citation only the person who
+  last ran the benchmark can follow. Either name the run that produces it or quote the number
+  and drop the path.
+
+- **The new `ForwardDiff` cross-check is a point check, not a sweep.** One time input
+  (`t = 0.37`), one random parameter draw per basis, the default code generation only, and
+  `TEST_TYPES`, so no Float16. That is enough for what it was added for — a wrong shape or a
+  wrong expression shows up immediately, which is the failure mode the 0.5 rename could have
+  produced — but an expression that happens to agree at that one point would pass. Sweeping a
+  few nodes, or reusing the quadrature nodes the integrators actually evaluate at, would cost
+  almost nothing.
+
+- **`Project.toml`'s `AbstractNeuralNetworks = "0.6.4"` is a floor this package does not need.**
+  Neither `input_dimension` nor `output_dimension` is called anywhere here; the constraint that
+  forces 0.6.4 is `SymbolicNeuralNetworks` 0.5's own, and the resolver applies it whether or not
+  this entry exists. Kept because it documents the coupling the *0.4 → 0.5* entry explains, but
+  it is a compat bound stating something other than this package's requirement, and it will need
+  a reason to move when it next changes.
