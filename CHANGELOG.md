@@ -252,6 +252,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The `residual!` of the autodiff pair no longer accumulates in `Float64` at reduced
+  precision.** Three `Float64` literals sat in the `p̄` row of the residual — `(1.0 -
+  quad_nodes[j])` and `(-1.0)` in `src/nvi/shallownet_autodiff.jl:390-391`, `(-1.0)` in
+  `src/nvi/shallownet_autodiff_reversible.jl:401` — where they stand in for the analytic
+  boundary derivatives `∂q_h/∂q̄ = 1-t` and `∂v_h/∂q̄ = -1`. The accumulator `z` starts as
+  `zero(ST)`, and during the Newton solve `ST` is a `ForwardDiff.Dual`; multiplying by a
+  `Float64` literal promotes it, so at `Float32` the residual was summed as
+  `Dual{…,Float64}` and only rounded back on the write into `b::Vector{ST}`. That is a
+  silent upcast the suite cannot see — `assert_no_upcast` checks the eltype of the final
+  state, which is converted back — and it retypes `z` mid-loop on the Newton path. They are
+  now integer literals, `(1 - quad_nodes[j])` and `(-1)`, which is the idiom
+  `shallownet_autodiff_reversible.jl:400` already used and which takes the precision of the
+  operand instead of imposing one. `Float64` results are bit-identical; `Float32` moves by
+  round-off. Found while reviewing the `*_anstaz_*` → `*_ansatz_*` rename, which is what
+  drew attention to these hand-written copies of the boundary derivatives.
+
 - **`CGVINodal` (formerly `CGVI_standard`) can integrate problems with more than one degree of
   freedom.** Found while diffing it against `GeometricIntegrators.CGVI` for the rename above, and
   pre-existing rather than introduced by it: a `D = 2` run (Lagrange basis on 4 Lobatto nodes)
@@ -722,10 +738,15 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   `∂NN_ansatz_∂q̄`, `∂NN_ansatz_∂q`, `∂VNN_ansatz_∂q̄` and `∂VNN_ansatz_∂q`
   (`src/nvi/shallownet_autodiff.jl:234-238`) return `1-t`, `t`, `-1` and `1` — the exact
   derivatives of `q_h` and `dq_h/dt` with respect to the two endpoint unknowns — and nothing
-  in `src/`, `test/`, `scripts/`, `benchmark/` or `docs/` reads them. `components!` writes
-  those same four quantities out by hand where it assembles the Jacobian. Either call them
-  there or drop them. Surfaced while renaming `*_anstaz_*` to `*_ansatz_*`, which had to touch
-  all four.
+  in `src/`, `test/`, `scripts/`, `benchmark/` or `docs/` reads them. All four are written out
+  by hand elsewhere: `residual!` spells the two `∂/∂q̄` ones into the `p̄` row of the residual
+  (`shallownet_autodiff.jl:390-391`, `shallownet_autodiff_reversible.jl:400-401`) and
+  `update!` spells the two `∂/∂q` ones into the momentum update
+  (`shallownet_autodiff.jl:437-438`, `shallownet_autodiff_reversible.jl:446-447`, where the
+  `∂VNN/∂q = 1` factor is left implicit). Neither is `components!`, and neither assembles a
+  Jacobian — the solver differentiates one out of `residual!`. Either call the helpers at
+  those four sites or drop them. Surfaced while renaming `*_anstaz_*` to `*_ansatz_*`, which
+  had to touch all four.
 
 - **`src/nvi/shallownet_autodiff_reversible.jl:218-244` is a commented-out duplicate** of the
   ansatz definitions that live, uncommented, in `shallownet_autodiff.jl:212-238`. It is

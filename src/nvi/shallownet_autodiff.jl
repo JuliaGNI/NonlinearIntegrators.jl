@@ -387,8 +387,8 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
     for k in eachindex(p̄)
         z = zero(ST)
         for j in eachindex(P, F)
-            z += timestep(int) * method(int).b[j] * F[j][k] * (1.0 - quad_nodes[j])
-            z += method(int).b[j] * P[j][k] * (-1.0)
+            z += timestep(int) * method(int).b[j] * F[j][k] * (1 - quad_nodes[j])
+            z += method(int).b[j] * P[j][k] * (-1)
         end
         b[D*S+k] = p̄[k] + z
     end
