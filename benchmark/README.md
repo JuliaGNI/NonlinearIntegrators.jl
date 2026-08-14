@@ -9,9 +9,9 @@ rather than benchmarks of the integrator suite, which is what this directory hol
 `scripts/README.md` and the *Orthogonal Greedy Algorithm* section of the package
 documentation.
 
-## One-layer GML solver / precision / config sweep
+## Shallow-net solver / precision / config sweep
 
-A systematic, SolverBenchmark-style sweep of `NonLinear_OneLayer_GML` — **one runnable
+A systematic, SolverBenchmark-style sweep of `ShallowNet` — **one runnable
 file per test problem** — over timestep × precision × quadrature order `R` × network
 width `S` × activation × nonlinear-solver strategy × regularization `λ` × initial-guess
 strategy. Every case integrates exactly **10 steps**; the interval is adapted per case as
@@ -27,14 +27,14 @@ trust-region `DogLeg`. Initial-guess (trajectory) strategies: `midpoint`
 `previous solution` (`NoExtrapolation`).
 
 ### Files
-- `gml_benchmark_common.jl` — shared sweep engine, presets, builders, per-run measurement, CSV.
-- `gml_report.jl` — CSV parsing, CairoMakie plots, markdown report.
+- `shallownet_benchmark_common.jl` — shared sweep engine, presets, builders, per-run measurement, CSV.
+- `shallownet_report.jl` — CSV parsing, CairoMakie plots, markdown report.
 - `run_harmonic_oscillator.jl`, `run_pendulum.jl`, `run_double_pendulum.jl`,
   `run_toda_lattice.jl` — one per problem.
 - `report.jl` — aggregates all `results/*.csv` into a combined report.
 
 ### Modes
-Each run file takes a mode as `ARGS[1]` or `ENV["GML_BENCH_PRESET"]` (default `quick`):
+Each run file takes a mode as `ARGS[1]` or `ENV["SHALLOWNET_BENCH_PRESET"]` (default `quick`):
 
 | axis | `full` | `quick` |
 |---|---|---|
@@ -71,13 +71,13 @@ julia --project=benchmark benchmark/run_toda_lattice.jl full            # full s
 julia --project=benchmark benchmark/report.jl                           # combined report
 ```
 Each run writes `results/<problem>_<mode>.csv`, a `results/<problem>_<mode>.md` summary, and
-PNG plots. `report.jl` writes the combined `results/onelayer_gml_benchmark.md`. (The `results/`
+PNG plots. `report.jl` writes the combined `results/shallownet_benchmark.md`. (The `results/`
 contents are git-ignored.)
 
 ### Note
 
 Developing this benchmark surfaced (goal b) and fixed a pre-existing package bug: the
-`NonLinear_OneLayer_GML` Hermite `initial_trajectory!` built a `(t, q, p, v, f)` solution
+`ShallowNet` Hermite `initial_trajectory!` built a `(t, q, p, v, f)` solution
 tuple, but the current `GeometricIntegratorsBase` `HermiteExtrapolation` expects `q̇`/`ṗ`
 fields, so the `Hermite` initial-guess strategy failed with a `FieldError`. The tuple field
 names are now corrected, so all three initial-guess strategies run.

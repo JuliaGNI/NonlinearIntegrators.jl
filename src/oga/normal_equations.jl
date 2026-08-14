@@ -12,7 +12,7 @@
 """
     initial_params!(int, ::OGA1dNormalEquations, sol)
 
-Reference OGA initial guess for `NonLinear_OneLayer_GML`: the implementation from the
+Reference OGA initial guess for `ShallowNet`: the implementation from the
 original paper, kept as a selectable baseline.
 
 The dictionary and the greedy least-squares fit are assembled in `Float64` (a
@@ -23,10 +23,10 @@ Algorithm" section of the documentation for why the working-precision QR fit of
 [`OGA1d`](@ref) replaced it as the default, and [`OGA1dNormalEquations`](@ref) for the
 failure mode this variant exhibits at 16 bits.
 
-Defined only for `NonLinear_OneLayer_GML` — it is a comparison baseline, not a production
+Defined only for `ShallowNet` — it is a comparison baseline, not a production
 seed.
 """
-function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML},
+function initial_params!(int::GeometricIntegrator{<:ShallowNet},
                          initialParams::OGA1dNormalEquations, sol)
     local S = nbasis(method(int))
     local D = length(cache(int).q̃)

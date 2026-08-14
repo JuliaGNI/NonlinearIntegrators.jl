@@ -35,11 +35,11 @@ using ForwardDiff
 
 
 include("methods.jl")
-export OneLayerMethod, DenseNetMethod, NetworkIntegratorMethod
+export ShallowNetMethod, DenseNetMethod, NetworkIntegratorMethod
 export IntegratorExtrapolation
 export InitialParametersMethod, TrainingMethod, LSGD
 
-include("network_integrators/utilities.jl")
+include("nvi/utilities.jl")
 
 # Orthogonal Greedy Algorithm. The core (dictionaries, selection rules, fits and the
 # greedy loop) is integrator-agnostic and comes first; the per-integrator adapters have
@@ -60,72 +60,46 @@ export oga_fit, OGAResult, oga_label
 # Fields, accessors, traits, cache supertype and the shared step/solve machinery that all
 # five network integrators have in common. Comes after `oga/types.jl`, whose `OGA1d()` is
 # the default `initial_guess_method` in the core constructor.
-include("network_integrators/NetworkIntegratorCore.jl")
+include("nvi/network_integrator_core.jl")
 export NetworkIntegratorCore, NetworkIntegratorCache
 
-include("network_basis/NetworkBasisCore.jl")
+include("nvi/network_basis_core.jl")
 export NetworkBasisCore
 
-include("network_basis/NetworkBasis.jl")
-export NetworkBasis, DenseNetBasis, OneLayerNetBasis
+include("nvi/network_basis.jl")
+export NetworkBasis, AbstractDenseNetBasis, AbstractShallowNetBasis
 
-include("network_basis/DenseNet_GML.jl")
-# include("network_basis/DenseNet_Lux.jl")
-export DenseNet_GML
-# export DenseNet_Lux
+include("nvi/densenet_basis.jl")
+export DenseNetBasis
 
-include("network_basis/OneLayerNetwork_GML.jl")
-# include("network_basis/OneLayerNetwork_Lux.jl")
-# include("network_basis/OneLayerNetwork.jl")
-export OneLayerNetwork_GML
-# export OneLayerNetwork_Lux,OneLayerNetwork
+include("nvi/shallownet_basis.jl")
+export ShallowNetBasis
 
-# include("network_basis/OneLayerVectorValueNet_Lux.jl")
-# include("network_basis/OneLayerVectorValueNet_GML.jl")
-# export OneLayerVectorValueNet_Lux,OneLayerVectorValueNet_GML
+# The Lux and vector-valued network variants, and the BSpline bases and integrators, are
+# retired: they live under `obsolete/` and are not part of the package.
 
-include("network_integrators/NonLinear_OneLayer_GML.jl")
-# include("network_integrators/NonLinear_OneLayer_Lux.jl")
-include("network_integrators/NonLinear_DenseNet_GML.jl")
-# include("network_integrators/NonLinear_DenseNet_Lux.jl")
-# include("network_integrators/Linear_DenseNet_GML.jl")
-export NonLinear_OneLayer_GML, NonLinear_DenseNet_GML
-# export NonLinear_OneLayer_Lux, NonLinear_DenseNet_Lux, Linear_DenseNet_GML
+include("nvi/shallownet_nonlinear.jl")
+include("nvi/densenet_nonlinear.jl")
+export ShallowNet, DenseNet
 
-include("network_integrators/Hardcode_int.jl")
-export Hardcode_int
+include("nvi/shallownet_autodiff.jl")
+export ShallowNetAutodiff
 
-
-include("network_integrators/Time_reversible_OneLayer.jl")
-include("network_integrators/Time_reversible_Hardcode_int.jl")
-export Time_Reversible_Hardcode
-export Time_reversible_OneLayer
+include("nvi/shallownet_reversible.jl")
+include("nvi/shallownet_autodiff_reversible.jl")
+export ShallowNetReversible, ShallowNetAutodiffReversible
 
 # The OGA seeds for the four integrators above, plus the original-paper reference.
 include("oga/adapters.jl")
 include("oga/normal_equations.jl")
 
-# include("network_integrators/NonLinear_OneLayer_VectorValue_Lux.jl")
-# include("network_integrators/NonLinear_OneLayer_VectorValue_GML.jl")
-# export NonLinear_OneLayer_VectorValue_Lux, NonLinear_OneLayer_VectorValue_GML
-
-# BSpline
-# include("BSpline/BSplineBasis.jl")
-# include("BSpline/CGVI_SplineBasis.jl")
-# export BSplineDirichlet, CGVI_BSpline
-
-# Nonlinear BSpline
-# include("BSpline/NL_BSplineBasis.jl")
-# include("BSpline/NL_Spline_CGVI.jl")
-# export Nonlinear_BSpline_Basis, Nonlinear_BSpline_Integrator
-
-# Sindy models
+# Variational integrators with a symbolic expression as the ansatz.
 using Symbolics
-include("SINDy_methods/PR_Int.jl")
-include("SINDy_methods/PR_basis.jl")
-export PR_Integrator, PR_Basis
+include("vise/vise_integrator.jl")
+include("vise/vise_basis.jl")
+export VISE, VISEBasis
 
-# CGVI Standard
-include("CGVI_standard/CGVI_standard.jl")
-export CGVI_standard
+# The linear reference integrator: continuous Galerkin on a nodal basis.
+include("cgvi/cgvi.jl")
+export CGVINodal
 end

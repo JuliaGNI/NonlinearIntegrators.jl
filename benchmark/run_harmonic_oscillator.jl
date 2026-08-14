@@ -1,11 +1,11 @@
-# Benchmark the one-layer GML integrator on the harmonic oscillator.
+# Benchmark the shallow-net integrator on the harmonic oscillator.
 #
 #   julia --project=benchmark benchmark/run_harmonic_oscillator.jl [quick|full]
 #
-# Mode defaults to "quick" (also settable via GML_BENCH_PRESET). Writes
+# Mode defaults to "quick" (also settable via SHALLOWNET_BENCH_PRESET). Writes
 # results/harmonic_oscillator_<mode>.csv plus a markdown report and plots.
 
-include(joinpath(@__DIR__, "gml_benchmark_common.jl"))
+include(joinpath(@__DIR__, "shallownet_benchmark_common.jl"))
 using GeometricProblems.HarmonicOscillator
 
 const NAME = "harmonic_oscillator"
@@ -29,6 +29,6 @@ let mode = pick_mode()
     csv = run_sweep(; problem_name = NAME, build_prob = build_prob,
                     hamiltonian = ham, mode = mode, over...)
     write_report(read_results(csv);
-        title = "One-layer GML benchmark — Harmonic Oscillator ($(mode))",
+        title = "Shallow-net benchmark — Harmonic Oscillator ($(mode))",
         mode = mode, outdir = RESULTS_DIR, prefix = "$(NAME)_$(mode)")
 end

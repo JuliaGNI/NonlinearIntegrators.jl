@@ -9,6 +9,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING: every exported type and every source file has been renamed** to line up with
+  GeometricIntegrators. The old names are gone; there are no deprecation shims. Nothing about
+  the numerics changed — this is purely nomenclature.
+
+  Source files now sit in one lowercase directory per method family. `src/network_basis/` and
+  `src/network_integrators/` merge into `src/nvi/` (network variational integrators),
+  `src/CGVI_standard/` becomes `src/cgvi/`, and `src/SINDy_methods/` becomes `src/vise/`,
+  joining the existing `src/oga/`. Test, script, benchmark and documentation files follow the
+  same scheme.
+
+  Integrators keep the bare family name and carry the variant as a suffix:
+
+  | old | new |
+  | --- | --- |
+  | `NonLinear_OneLayer_GML` | `ShallowNet` |
+  | `Hardcode_int` | `ShallowNetAutodiff` |
+  | `Time_reversible_OneLayer` | `ShallowNetReversible` |
+  | `Time_Reversible_Hardcode` | `ShallowNetAutodiffReversible` |
+  | `NonLinear_DenseNet_GML` | `DenseNet` |
+  | `CGVI_standard` | `CGVINodal` |
+  | `PR_Integrator` | `VISE` |
+
+  Bases take the `...Basis` names, so each matches the file that defines it, and the per-family
+  abstract supertypes gain an `Abstract` prefix to make room:
+
+  | old | new |
+  | --- | --- |
+  | `OneLayerNetwork_GML` | `ShallowNetBasis` |
+  | `DenseNet_GML` | `DenseNetBasis` |
+  | `OneLayerNetBasis` (abstract) | `AbstractShallowNetBasis` |
+  | `DenseNetBasis` (abstract) | `AbstractDenseNetBasis` |
+  | `PR_Basis` | `VISEBasis` |
+
+  `OneLayerMethod` becomes `ShallowNetMethod`, and every `*Cache` follows its method. A call
+  site now reads `ShallowNet(ShallowNetBasis{T}(tanh, 8), quad)`.
+
+  Three of the new names say something the old ones did not:
+
+  - `Autodiff` replaces `Hardcode`. The distinction is the derivative backend: these two
+    integrators differentiate a hand-written ansatz with `ForwardDiff`, where `ShallowNet` and
+    `ShallowNetReversible` use derivatives compiled ahead of time by `SymbolicNeuralNetworks`.
+  - `CGVINodal` replaces `CGVI_standard`. It is not a copy of `GeometricIntegrators.CGVI`:
+    upstream solves for all `S` basis coefficients plus the endpoint momentum (`D*(S+1)`
+    unknowns), whereas this one pins `X[1] = q̄`, reads `q` back off the last coefficient and
+    computes `p` explicitly, leaving `D*(S-1)`. That reduction requires an interpolatory basis
+    with nodes at both endpoints — the coefficients *are* nodal values. The name also avoids a
+    binding clash for anyone loading both packages, as `benchmark/` and `scripts/` do.
+  - `VISE` replaces `PR_Integrator`, matching what the documentation has always called it.
+
+  The `_GML` suffixes are dropped throughout: GeometricMachineLearning stopped being a
+  dependency earlier in this same release cycle, so they pointed at nothing.
+
+  In `benchmark/`, the environment variables `GML_BENCH_PRESET` and `SKIP_GML_BENCH` become
+  `SHALLOWNET_BENCH_PRESET` and `SKIP_SHALLOWNET_BENCH`, and the combined-report figure prefix
+  changes from `onelayer_gml_benchmark` to `shallownet_benchmark`. Result CSVs written before
+  this change still parse, but the combined figures are written under the new prefix.
+
+  In `scripts/`, the JLD2 result keys are renamed with everything else: `HO_PR_sol_q` becomes
+  `HO_vise_sol_q`, and so on for the Pendulum, PerturbedPendulum and HenonHeiles families.
+  The writer (`test_vise.jl`) and both readers (`vise_plot.jl`, `find_optimal_results.jl`) were
+  changed together, so they remain consistent — but **`.jld2` files produced before this change
+  can no longer be read by the plotting scripts**, since the keys they contain no longer exist.
+  Re-run the sweep, or rename the keys in place. `scripts/results/` is git-ignored, so nothing
+  in the repository is affected.
+
 - **Upgraded to QuadratureRules 0.2 and CompactBasisFunctions 0.3**, along with
   GeometricIntegratorsBase 0.6, GeometricEquations 0.21 and SimpleSolvers 0.11. The source side was
   already done — `basis` and `nnodes` come from `GeometricBase` and `nbasis` from
@@ -16,9 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   vacuously: it is not a dependency of this package at all any more (see below).
 - Zygote compat widened to `0.6, 0.7`; the graph resolves to 0.7.12. Zygote remains a direct
   dependency for `VNN_anstaz_zygote`, which supplies the velocity of the hardcoded ansatz in
-  `Hardcode_int` and `Time_Reversible_Hardcode`.
+  `ShallowNetAutodiff` and `ShallowNetAutodiffReversible`.
 - **`ImplicitMidpoint` now comes from `GeometricIntegratorsBase`** for the
-  `IntegratorExtrapolation` warm start and `PR_Integrator`, and requires 0.6: the warm start
+  `IntegratorExtrapolation` warm start and `VISE`, and requires 0.6: the warm start
   integrates a LODE sub-problem and reads `p` back out of it to seed the momentum degree of
   freedom, which needs that release's `IODEProblem`/`LODEProblem` methods rather than an ODE-only
   implicit midpoint.
@@ -38,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Adam moment update differs, and gradients now come from the optimizer's own `GradientAutodiff`
   rather than from explicit `Zygote.gradient` calls in the loops.
 - New internal helpers `optimizer_params` / `network_params`
-  (`src/network_integrators/utilities.jl`) convert between the nested per-layer parameters of
+  (`src/nvi/utilities.jl`) convert between the nested per-layer parameters of
   `AbstractNeuralNetworks` and the flat `NamedTuple` of arrays that GeometricOptimizers
   accepts. They alias rather than copy, so the optimizer's in-place updates remain visible
   through `PNN.params`. Both are `@generated`: written as ordinary code they build their key
@@ -55,7 +120,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-exporting it — that is where `AbstractProblemIODE`, `StateVariable` and `initial_conditions`
   come from, and GeometricIntegratorsBase does not pass them on. `create_internal_stage_vector` was
   the only genuinely GeometricIntegrators-local name and is now defined in
-  `src/network_integrators/utilities.jl`. Consequences: `RungeKutta` and `GenericLinearAlgebra`
+  `src/nvi/utilities.jl`. Consequences: `RungeKutta` and `GenericLinearAlgebra`
   leave the dependency graph entirely. Runge-Kutta reference integrators such as `Gauss(8)` are
   only ever needed by the `benchmark/` and `scripts/` environments, which declare
   GeometricIntegrators themselves.
@@ -63,7 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   GeometricOptimizers, its only remaining use was `GeometricMachineLearning.NeuralNetwork`, which
   it `import`s straight from `AbstractNeuralNetworks` — the same object — so the call site now
   names `AbstractNeuralNetworks.NeuralNetwork` directly. The `_GML` suffixes on the basis and
-  integrator types are kept for source compatibility.
+  integrator types, which recorded that provenance, are dropped by the renaming above.
 - `ContinuumArrays` is no longer a dependency; it had no use in `src/`. The quasi-array indexing
   and `grid` come from `CompactBasisFunctions`, which carries `ContinuumArrays` itself.
 - `GeometricProblems` moved from `[deps]` to the test target — its only use in `src/` was the
@@ -78,6 +143,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known issues
 
+- **`CGVINodal` (formerly `CGVI_standard`) cannot integrate a problem with more than one degree
+  of freedom.** Found while diffing it against `GeometricIntegrators.CGVI` for the rename above;
+  pre-existing and not introduced here, and not fixed here either — this release changes names
+  only. A `D = 2` run (Hénon–Heiles, Lagrange basis on 4 Lobatto nodes) dies in the first step
+  with `SingularException: Zero pivot found at index 6`, against `D*(S-1) = 6` unknowns.
+
+  Three layout mistakes, all of which collapse to the identity at `D = 1`:
+
+  - `components!` unpacks the nonlinear solution as `C.X[s+1][d] = x[D*(d-1)+s]` — a stride of
+    `D` per degree of freedom, but `S-1` values stored per degree of freedom. At `D = 2, S = 4`
+    that reads `x[3]` twice and never reads `x[6]`, leaving column 6 of the Jacobian identically
+    zero. That is the zero pivot.
+  - `residual!` uses the opposite ordering, `b[D + D*(i-1) + k]`, with the degree of freedom
+    fastest — so the residual and the unknown vector disagree about the layout.
+  - `update!` assigns `sol.q .= nlsolution(int)[end]`, broadcasting one scalar across all `D`
+    components, where it should read one endpoint coefficient per degree of freedom.
+
+  The unit test (`test/unit/cgvi_unit.jl`) exercises the `D = 1` harmonic oscillator only, which
+  is why this passes CI. A fix needs to settle on one layout, apply it in all three places, and
+  add a `D > 1` regression test. Only this reference integrator is affected; the network
+  integrators and `VISE` handle `D > 1` and are covered at `D = 2` by the benchmark suite.
 - `GeometricOptimizers` 0.2.0 is taken from git via `[sources]`, the registry carrying only 0.1.0.
   A git `[sources]` entry blocks registration in General, so this package cannot be tagged until
   GeometricOptimizers is released; drop the `[sources]` section then.
@@ -90,7 +176,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   again the moment the `[sources]` section can be dropped. The three Julia 1.10 CI jobs are
   expected to be red until then.
 - **The test suite takes hours on Julia 1.12** — 287 minutes in CI against ~20 on 1.13 and ~10
-  on `main` before this release. Measured locally, a two-step `NonLinear_OneLayer_GML` run with
+  on `main` before this release. Measured locally, a two-step `ShallowNet` run with
   `initial_guess_method = TrainingMethod()` takes over 30 minutes on 1.12 and 28.8 seconds on
   1.13; the same integrator with `OGA1d()`, which never touches GeometricOptimizers, takes 28.0
   seconds on 1.12. `LSGD` is affected as well, so it is not specific to `Adam`. The process sits

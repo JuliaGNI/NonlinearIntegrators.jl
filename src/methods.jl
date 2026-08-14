@@ -12,20 +12,20 @@ forwarding, so call sites can write `method.basis`, `method.record_grid_points`,
 abstract type NetworkIntegratorMethod <: LODEMethod end
 
 """
-    OneLayerMethod <: NetworkIntegratorMethod
+    ShallowNetMethod <: NetworkIntegratorMethod
 
 Abstract supertype for integrators whose ansatz is a single-hidden-layer network:
-`NonLinear_OneLayer_GML`, `Hardcode_int`, `Time_reversible_OneLayer`, and
-`Time_Reversible_Hardcode`. All take an [`OGA`](@ref) seed as their
-`initial_guess_method` — `OGA1d()` by default, `OGA1dNormalized()` for `Hardcode_int`.
+`ShallowNet`, `ShallowNetAutodiff`, `ShallowNetReversible`, and
+`ShallowNetAutodiffReversible`. All take an [`OGA`](@ref) seed as their
+`initial_guess_method` — `OGA1d()` by default, `OGA1dNormalized()` for `ShallowNetAutodiff`.
 """
-abstract type OneLayerMethod <: NetworkIntegratorMethod end
+abstract type ShallowNetMethod <: NetworkIntegratorMethod end
 
 """
     DenseNetMethod <: NetworkIntegratorMethod
 
 Abstract supertype for integrators whose ansatz is a three-layer dense network:
-`NonLinear_DenseNet_GML`. Accepts `LSGD` (default) or `TrainingMethod` as its
+`DenseNet`. Accepts `LSGD` (default) or `TrainingMethod` as its
 `initial_guess_method`.
 """
 abstract type DenseNetMethod <: NetworkIntegratorMethod end
@@ -58,7 +58,7 @@ abstract type InitialParametersMethod end
 Initialise network parameters by gradient descent (`GeometricOptimizers.Adam` with a
 `DecayingStatic` line search) against an MSE target built from the extrapolated
 trajectory. Applies to both
-`NonLinear_OneLayer_GML` and `NonLinear_DenseNet_GML`; controlled by the
+`ShallowNet` and `DenseNet`; controlled by the
 `training_epochs` constructor kwarg.
 """
 struct TrainingMethod <: InitialParametersMethod end
@@ -67,7 +67,7 @@ struct TrainingMethod <: InitialParametersMethod end
     LSGD <: InitialParametersMethod
 
 Initialise dense-network parameters with a Lipschitz-SGD step (LSGD). Used as the
-default `initial_guess_method` for `NonLinear_DenseNet_GML`.
+default `initial_guess_method` for `DenseNet`.
 """
 struct LSGD <: InitialParametersMethod end
 

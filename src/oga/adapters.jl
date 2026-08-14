@@ -8,13 +8,13 @@
 #
 # The four integrators differ in exactly two ways:
 #
-#   * the *ansatz*. `Hardcode_int` and `Time_Reversible_Hardcode` represent the step as
+#   * the *ansatz*. `ShallowNetAutodiff` and `ShallowNetAutodiffReversible` represent the step as
 #     `q(t) = (1-t) q̄ + t q̃ + t(1-t) u(t)`, so the network only has to fit what is left
 #     after the linear part is subtracted, and every dictionary atom carries the `t(1-t)`
-#     factor. The two `OneLayer` integrators fit the labels directly.
+#     factor. The two symbolic-derivative integrators (`ShallowNet` and `ShallowNetReversible`) fit the labels directly.
 #   * the *symmetry*. The two time-reversible integrators add neurons in mirrored pairs,
-#     sharing one output weight (`Time_Reversible_Hardcode`) or keeping two
-#     (`Time_reversible_OneLayer`), and store only the independent half of the hidden
+#     sharing one output weight (`ShallowNetAutodiffReversible`) or keeping two
+#     (`ShallowNetReversible`), and store only the independent half of the hidden
 #     parameters in `x`.
 #
 # This file is included *after* the integrator definitions, since the methods below
@@ -61,7 +61,7 @@ function _store_params!(ps, results)
     return nothing
 end
 
-# Layout used by `NonLinear_OneLayer_GML` and `Hardcode_int`: all `S` hidden neurons are
+# Layout used by `ShallowNet` and `ShallowNetAutodiff`: all `S` hidden neurons are
 # independent, so `x` carries `W` and `b` for every one of them.
 function _store_full!(x, results, D::Int, S::Int)
     for d in 1:D
@@ -106,9 +106,9 @@ _oga_status(results, show_status) = show_status && for (d, r) in enumerate(resul
             (r.rejected > 0 ? ", $(r.rejected) atom(s) rejected for adding no new direction" : ""))
 end
 
-# ---- NonLinear_OneLayer_GML -------------------------------------------------
+# ---- ShallowNet -------------------------------------------------
 
-function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, oga::OGA, sol)
+function initial_params!(int::GeometricIntegrator{<:ShallowNet}, oga::OGA, sol)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
@@ -126,9 +126,9 @@ function initial_params!(int::GeometricIntegrator{<:NonLinear_OneLayer_GML}, oga
     return nothing
 end
 
-# ---- Hardcode_int -----------------------------------------------------------
+# ---- ShallowNetAutodiff -----------------------------------------------------------
 
-function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, oga::OGA, sol)
+function initial_params!(int::GeometricIntegrator{<:ShallowNetAutodiff}, oga::OGA, sol)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
@@ -151,9 +151,9 @@ function initial_params!(int::GeometricIntegrator{<:Hardcode_int}, oga::OGA, sol
     return nothing
 end
 
-# ---- Time_reversible_OneLayer ----------------------------------------------
+# ---- ShallowNetReversible ----------------------------------------------
 
-function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, oga::OGA, sol)
+function initial_params!(int::GeometricIntegrator{<:ShallowNetReversible}, oga::OGA, sol)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
@@ -170,9 +170,9 @@ function initial_params!(int::GeometricIntegrator{<:Time_reversible_OneLayer}, o
     return nothing
 end
 
-# ---- Time_Reversible_Hardcode ----------------------------------------------
+# ---- ShallowNetAutodiffReversible ----------------------------------------------
 
-function initial_params!(int::GeometricIntegrator{<:Time_Reversible_Hardcode}, oga::OGA, sol)
+function initial_params!(int::GeometricIntegrator{<:ShallowNetAutodiffReversible}, oga::OGA, sol)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local x = nlsolution(int)
@@ -181,7 +181,7 @@ function initial_params!(int::GeometricIntegrator{<:Time_Reversible_Hardcode}, o
     local labels = cache(int).network_labels'
     local q̃ = cache(int).q̃
 
-    # Unlike `Hardcode_int`, the endpoint of the linear part is the cache's endpoint
+    # Unlike `ShallowNetAutodiff`, the endpoint of the linear part is the cache's endpoint
     # estimate rather than the last label.
     targets = [_ansatz_target(T.(labels[d, :]), nodes, T(sol.q[d]), T(q̃[d])) for d in 1:D]
     results = oga_seed(int, oga, SharedMirrorPairs(), targets, _ansatz_modulation(nodes))

@@ -41,7 +41,7 @@ One atom `(w, b)` → two neurons `(w, b)` and `(-w, w + b)` → two *independen
 columns, so each member of the pair gets its own output weight.
 
 The map `(w, b) ↦ (-w, w + b)` sends `σ(w t + b)` to `σ(w (1 - t) + b)`, i.e. reflects the
-neuron about the midpoint of the unit time interval. Used by `Time_reversible_OneLayer`.
+neuron about the midpoint of the unit time interval. Used by `ShallowNetReversible`.
 
 Since neurons come in pairs, the requested neuron count must be even; [`oga_fit`](@ref)
 rejects an odd one rather than quietly placing one neuron fewer.
@@ -55,7 +55,7 @@ One atom → two mirrored neurons → *one* design column, their sum, so the pai
 single output weight.
 
 Sharing the weight is what actually enforces time-reversal symmetry of the ansatz (with
-independent weights the pair can drift apart). Used by `Time_Reversible_Hardcode`.
+independent weights the pair can drift apart). Used by `ShallowNetAutodiffReversible`.
 
 As for [`MirrorPairs`](@ref), the requested neuron count must be even.
 """
@@ -143,7 +143,7 @@ end
     oga_fit(oga, σ, nodes, w, y, nneurons; bias_interval, dict_amount,
             modulation = nothing, symmetry = NoSymmetry()) -> OGAResult
 
-Greedily fit `nneurons` neurons of a one-layer network to the target `y` sampled at
+Greedily fit `nneurons` neurons of a shallow (single-hidden-layer) network to the target `y` sampled at
 `nodes`, under the quadrature weights `w`.
 
 * `oga::`[`OGA`](@ref) — the dictionary, selection rule, fit and guard rails.

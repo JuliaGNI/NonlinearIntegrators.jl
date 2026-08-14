@@ -11,15 +11,15 @@ and accepts any `AbstractProblemIODE` (implicit ODE in Lagrangian form).
 Every integrator is a subtype of `NetworkIntegratorMethod <: LODEMethod`. Two families
 are provided:
 
-- **`OneLayerMethod`** — single-hidden-layer ansatz. Includes `NonLinear_OneLayer_GML`,
-  `Hardcode_int`, `Time_reversible_OneLayer`, and `Time_Reversible_Hardcode`. All use the
+- **`ShallowNetMethod`** — single-hidden-layer ansatz. Includes `ShallowNet`,
+  `ShallowNetAutodiff`, `ShallowNetReversible`, and `ShallowNetAutodiffReversible`. All use the
   Orthogonal Greedy Algorithm to initialise the network weights at each step, configured
   through `initial_guess_method` — `OGA1d()` by default, `OGA1dNormalized()` for
-  `Hardcode_int`. See [`OGA`](@ref) and the *Orthogonal Greedy Algorithm* section of this
+  `ShallowNetAutodiff`. See [`OGA`](@ref) and the *Orthogonal Greedy Algorithm* section of this
   manual for the dictionary, selection and fit variants and when to reach for each.
 
 - **`DenseNetMethod`** — three-layer dense-network ansatz. The only implementation is
-  `NonLinear_DenseNet_GML`, which uses `LSGD` (Least Square Gradient Descent) for parameter initialisation.
+  `DenseNet`, which uses `LSGD` (Least Square Gradient Descent) for parameter initialisation.
 
 The initial trajectory used to warm-start the Newton solve is controlled by
 `initial_trajectory_method`: `IntegratorExtrapolation` (default — integrates a
@@ -27,7 +27,7 @@ sub-problem with `ImplicitMidpoint`), `HermiteExtrapolation`, or `NoExtrapolatio
 
 ## Getting started
 
-For most applications, `NonLinear_OneLayer_GML` with the default settings is the best
+For most applications, `ShallowNet` with the default settings is the best
 starting point. Below is a minimal example using the built-in Harmonic Oscillator
 problem from [GeometricProblems.jl](https://github.com/JuliaGNI/GeometricProblems.jl).
 
@@ -42,11 +42,11 @@ prob = HarmonicOscillator.lodeproblem(
     timespan = (0.0, 10.0), timestep = 0.1)
 
 # 2. Build the basis and quadrature rule
-basis  = OneLayerNetwork_GML{Float64}(tanh, 8)
+basis  = ShallowNetBasis{Float64}(tanh, 8)
 quad   = GaussLegendreQuadrature(Float64, 8)
 
 # 3. Construct the integrator
-method = NonLinear_OneLayer_GML(basis, quad;
+method = ShallowNet(basis, quad;
     bias_interval = [-π, π],
     dict_amount   = 400)
 

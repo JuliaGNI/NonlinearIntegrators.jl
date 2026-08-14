@@ -2,20 +2,20 @@ using Documenter
 using DocumenterCitations
 using NonlinearIntegrators
 
-# Regenerate the one-layer GML benchmark figures embedded in the Benchmarks page.
+# Regenerate the shallow-net benchmark figures embedded in the Benchmarks page.
 #
 # Rather than committing the PNGs, we run the `quick` benchmark suite (under
 # `benchmark/`) in its own environment and copy the figures into
-# `docs/src/Benchmarks/figures/`, where `Benchmarks/benchmarks.md` references them. Set
-# `SKIP_GML_BENCH=true` to skip this (useful while iterating on unrelated docs locally).
+# `docs/src/benchmarks/figures/`, where `benchmarks/benchmarks.md` references them. Set
+# `SKIP_SHALLOWNET_BENCH=true` to skip this (useful while iterating on unrelated docs locally).
 #
 # Two families of figures are copied: the per-problem plots (prefix `<problem>_quick`,
 # each coloured by precision) for the per-problem sections of the page, and the combined
-# summary plots (prefix `onelayer_gml_benchmark`, scatters coloured by problem) for the
+# summary plots (prefix `shallownet_benchmark`, scatters coloured by problem) for the
 # summary section.
 function generate_benchmark_figures()
     benchdir = normpath(joinpath(@__DIR__, "..", "benchmark"))
-    figdir   = joinpath(@__DIR__, "src", "Benchmarks", "figures")
+    figdir   = joinpath(@__DIR__, "src", "benchmarks", "figures")
     resdir   = joinpath(benchdir, "results")
     mkpath(figdir)
     julia = Base.julia_cmd()
@@ -38,13 +38,13 @@ function generate_benchmark_figures()
     figs = ["$(p)_quick_$(m).png" for p in problems for m in per_problem_metrics]
 
     # Combined summary figures (scatters coloured by problem).
-    append!(figs, ["onelayer_gml_benchmark_convergence_problem.png",
-                   "onelayer_gml_benchmark_convergence_solver.png",
-                   "onelayer_gml_benchmark_convergence_heatmap.png",
-                   "onelayer_gml_benchmark_accuracy_vs_dt.png",
-                   "onelayer_gml_benchmark_energy_drift_vs_dt.png",
-                   "onelayer_gml_benchmark_runtime_vs_dt.png",
-                   "onelayer_gml_benchmark_iterations_vs_dt.png"])
+    append!(figs, ["shallownet_benchmark_convergence_problem.png",
+                   "shallownet_benchmark_convergence_solver.png",
+                   "shallownet_benchmark_convergence_heatmap.png",
+                   "shallownet_benchmark_accuracy_vs_dt.png",
+                   "shallownet_benchmark_energy_drift_vs_dt.png",
+                   "shallownet_benchmark_runtime_vs_dt.png",
+                   "shallownet_benchmark_iterations_vs_dt.png"])
 
     # A plot the reporting step skipped (no data) leaves no file, so copy what is there.
     for fig in figs
@@ -55,7 +55,7 @@ function generate_benchmark_figures()
     # The reporting step skips any plot with no measured cases, which used to surface
     # half an hour later as a batch of Documenter `invalid local link/image` errors.
     # Check the figures the page actually references and fail here instead, naming them.
-    page = read(joinpath(@__DIR__, "src", "Benchmarks", "benchmarks.md"), String)
+    page = read(joinpath(@__DIR__, "src", "benchmarks", "benchmarks.md"), String)
     referenced = unique(m[1] for m in eachmatch(r"\]\(figures/([\w.\-]+\.png)\)", page))
     absent = filter(f -> !isfile(joinpath(figdir, f)), referenced)
     isempty(absent) || error("""
@@ -67,7 +67,7 @@ function generate_benchmark_figures()
     return nothing
 end
 
-if get(ENV, "SKIP_GML_BENCH", "false") != "true"
+if get(ENV, "SKIP_SHALLOWNET_BENCH", "false") != "true"
     generate_benchmark_figures()
 end
 
@@ -88,16 +88,16 @@ makedocs(
     pages=[
         "Home" => "index.md",
         "Orthogonal Greedy Algorithm" => [
-            "Overview" => "Orthogonal Greedy Algorithm/OGA.md",
-            "Theory" => "Orthogonal Greedy Algorithm/theory.md",
-            "Algorithms" => "Orthogonal Greedy Algorithm/algorithms.md",
-            "Usage" => "Orthogonal Greedy Algorithm/usage.md",
-            "Precision" => "Orthogonal Greedy Algorithm/precision.md",
-            "Studies" => "Orthogonal Greedy Algorithm/studies.md",
+            "Overview" => "oga/oga.md",
+            "Theory" => "oga/theory.md",
+            "Algorithms" => "oga/algorithms.md",
+            "Usage" => "oga/usage.md",
+            "Precision" => "oga/precision.md",
+            "Studies" => "oga/studies.md",
         ],
         "Variational Integrator with Symbolic Expression" =>
-            "Variational Integrator with Symbolic Expression/VISE.md",
-        "Benchmarks" => "Benchmarks/benchmarks.md",
+            "vise/vise.md",
+        "Benchmarks" => "benchmarks/benchmarks.md",
     ],
 )
 

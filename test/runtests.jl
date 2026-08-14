@@ -16,7 +16,7 @@ include("testsetup.jl")
 # high-fidelity accuracy guard. Every phase is parametrized over TEST_TYPES so the
 # whole package is exercised at both Float64 and Float32.
 #
-# NOTE: NonLinear_DenseNet_GML is exercised end to end in densenet_gml_unit.jl, but only
+# NOTE: DenseNet is exercised end to end in densenet_unit.jl, but only
 # on two-step runs with `training_epochs = 3`. Its Training/LSGD initial-guess methods are
 # not stable enough for an accuracy guard, so those testsets assert dispatch, element type
 # and finiteness only — a converged DenseNet solve is not something CI can rely on.
@@ -29,17 +29,17 @@ include("testsetup.jl")
     @testset "unit" begin
         include("unit/optimizer_params_unit.jl")
         include("unit/oga_kernels.jl")
-        include("unit/onelayer_gml_unit.jl")
-        include("unit/cgvi_standard_unit.jl")
-        include("unit/time_reversible_onelayer_unit.jl")
-        include("unit/hardcode_unit.jl")
-        include("unit/time_reversible_hardcode_unit.jl")
-        include("unit/densenet_gml_unit.jl")
+        include("unit/shallownet_unit.jl")
+        include("unit/cgvi_unit.jl")
+        include("unit/shallownet_reversible_unit.jl")
+        include("unit/shallownet_autodiff_unit.jl")
+        include("unit/shallownet_autodiff_reversible_unit.jl")
+        include("unit/densenet_unit.jl")
         include("unit/dispatch_variants_unit.jl")
-        include("unit/pr_integrator_unit.jl")
+        include("unit/vise_integrator_unit.jl")
     end
 
     @testset "integration" begin
-        include("integration/onelayer_accuracy.jl")
+        include("integration/shallownet_accuracy.jl")
     end
 end

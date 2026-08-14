@@ -386,7 +386,7 @@ end
     # `OGA1d`'s selected atoms are load-bearing rather than incidental: the docs record
     # that normalising before selection steers the Newton solve into a different and
     # empirically worse basin. Values captured from the implementation that passes the
-    # Float64 end-to-end accuracy guard (`test/integration/onelayer_accuracy.jl`, < 1e-12).
+    # Float64 end-to-end accuracy guard (`test/integration/shallownet_accuracy.jl`, < 1e-12).
     @testset "$T" for T in (Float64, Float32)
         nodes, weights, y = oga_testcase(T)
         r = oga_fit(OGA1d(), x -> max(zero(x), x)^3, nodes, weights, y, 4;

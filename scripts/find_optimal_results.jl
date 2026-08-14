@@ -37,10 +37,10 @@ for R in [8,16,32]
             for fsuc in ["1.78e-15","4.44e-16"]
                 filename = "parallel_results/Backtracking2_R$(R)_h$(h)0_iter$(iter)_fabs$(fab)_fsuc$(fsuc)_TT200.jld2"
                 res = load(filename)
-                HHq1 = res["HenonHeiles_PR_sol_q1"][1:Int(time_span/h)+1]
-                HHq2 = res["HenonHeiles_PR_sol_q2"][1:Int(time_span/h)+1]
-                HHp1 = res["HenonHeiles_PR_sol_p1"][1:Int(time_span/h)+1]
-                HHp2 = res["HenonHeiles_PR_sol_p2"][1:Int(time_span/h)+1]
+                HHq1 = res["HenonHeiles_vise_sol_q1"][1:Int(time_span/h)+1]
+                HHq2 = res["HenonHeiles_vise_sol_q2"][1:Int(time_span/h)+1]
+                HHp1 = res["HenonHeiles_vise_sol_p1"][1:Int(time_span/h)+1]
+                HHp2 = res["HenonHeiles_vise_sol_p2"][1:Int(time_span/h)+1]
                 initial_ham = hamiltonian(HHq1[1], HHq2[1], HHp1[1], HHp2[1])
 
                 ham = hamiltonian.(HHq1, HHq2, HHp1, HHp2)

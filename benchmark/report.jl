@@ -6,7 +6,7 @@
 # markdown report + plots covering all problems present. Decoupled from the sweep, so
 # it can be re-run cheaply whenever new CSVs appear.
 
-include(joinpath(@__DIR__, "gml_report.jl"))
+include(joinpath(@__DIR__, "shallownet_report.jl"))
 
 const RESULTS_DIR = joinpath(@__DIR__, "results")
 
@@ -21,8 +21,8 @@ function main()
     isempty(rows) && error("CSV files contained no data rows")
 
     md = write_report(rows;
-        title = "One-layer GML benchmark — combined report",
-        mode = "combined", outdir = RESULTS_DIR, prefix = "onelayer_gml_benchmark")
+        title = "Shallow-net benchmark — combined report",
+        mode = "combined", outdir = RESULTS_DIR, prefix = "shallownet_benchmark")
     println("Wrote combined report: ", md)
 end
 

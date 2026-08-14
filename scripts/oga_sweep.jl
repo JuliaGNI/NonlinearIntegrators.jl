@@ -81,7 +81,7 @@ function reference_q(::Type{T}, params) where {T}
 end
 
 function run_case(basis, ::Type{T}, seed, λ, params, prob, refq) where {T}
-    method = NonLinear_OneLayer_GML(basis, QuadratureRules.GaussLegendreQuadrature(T, R_QUAD);
+    method = ShallowNet(basis, QuadratureRules.GaussLegendreQuadrature(T, R_QUAD);
                                    show_status = false,
                                    bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
                                    initial_guess_method = seed)
@@ -157,7 +157,7 @@ function run_stage(name::AbstractString, seeds, activations)
                 # The symbolic network build is the expensive part; amortise it over every
                 # seed and regularization factor for this (T, activation).
                 basis = try
-                    OneLayerNetwork_GML{T}(σ, S_NEURONS)
+                    ShallowNetBasis{T}(σ, S_NEURONS)
                 catch e
                     @warn "basis build failed" T aname exception = e
                     continue
