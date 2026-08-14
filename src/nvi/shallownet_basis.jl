@@ -27,10 +27,11 @@ pure overhead — 0.095 s against 0.003 s for `tanh` at `S = 8`, Float64. The in
 reject such a basis in their constructor; see [`has_symbolic_derivatives`](@ref).
 
 `cse` (common-subexpression elimination during code generation) and `inplace` (evaluate a
-batch through a kernel writing into one preallocated array) default to whatever
-`SymbolicNeuralNetworks` defaults to — currently both `true`, which is what you want.
-They are exposed to be turned *off*: `cse = false, inplace = false` is the code generation
-`SymbolicNeuralNetworks` performed before 0.4.0, which is how
+batch through a kernel writing into one preallocated array) both default to `true`, which is
+also what `SymbolicNeuralNetworks` 0.4 uses. They are pinned here rather than left to the
+upstream default so that a change there cannot silently change this package's code
+generation. They are exposed to be turned *off*: `cse = false, inplace = false` is the code
+generation `SymbolicNeuralNetworks` performed before 0.4.0, which is how
 `benchmark/compare_derivative_backends.jl` measures what that release bought. Note that
 `inplace = true` mutates its output and so cannot be differentiated with `Zygote`; nothing
 in this package does that, but a caller who wants to needs `inplace = false`.

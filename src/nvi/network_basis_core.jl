@@ -5,6 +5,13 @@ Common sub-struct shared by all `NetworkBasis` concrete types. Bundles the neura
 network together with its symbolically-compiled derivatives, which are built once at
 construction time and reused at every integration step.
 
+`SNN`, `dqdθ`, `V_func` and `dvdθ` are all `nothing` for a
+[`ShallowNetBasis`](@ref) built with `symbolic = false` — the form the `ForwardDiff`-based
+integrators want, since they differentiate their ansatz at run time and never read these
+fields. Test for it with [`has_symbolic_derivatives`](@ref) rather than by comparing a
+field against `nothing`; the four type parameters are `Nothing` in that case, so the
+distinction is visible to dispatch.
+
 # Fields
 - `activation`: activation function used in the hidden layer.
 - `NN`: neural-network model (the forward map q(t; θ)).

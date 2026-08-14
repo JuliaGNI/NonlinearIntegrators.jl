@@ -19,8 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `has_symbolic_derivatives(basis)` is exported.
 
 - **`cse` and `inplace` keywords on `ShallowNetBasis` and `DenseNetBasis`**, forwarded to
-  `SymbolicNeuralNetworks.build_nn_function`. They default to whatever that package defaults
-  to — currently both `true`, which is what you want — and exist to be turned *off*:
+  `SymbolicNeuralNetworks.build_nn_function`. Both default to `true`, which is also what that
+  package uses — pinned here rather than left implicit, so an upstream change cannot silently
+  change the code generation — and they exist to be turned *off*:
   `cse = false, inplace = false` is the code generation of `SymbolicNeuralNetworks` 0.3.x,
   which is how the new benchmark measures what 0.4.0 bought. `inplace = false` is also what a
   caller who wants to differentiate the kernels with `Zygote` would need, since the in-place
@@ -59,8 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what `symbolic_pullback` returns) is generated as one function rather than one per leaf.
   Measured here: `ShallowNetBasis` construction 1.6–2.0× faster, `DenseNetBasis` 4.1×
   (3.22 s → 0.79 s — the deeper network is where re-emitting the shared forward pass hurt
-  most). No call site changed; the new `cse` and `inplace` keywords already default to the
-  fast path, and are now also exposed on the bases (see *Added*).
+  most). No call site changed; the new `cse` and `inplace` keywords are set to the fast path,
+  which is also what they default to upstream, and are now exposed on the bases (see *Added*).
 
   The build-time and run-time wins come from different halves. For a *shallow* net `cse`
   costs nothing to build and buys nothing at `S = 4`, while generating the in-place kernel is
@@ -662,8 +663,8 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
 `benchmark/compare_derivative_backends.jl`.
 
 - **The compiled kernels are still called once per quadrature node.** `components!` evaluates
-  `DQDθ`/`DVDθ` node by node — `src/nvi/shallownet.jl:274-292`,
-  `src/nvi/shallownet_reversible.jl:185-186` and `src/nvi/densenet.jl:370-372` — which is
+  `DQDθ`/`DVDθ` node by node — the loops at `src/nvi/shallownet.jl:274-293`,
+  `src/nvi/shallownet_reversible.jl:223-242` and `src/nvi/densenet.jl:406-418` — which is
   `2R + 2` calls per dimension per Newton iteration, sixteen of them at the benchmark's
   `R = 8`. `SymbolicNeuralNetworks` 0.4 evaluates a whole batch through one in-place kernel
   and a single allocation, so the same work is two calls if the nodes are passed as one

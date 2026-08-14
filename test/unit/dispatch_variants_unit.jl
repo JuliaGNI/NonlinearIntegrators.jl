@@ -1,8 +1,10 @@
-# Unit tests for initial-parameter-method dispatch variants not exercised by the default
-# OGA1d path. The 1-D seeds are covered by the cross-product in shallownet_unit.jl; what is
-# left here is `TrainingMethod` and the two-dimensional dictionaries — the latter have unit
-# coverage in oga_kernels.jl but are otherwise never driven through an integrator.
-# DenseNet dispatch variants and extrapolation cross-products live in densenet_unit.jl.
+# Unit tests for the construction-time variants not exercised by the default path — the
+# initial-parameter methods other than OGA1d, and the basis keywords that change what a basis
+# carries. The 1-D seeds are covered by the cross-product in shallownet_unit.jl; what is left
+# here is `TrainingMethod` and the two-dimensional dictionaries (the latter have unit coverage
+# in oga_kernels.jl but are otherwise never driven through an integrator), plus
+# `ShallowNetBasis`'s `symbolic = false` and `cse`/`inplace`. DenseNet dispatch variants and
+# extrapolation cross-products live in densenet_unit.jl.
 # Each testset checks:
 #   (a) the run stays at the working element type (no silent upcast), and
 #   (b) the final position is finite.

@@ -389,48 +389,51 @@ function run_kernel_benchmark(cfg)
             "T", "S", "kernel", "backend", "codegen", "min [µs]", "median [µs]", "bytes")
     println("-"^96)
 
-    agr = open(agrpath, "w")
-    println(agr, AGREEMENT_CSV_HEADER)
-    open(csvpath, "w") do io
-        println(io, KERNEL_CSV_HEADER)
-        flush(io)
-        for T in cfg.types, S in cfg.kernel_Ss
-            default = get_basis(T, act, actlabel, S, CG_DEFAULT, true)
-            plain   = get_basis(T, act, actlabel, S, CG_PLAIN,   true)
-            nnp, ps_vec = kernel_params(T, S)
-            t  = T(0.3)                       # an interior quadrature-node-like input
-            q̄  = T(0.5); q = T(0.7)           # the endpoint values the autodiff ansatz needs
-            input = [t]
+    # Both handles opened with the `do` form: an exception anywhere in the sweep below has to
+    # close them, or `DERIV_BENCH_REUSE=true` reads a truncated agreement CSV as a complete one.
+    open(agrpath, "w") do agr
+        println(agr, AGREEMENT_CSV_HEADER)
+        open(csvpath, "w") do io
+            println(io, KERNEL_CSV_HEADER)
+            flush(io)
+            for T in cfg.types, S in cfg.kernel_Ss
+                default = get_basis(T, act, actlabel, S, CG_DEFAULT, true)
+                plain   = get_basis(T, act, actlabel, S, CG_PLAIN,   true)
+                nnp, ps_vec = kernel_params(T, S)
+                t  = T(0.3)                       # an interior quadrature-node-like input
+                q̄  = T(0.5); q = T(0.7)           # the endpoint values the autodiff ansatz needs
+                input = [t]
 
-            for (kernel, f) in (("dqdθ", b -> b.dqdθ(input, nnp)), ("dvdθ", b -> b.dvdθ(input, nnp)))
-                d = codegen_max_rel_diff(T, f(default), f(plain))
-                println(agr, join((string(T), csvnum(S), actlabel, kernel, csvnum(d)), ","))
-            end
-            flush(agr)
+                for (kernel, f) in (("dqdθ", b -> b.dqdθ(input, nnp)),
+                                    ("dvdθ", b -> b.dvdθ(input, nnp)))
+                    d = codegen_max_rel_diff(T, f(default), f(plain))
+                    println(agr, join((string(T), csvnum(S), actlabel, kernel, csvnum(d)), ","))
+                end
+                flush(agr)
 
-            entries = [
-                ("dqdθ", "symbolic", CG_DEFAULT.label, () -> default.dqdθ(input, nnp)),
-                ("dvdθ", "symbolic", CG_DEFAULT.label, () -> default.dvdθ(input, nnp)),
-                ("dqdθ", "symbolic", CG_PLAIN.label,   () -> plain.dqdθ(input, nnp)),
-                ("dvdθ", "symbolic", CG_PLAIN.label,   () -> plain.dvdθ(input, nnp)),
-                ("dqdθ", "autodiff", CG_NA.label,
-                    () -> NI.∂NN_anstaz_∂params(ps_vec, S, act, t, q̄, q)),
-                ("dvdθ", "autodiff", CG_NA.label,
-                    () -> NI.∂VNN_anstaz_∂params(ps_vec, S, act, t, q̄, q)),
-            ]
-            for (kernel, backend, codegen, f) in entries
-                r = bench_call(f; calls = cfg.kernel_calls)
-                @printf("%-8s %-4d %-8s %-10s %-12s | %-12.3f %-12.3f %-10d\n",
-                        string(T), S, kernel, backend, codegen, 1e6 * r.min, 1e6 * r.median,
-                        round(Int, r.bytes))
-                println(io, join((string(T), csvnum(S), actlabel, kernel, backend, codegen,
-                                  csvnum(cfg.kernel_calls), csvnum(r.min), csvnum(r.median),
-                                  csvnum(r.bytes)), ","))
-                flush(io)
+                entries = [
+                    ("dqdθ", "symbolic", CG_DEFAULT.label, () -> default.dqdθ(input, nnp)),
+                    ("dvdθ", "symbolic", CG_DEFAULT.label, () -> default.dvdθ(input, nnp)),
+                    ("dqdθ", "symbolic", CG_PLAIN.label,   () -> plain.dqdθ(input, nnp)),
+                    ("dvdθ", "symbolic", CG_PLAIN.label,   () -> plain.dvdθ(input, nnp)),
+                    ("dqdθ", "autodiff", CG_NA.label,
+                        () -> NI.∂NN_anstaz_∂params(ps_vec, S, act, t, q̄, q)),
+                    ("dvdθ", "autodiff", CG_NA.label,
+                        () -> NI.∂VNN_anstaz_∂params(ps_vec, S, act, t, q̄, q)),
+                ]
+                for (kernel, backend, codegen, f) in entries
+                    r = bench_call(f; calls = cfg.kernel_calls)
+                    @printf("%-8s %-4d %-8s %-10s %-12s | %-12.3f %-12.3f %-10d\n",
+                            string(T), S, kernel, backend, codegen, 1e6 * r.min, 1e6 * r.median,
+                            round(Int, r.bytes))
+                    println(io, join((string(T), csvnum(S), actlabel, kernel, backend, codegen,
+                                      csvnum(cfg.kernel_calls), csvnum(r.min), csvnum(r.median),
+                                      csvnum(r.bytes)), ","))
+                    flush(io)
+                end
             end
         end
     end
-    close(agr)
     println("-"^96)
     println("Wrote $(csvpath)")
     println("Wrote $(agrpath)")
@@ -446,8 +449,13 @@ codegen_of(label) = get(VARIANT_BY_LABEL, label, (codegen = CG_NA,)).codegen.lab
 
 # ref_err for cases that produced a trajectory, otherwise the failure status. Same convention
 # as `compare_float16_activations.jl`'s head-to-head table.
-function _cell(rows, problem, dt, method)
-    hit = findfirst(r -> r.problem == problem && r.dt == dt && r.method == method, rows)
+#
+# `activation` is part of the key, not just `(problem, dt)`: `full` mode sweeps two of them, and
+# keying without it would make `findfirst` return whichever came first and drop the other
+# activation from the table with nothing to show it had been there.
+function _cell(rows, problem, activation, dt, method)
+    hit = findfirst(r -> r.problem == problem && r.activation == activation &&
+                         r.dt == dt && r.method == method, rows)
     hit === nothing && return "—"
     r = rows[hit]
     has_metrics(r) ? (isnan(r.ref_err) ? "$(r.status)(NaN)" : fmt_sci(r.ref_err)) : r.status
@@ -455,8 +463,11 @@ end
 
 # How far the two codegen settings drift apart once the Newton solve is wrapped around them.
 # Pairs the plain-codegen run of each integrator with its default-codegen counterpart by
-# (problem, T, dt). This is *not* a check on the code generation — see
-# `codegen_max_rel_diff` for that — it is a measurement of the amplification.
+# (problem, T, activation, dt) — every axis of the sweep, so that the only thing left between
+# the two rows of a pair is the code generation. Dropping `activation` from the key would pair
+# a `gelu` row against a `tanh` one in `full` mode and report the activation difference as the
+# codegen spread. This is *not* a check on the code generation — see `codegen_max_rel_diff`
+# for that — it is a measurement of the amplification.
 function _codegen_endtoend_spread(io, rows)
     cells = Vector{Vector{String}}()
     for v in VARIANTS
@@ -468,11 +479,14 @@ function _codegen_endtoend_spread(io, rows)
         for r in rows
             r.method == v.label || continue
             hit = findfirst(s -> s.method == base.label && s.problem == r.problem &&
-                                 s.T == r.T && s.dt == r.dt, rows)
+                                 s.T == r.T && s.activation == r.activation &&
+                                 s.dt == r.dt, rows)
             hit === nothing && continue
             d = rows[hit]
             d.status == r.status || (mismatched += 1)
-            d.iterations == r.iterations || (iterdiff += 1)
+            # `isequal`, not `==`: an iteration count the solver state did not yield is `NaN`,
+            # and two cases that both failed that way have not disagreed about anything.
+            isequal(d.iterations, r.iterations) || (iterdiff += 1)
             (isfinite(d.ref_err) && isfinite(r.ref_err) && d.ref_err != 0) || continue
             push!(pairs, (d.ref_err, r.ref_err))
         end
@@ -539,9 +553,12 @@ function write_backend_report(rows, krows, arows; mode, outdir)
         println(io, "|---|---|")
         println(io, "| `cse+inplace` | the `SymbolicNeuralNetworks` 0.4.0 defaults — common-subexpression elimination, and a batch evaluated by an in-place kernel writing into one preallocated array |")
         println(io, "| `plain` | `cse = false, inplace = false`: the code generation of 0.3.x. Same mathematics, different emitted code. |\n")
-        println(io, "Every other axis is held fixed: **$(STRAT_LABEL)**, midpoint initial")
-        println(io, "trajectory, `λ = 16·√eps(T)`, 10 steps per case, `timespan = (0, 10·dt)`,")
-        println(io, "and the per-problem `R`/`S` the standard sweep uses.\n")
+        println(io, "Every axis other than problem, precision, activation and `dt` is held")
+        println(io, "fixed: **$(STRAT_LABEL)**, midpoint initial trajectory, `λ = 16·√eps(T)`,")
+        println(io, "10 steps per case, `timespan = (0, 10·dt)`, and the per-problem `R`/`S`")
+        println(io, "the standard sweep uses. `quick` sweeps one activation, `full` two, so")
+        println(io, "`activation` is a column of the head-to-head table and part of the key")
+        println(io, "every paired comparison below joins on.\n")
         println(io, "- Total cases: **$(ntot)**  •  converged (`ok`): **$(nok)** " *
                     "($(fmt_pct(ntot == 0 ? 0.0 : nok/ntot)))  •  produced a trajectory " *
                     "(`ok` + `maxiter`): **$(nmeas)**.")
@@ -593,8 +610,10 @@ function write_backend_report(rows, krows, arows; mode, outdir)
 
         println(io, "## Cost of the backend (goal of this file)\n")
         println(io, "Medians over every case that produced a trajectory. `basis build` is the")
-        println(io, "one-off symbolic compilation — zero for the autodiff pair, which is handed")
-        println(io, "a basis built with `symbolic = false`.\n")
+        println(io, "one-off basis construction. For the autodiff pair, which is handed a basis")
+        println(io, "built with `symbolic = false`, that is the network alone and lands in the")
+        println(io, "microseconds; for the symbolic pair it is the code generation and lands in")
+        println(io, "the tens to hundreds of milliseconds.\n")
         cost = Vector{Vector{String}}()
         for m in methods_present
             sub  = [r for r in rows if r.method == m]
@@ -636,10 +655,13 @@ function write_backend_report(rows, krows, arows; mode, outdir)
         probs = unique(r.problem for r in rows)
         dts   = sort(unique(r.dt for r in rows))
         Ts    = sort(unique(r.T for r in rows))
-        cells = [[p, T, @sprintf("%.3g", dt),
-                  (_cell([r for r in rows if r.T == T], p, dt, m) for m in headtohead)...]
-                 for p in probs for T in Ts for dt in dts]
-        _table(io, ["problem", "T", "dt", headtohead...], cells)
+        acts  = sort(unique(r.activation for r in rows))
+        # One row per full sweep key. `activation` is a column rather than an implicit
+        # constant because `full` mode sweeps two of them.
+        cells = [[p, T, a, @sprintf("%.3g", dt),
+                  (_cell([r for r in rows if r.T == T], p, a, dt, m) for m in headtohead)...]
+                 for p in probs for T in Ts for a in acts for dt in dts]
+        _table(io, ["problem", "T", "activation", "dt", headtohead...], cells)
         have_acc  && println(io, "![accuracy]($(p_acc))\n")
         have_ener && println(io, "![energy drift]($(p_ener))\n")
 

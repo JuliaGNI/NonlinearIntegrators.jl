@@ -103,8 +103,10 @@ what `SymbolicNeuralNetworks` 0.4.0 changed:
 
 Three measurements:
 
-1. **Basis build** — the one-off symbolic compilation, per codegen setting. Zero for the
-   autodiff pair, which is handed a `ShallowNetBasis{T}(σ, S; symbolic = false)`.
+1. **Basis build** — the one-off symbolic compilation, per codegen setting. For the autodiff
+   pair, which is handed a `ShallowNetBasis{T}(σ, S; symbolic = false)`, there is no
+   compilation and what is left is the network alone: microseconds, against tens to hundreds
+   of milliseconds for the symbolic pair.
 2. **End-to-end solve, cold and warm** — every case is solved twice on a fresh integrator.
    The first solve carries the specialization of the generated kernels (symbolic) or of the
    ForwardDiff tape (autodiff); the second is the steady-state cost and is what the
@@ -146,5 +148,6 @@ DERIV_BENCH_REUSE=true julia --project=benchmark benchmark/compare_derivative_ba
 | kernel sweep `S` | 4, 8, 16 | 4, 8, 12, 16 |
 
 Writes `results/derivative_backends_<mode>.csv`, `results/derivative_backends_kernels.csv`,
-`results/derivative_backends_codegen_agreement.csv`, `results/derivative_backends.md` and
-five PNGs.
+`results/derivative_backends_codegen_agreement.csv`, `results/derivative_backends.md` and six
+PNGs (convergence by integrator and as a heatmap, and run time / accuracy / energy drift /
+iterations against `dt`).

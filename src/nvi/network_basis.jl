@@ -46,7 +46,7 @@ Whether `basis` carries the derivatives (`dqdθ`, `V_func`, `dvdθ`) that
 form the `ForwardDiff`-based integrators want — they differentiate their ansatz at run
 time and never read these fields. Every other basis builds them unconditionally.
 """
-has_symbolic_derivatives(b::NetworkBasis) = b.common.dqdθ !== nothing
+has_symbolic_derivatives(b::NetworkBasis) = b.dqdθ !== nothing
 
 """
     require_symbolic_derivatives(basis, method_name)
