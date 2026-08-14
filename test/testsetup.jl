@@ -13,6 +13,11 @@ using QuadratureRules
 using CompactBasisFunctions
 using GeometricIntegratorsBase
 using GeometricProblems.HarmonicOscillator
+# `import`, not `using`: this only binds the module name, so the two-degree-of-freedom problem in
+# `cgvi_unit.jl` can be reached as `CoupledHarmonicOscillator.lodeproblem` without its exported
+# `lodeproblem`/`podeproblem` colliding with the `HarmonicOscillator` ones that
+# `integration/shallownet_accuracy.jl` calls unqualified.
+import GeometricProblems.CoupledHarmonicOscillator
 using GeometricSolutions: relative_maximum_error
 using LinearAlgebra: SingularException
 using SimpleSolvers: NonlinearSolverException
@@ -30,17 +35,17 @@ relu_k(k::Int = 3) = x -> max(zero(x), x)^k
 
 # ---- basis / quadrature builders -------------------------------------------
 
-build_onelayer_basis(::Type{T}; S = 4, k = 3) where {T} =
-    OneLayerNetwork_GML{T}(relu_k(k), S)
+build_shallownet_basis(::Type{T}; S = 4, k = 3) where {T} =
+    ShallowNetBasis{T}(relu_k(k), S)
 
 build_densenet_basis(::Type{T}; S₁ = 3, S = 3) where {T} =
-    DenseNet_GML{T}(tanh, S₁, S)
+    DenseNetBasis{T}(tanh, S₁, S)
 
-function build_pr_basis(::Type{T}) where {T}
+function build_vise_basis(::Type{T}) where {T}
     @variables tvar
     @variables Wv[1:3]
     q_expr = Wv[1] * cos(Wv[2] * tvar + Wv[3])
-    PR_Basis{T}([q_expr], [Wv], tvar, 1)
+    VISEBasis{T}([q_expr], [Wv], tvar, 1)
 end
 
 gauss(::Type{T}, R = 8) where {T} = QuadratureRules.GaussLegendreQuadrature(T, R)
@@ -78,19 +83,19 @@ const SOLVER_GAVE_UP = Union{SingularException,NonlinearSolverException}
 # extrapolation `GeometricIntegratorsBase.solutionstep!` actually applies, and its default
 # (`NoInitialGuess`) makes that call a no-op. So a Hermite row that passes only
 # `initial_trajectory_method = HermiteExtrapolation()` takes the Hermite code path but
-# extrapolates nothing. Passing both is what `benchmark/gml_benchmark_common.jl` does, and it is
+# extrapolates nothing. Passing both is what `benchmark/shallownet_benchmark_common.jl` does, and it is
 # what makes these rows measure something.
 hermite_kw(extrap) = extrap isa HermiteExtrapolation ? (; initialguess = HermiteExtrapolation()) : (;)
 
-# Newton iteration cap for the unit tests. Measured on the Hardcode accuracy guard: the solve
+# Newton iteration cap for the unit tests. Measured on the ShallowNetAutodiff accuracy guard: the solve
 # converges in 88 iterations, but with a 10000 cap some *earlier* step burns the whole budget,
 # costing 30s per case against 0.7s at 100 — for identical accuracy (2.6e-6 vs 3.1e-6 against a
-# 1e-4 threshold). The one-layer guards converge in 2–6 iterations and are unaffected.
+# 1e-4 threshold). The shallow-net guards converge in 2–6 iterations and are unaffected.
 #
 # The extrapolation cross-products do not converge within two steps at all: they exhaust
 # whatever cap they are given. They assert dispatch and a finite result at the working type,
 # which is what `integrate` returns after exhausting the budget — deliberately not a
-# convergence claim (see `benchmark/gml_benchmark_common.jl`, which records the same situation
+# convergence claim (see `benchmark/shallownet_benchmark_common.jl`, which records the same situation
 # as a distinct `maxiter` status rather than as `ok`).
 const MAX_NEWTON_ITERATIONS = 100
 

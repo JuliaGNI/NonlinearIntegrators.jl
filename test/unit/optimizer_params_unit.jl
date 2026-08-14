@@ -45,7 +45,7 @@ nested_params() = (L1 = (W = [1.0 2.0; 3.0 4.0], b = [5.0, 6.0]),
         @test back.L2.W === ps.L2.W
     end
 
-    # `NonLinear_DenseNet_GML`'s LSGD path optimises L1 and L2 only, re-solving L3 by least
+    # `DenseNet`'s LSGD path optimises L1 and L2 only, re-solving L3 by least
     # squares each epoch, so both helpers have to work on a subset of the layers.
     @testset "subset of layers" begin
         subset = (L1 = ps.L1, L2 = ps.L2)

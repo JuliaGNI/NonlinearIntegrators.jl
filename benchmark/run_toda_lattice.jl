@@ -1,4 +1,4 @@
-# Benchmark the one-layer GML integrator on the Toda lattice with N = 16 (D = 16).
+# Benchmark the shallow-net integrator on the Toda lattice with N = 16 (D = 16).
 #
 #   julia --project=benchmark benchmark/run_toda_lattice.jl [quick|full]
 #
@@ -6,7 +6,7 @@
 # simplification, so each problem construction is comparatively heavy; problems are
 # cached per (T, dt) by the sweep engine.
 
-include(joinpath(@__DIR__, "gml_benchmark_common.jl"))
+include(joinpath(@__DIR__, "shallownet_benchmark_common.jl"))
 using GeometricProblems.TodaLattice
 
 const NAME = "toda_lattice"
@@ -28,6 +28,6 @@ let mode = pick_mode()
     csv = run_sweep(; problem_name = NAME, build_prob = build_prob,
                     hamiltonian = ham, mode = mode, over...)
     write_report(read_results(csv);
-        title = "One-layer GML benchmark — Toda Lattice (N=16, $(mode))",
+        title = "Shallow-net benchmark — Toda Lattice (N=16, $(mode))",
         mode = mode, outdir = RESULTS_DIR, prefix = "$(NAME)_$(mode)")
 end

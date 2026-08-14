@@ -117,7 +117,7 @@ function ham_drift(sol, params)
 end
 
 function run_case(basis, ::Type{T}, seed, λ, prob, refq) where {T}
-    method = NonLinear_OneLayer_GML(basis, QuadratureRules.GaussLegendreQuadrature(T, R_QUAD);
+    method = ShallowNet(basis, QuadratureRules.GaussLegendreQuadrature(T, R_QUAD);
                                    show_status = false,
                                    bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
                                    initial_guess_method = seed)
@@ -189,7 +189,7 @@ function main()
 
             for (aname, σ) in ACTIVATIONS
                 basis = try
-                    OneLayerNetwork_GML{T}(σ, S_NEURONS)
+                    ShallowNetBasis{T}(σ, S_NEURONS)
                 catch e
                     @warn "basis build failed" T aname exception = e
                     continue

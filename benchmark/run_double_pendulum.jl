@@ -1,8 +1,8 @@
-# Benchmark the one-layer GML integrator on the double pendulum (D = 2).
+# Benchmark the shallow-net integrator on the double pendulum (D = 2).
 #
 #   julia --project=benchmark benchmark/run_double_pendulum.jl [quick|full]
 
-include(joinpath(@__DIR__, "gml_benchmark_common.jl"))
+include(joinpath(@__DIR__, "shallownet_benchmark_common.jl"))
 using GeometricProblems.DoublePendulum
 
 const NAME = "double_pendulum"
@@ -26,6 +26,6 @@ let mode = pick_mode()
     csv = run_sweep(; problem_name = NAME, build_prob = build_prob,
                     hamiltonian = ham, mode = mode, over...)
     write_report(read_results(csv);
-        title = "One-layer GML benchmark — Double Pendulum ($(mode))",
+        title = "Shallow-net benchmark — Double Pendulum ($(mode))",
         mode = mode, outdir = RESULTS_DIR, prefix = "$(NAME)_$(mode)")
 end

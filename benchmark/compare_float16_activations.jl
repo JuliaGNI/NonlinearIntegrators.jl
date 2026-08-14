@@ -1,4 +1,4 @@
-# Float16 activation comparison for the one-layer GML integrator: elu vs gelu vs
+# Float16 activation comparison for the shallow-net integrator: elu vs gelu vs
 # tanh across all four benchmark problems, using the "quick" preset scalar axes
 # (10 steps; DogLeg; midpoint initial guess; λ = 16·√eps; dt ∈ {0.1, 1, 10}).
 #
@@ -6,11 +6,11 @@
 #
 # ReLU-family activations diverge at Float16 (polynomial growth exceeds the range),
 # so they are excluded here. Writes results/float16_activations.csv (standard 17-column
-# sweep format, so it round-trips through gml_report's `read_results`) and a markdown
+# sweep format, so it round-trips through shallownet_report's `read_results`) and a markdown
 # report results/float16_activations.md with by-activation / by-problem stats and an
 # accuracy head-to-head table. It is a diagnostic, not part of the standard sweep.
 
-include(joinpath(@__DIR__, "gml_benchmark_common.jl"))
+include(joinpath(@__DIR__, "shallownet_benchmark_common.jl"))
 
 using GeometricProblems.Pendulum
 using GeometricProblems.HarmonicOscillator
@@ -82,8 +82,8 @@ open(CSVPATH, "w") do io
     for (name, build_prob, ham, R, S) in PROBLEMS
         refcache = Dict{Float64,Any}()
         for (actlabel, act) in ACTS
-            basis  = OneLayerNetwork_GML{T}(act, S)
-            method = NonLinear_OneLayer_GML(basis, QuadratureRules.GaussLegendreQuadrature(T, R);
+            basis  = ShallowNetBasis{T}(act, S)
+            method = ShallowNet(basis, QuadratureRules.GaussLegendreQuadrature(T, R);
                         show_status = false,
                         bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
                         initial_trajectory_method = IG.extrap)
@@ -108,7 +108,7 @@ end
 println("-"^60)
 println("Wrote $(CSVPATH)")
 
-# --- markdown report (reuses gml_report helpers) ------------------------------
+# --- markdown report (reuses shallownet_report helpers) ------------------------------
 rows = read_results(CSVPATH)
 hcell(prob, dt, act) = begin
     hit = findfirst(r -> r.problem == prob && r.dt == dt && r.activation == act, rows)
@@ -120,7 +120,7 @@ end
 md = joinpath(RESULTS_DIR, "$(NAME).md")
 open(md, "w") do io
     ntot = length(rows); nok = count(is_ok, rows)
-    println(io, "# One-layer GML — Float16 activation comparison (elu / gelu / tanh)\n")
+    println(io, "# Shallow net — Float16 activation comparison (elu / gelu / tanh)\n")
     println(io, "*Generated $(Dates.format(now(), "yyyy-mm-dd HH:MM")).*\n")
     println(io, "- Total cases: **$(ntot)**  •  converged (`ok`): **$(nok)** ($(fmt_pct(ntot == 0 ? 0.0 : nok/ntot)))")
     println(io, "- Axes: precision **Float16**; `dt ∈ {0.1, 1, 10}`; 10 steps; **DogLeg** solver;")

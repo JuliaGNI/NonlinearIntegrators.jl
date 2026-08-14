@@ -52,9 +52,9 @@ Everything runs at the solver's working precision `T`; see the precision note in
 # Examples
 
 ```julia
-NonLinear_OneLayer_GML(basis, quadrature)                                # OGA1d(), the default
-NonLinear_OneLayer_GML(basis, quadrature; initial_guess_method = OGA2d())
-NonLinear_OneLayer_GML(basis, quadrature;
+ShallowNet(basis, quadrature)                                # OGA1d(), the default
+ShallowNet(basis, quadrature; initial_guess_method = OGA2d())
+ShallowNet(basis, quadrature;
     initial_guess_method = OGA(BiasGrid1d(), OrthogonalProjection(), TruncatedSVD()))
 ```
 """
@@ -90,7 +90,7 @@ OGA1d(; kwargs...) = OGA(BiasGrid1d(), RawProjection(), WeightedQR(); kwargs...)
 
 `OGA1d`, but selecting on the *normalized* inner product.
 
-`Hardcode_int`'s constructor default: alone among the four integrators it ranks candidates
+`ShallowNetAutodiff`'s constructor default: alone among the four integrators it ranks candidates
 by `|⟨r, g⟩_w| / ‖g‖_w` rather than by the raw projection. Which of the two an integrator
 uses changes which neurons get picked and therefore which basin the Newton solve lands in,
 so each keeps the rule it was tuned with rather than inheriting a single default.
@@ -151,7 +151,7 @@ the Gram solve raises `SingularException` before the Newton iteration has begun.
 modern composable [`OGA`](@ref), where the island and the ridge can be toggled
 independently.
 
-Select it with `NonLinear_OneLayer_GML(...; initial_guess_method = OGA1dNormalEquations())`.
+Select it with `ShallowNet(...; initial_guess_method = OGA1dNormalEquations())`.
 """
 struct OGA1dNormalEquations <: InitialParametersMethod end
 

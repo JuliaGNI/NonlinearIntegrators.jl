@@ -1,12 +1,12 @@
-# Benchmark the one-layer GML integrator on the (mathematical) pendulum.
+# Benchmark the shallow-net integrator on the (mathematical) pendulum.
 #
 #   julia --project=benchmark benchmark/run_pendulum.jl [quick|full]
 #
 # NOTE: GeometricProblems' Pendulum has no `lodeproblem`; it exposes a *degenerate*
-# 2-component IODE (`iodeproblem`, ϑ: p₁=ml²q₂, p₂=0). The GML method accepts any
+# 2-component IODE (`iodeproblem`, ϑ: p₁=ml²q₂, p₂=0). The shallow-net method accepts any
 # `AbstractProblemIODE`, so we use it here — this case deliberately stresses the solver.
 
-include(joinpath(@__DIR__, "gml_benchmark_common.jl"))
+include(joinpath(@__DIR__, "shallownet_benchmark_common.jl"))
 using GeometricProblems.Pendulum
 
 const NAME = "pendulum"
@@ -31,6 +31,6 @@ let mode = pick_mode()
     csv = run_sweep(; problem_name = NAME, build_prob = build_prob,
                     hamiltonian = ham, mode = mode, over...)
     write_report(read_results(csv);
-        title = "One-layer GML benchmark — Pendulum ($(mode))",
+        title = "Shallow-net benchmark — Pendulum ($(mode))",
         mode = mode, outdir = RESULTS_DIR, prefix = "$(NAME)_$(mode)")
 end

@@ -9,7 +9,7 @@ Everything writes into `results/`, which is git-ignored.
 
 ## OGA seed variants
 
-Three studies cover the Orthogonal Greedy Algorithm seeds of `NonLinear_OneLayer_GML`,
+Three studies cover the Orthogonal Greedy Algorithm seeds of `ShallowNet`,
 across working precisions (`Float16`, `Float32`, `Float64`), `ReLUᵏ` powers, smooth
 activations, and the `regularization_factor` ladder. They share
 `oga_activations.jl` (float-generic activations, the λ ladder) and `oga_report.jl`
