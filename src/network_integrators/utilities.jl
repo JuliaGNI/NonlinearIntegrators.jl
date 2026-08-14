@@ -73,11 +73,27 @@ Does **not** copy: the result aliases the same arrays, so the optimizer's in-pla
 visible through the original `ps`.
 
 See [`network_params`](@ref) for the inverse.
+
+# Implementation
+
+`@generated` so that the joined key set is computed from the *type* of `ps`. Written as
+ordinary code — `Symbol(lname, :_, f)` inside a `map` over `keys(ps)` — the key tuple is built
+at run time, inference cannot fold it, and the return type degrades to `NamedTuple`. The
+training loops then hand `Optimizer` an argument of unknown type, and inferring the
+constructor plus `solver_step!` from there costs minutes per specialization on Julia 1.12.
 """
-function optimizer_params(ps)
-    layers = map(lname -> NamedTuple{map(f -> Symbol(lname, :_, f), keys(ps[lname]))}(values(ps[lname])),
-                 keys(ps))
-    merge(layers...)
+optimizer_params(ps::NeuralNetworkParameters) = optimizer_params(AbstractNeuralNetworks.params(ps))
+
+@generated function optimizer_params(ps::NamedTuple{LN,LT}) where {LN,LT}
+    names = Symbol[]
+    entries = Expr[]
+    for (i, lname) in enumerate(LN)
+        for f in fieldnames(LT.parameters[i])
+            push!(names, Symbol(lname, :_, f))
+            push!(entries, :(ps.$lname.$f))
+        end
+    end
+    :(NamedTuple{$(Tuple(names))}(($(entries...),)))
 end
 
 """
@@ -89,16 +105,22 @@ Rebuild the layer nesting that [`optimizer_params`](@ref) removed, taking the ke
 The loss handed to `Optimizer` is called on the flat parameters while the network wants them
 nested, so it needs this on the way in. The result is a `NeuralNetworkParameters` exactly when
 `template` is one.
+
+`@generated` for the same reason as [`optimizer_params`](@ref), and more pressingly: this one
+runs inside the differentiated loss, on every function and gradient evaluation.
 """
 function network_params(flat, template::NeuralNetworkParameters)
     NeuralNetworkParameters(network_params(flat, AbstractNeuralNetworks.params(template)))
 end
 
-function network_params(flat, template::NamedTuple)
-    NamedTuple{keys(template)}(map(
-        lname -> NamedTuple{keys(template[lname])}(map(
-            f -> flat[Symbol(lname, :_, f)], keys(template[lname]))),
-        keys(template)))
+@generated function network_params(flat::NamedTuple, template::NamedTuple{LN,LT}) where {LN,LT}
+    layers = Expr[]
+    for (i, lname) in enumerate(LN)
+        fields = fieldnames(LT.parameters[i])
+        entries = [:(flat.$(Symbol(lname, :_, f))) for f in fields]
+        push!(layers, :(NamedTuple{$fields}(($(entries...),))))
+    end
+    :(NamedTuple{$LN}(($(layers...),)))
 end
 
 function box_init_plain(input_dim::Int, output_dim::Int, ::Type{T}=Float32;Random_rng = Random.seed!(1)) where {T}

@@ -27,6 +27,7 @@ include("testsetup.jl")
     end
 
     @testset "unit" begin
+        include("unit/optimizer_params_unit.jl")
         include("unit/oga_kernels.jl")
         include("unit/onelayer_gml_unit.jl")
         include("unit/cgvi_standard_unit.jl")
