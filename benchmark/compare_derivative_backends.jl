@@ -417,9 +417,9 @@ function run_kernel_benchmark(cfg)
                     ("dqdθ", "symbolic", CG_PLAIN.label,   () -> plain.dqdθ(input, nnp)),
                     ("dvdθ", "symbolic", CG_PLAIN.label,   () -> plain.dvdθ(input, nnp)),
                     ("dqdθ", "autodiff", CG_NA.label,
-                        () -> NI.∂NN_anstaz_∂params(ps_vec, S, act, t, q̄, q)),
+                        () -> NI.∂NN_ansatz_∂params(ps_vec, S, act, t, q̄, q)),
                     ("dvdθ", "autodiff", CG_NA.label,
-                        () -> NI.∂VNN_anstaz_∂params(ps_vec, S, act, t, q̄, q)),
+                        () -> NI.∂VNN_ansatz_∂params(ps_vec, S, act, t, q̄, q)),
                 ]
                 for (kernel, backend, codegen, f) in entries
                     r = bench_call(f; calls = cfg.kernel_calls)

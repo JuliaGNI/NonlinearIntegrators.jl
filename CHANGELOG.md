@@ -54,6 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The hardcoded-ansatz helpers of `ShallowNetAutodiff` / `ShallowNetAutodiffReversible`
+  spell "ansatz" correctly.** `NN_anstaz`, `VNN_anstaz`, `VNN_anstaz_zygote`,
+  `∂NN_anstaz_∂params`, `∂VNN_anstaz_∂params`, `∂NN_anstaz_∂q̄`, `∂NN_anstaz_∂q`,
+  `∂VNN_anstaz_∂q̄` and `∂VNN_anstaz_∂q` became `*_ansatz_*`. Names only; no behaviour
+  changed. None of them is exported, and the only call site outside `src/` was
+  `benchmark/compare_derivative_backends.jl`, which reaches them through the `NI.` prefix
+  and was updated with them.
+
 - **`SymbolicNeuralNetworks` 0.3 → 0.4.** A performance release with a source-compatible API:
   code generation now performs common-subexpression elimination, batches are evaluated by an
   in-place kernel writing into a single preallocated array, and an equation *set* (which is
@@ -70,7 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole 4.1×.
 
   Two things to know. The in-place result cannot be differentiated with `Zygote`, which is
-  fine here — the only `Zygote.gradient` in the package (`VNN_anstaz_zygote`) differentiates
+  fine here — the only `Zygote.gradient` in the package (`VNN_ansatz_zygote`) differentiates
   a hand-written ansatz, and the generated kernels only ever see `ForwardDiff.Dual`. And the
   output element type is now promoted over the *inputs* rather than inferred from the
   expression, so a `Float32`/`Float16` network whose generated code contains a `Float64`
@@ -152,7 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CompactBasisFunctions`, which is what the new versions require. RungeKutta 0.6 is satisfied
   vacuously: it is not a dependency of this package at all any more (see below).
 - Zygote compat widened to `0.6, 0.7`; the graph resolves to 0.7.12. Zygote remains a direct
-  dependency for `VNN_anstaz_zygote`, which supplies the velocity of the hardcoded ansatz in
+  dependency for `VNN_ansatz_zygote`, which supplies the velocity of the hardcoded ansatz in
   `ShallowNetAutodiff` and `ShallowNetAutodiffReversible`.
 - **`ImplicitMidpoint` now comes from `GeometricIntegratorsBase`** for the
   `IntegratorExtrapolation` warm start and `VISE`, and requires 0.6: the warm start
@@ -675,14 +683,14 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   (`m × (n·N)`, column-major) worked into the slicing.
 
 - **The autodiff pair computes the velocity with `Zygote` and its parameter gradient with
-  `ForwardDiff`,** for the same expression. `VNN_anstaz_zygote`
+  `ForwardDiff`,** for the same expression. `VNN_ansatz_zygote`
   (`src/nvi/shallownet_autodiff.jl:228`) is what fills `V` at the quadrature nodes
   (`shallownet_autodiff.jl:341`, `shallownet_autodiff_reversible.jl:351`), while
-  `∂VNN_anstaz_∂params` differentiates the `ForwardDiff` version, `VNN_anstaz`
+  `∂VNN_ansatz_∂params` differentiates the `ForwardDiff` version, `VNN_ansatz`
   (`shallownet_autodiff.jl:230-232`). Both compute `dq_h/dt`. Reverse mode for a
   scalar-in/scalar-out derivative is the wrong tool, and the mismatch is at odds with the
   `Autodiff` name, which the 0.3.0 rename introduced to mean `ForwardDiff`. Switching the
-  value to `VNN_anstaz` looks like a one-line change; it is untested and would move the
+  value to `VNN_ansatz` looks like a one-line change; it is untested and would move the
   numbers, so it is not one to make blind.
 
 ### Nonlinear solve conditioning
@@ -709,6 +717,23 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   `scripts/`, `benchmark/` or `docs/` reads it. The values duplicate the defaults the
   constructors already carry, so it is documentation in code form that nothing keeps honest.
   Either wire it into the constructors as *the* source of the default, or drop it.
+
+- **The four analytic boundary derivatives of the hardcoded ansatz are called nowhere.**
+  `∂NN_ansatz_∂q̄`, `∂NN_ansatz_∂q`, `∂VNN_ansatz_∂q̄` and `∂VNN_ansatz_∂q`
+  (`src/nvi/shallownet_autodiff.jl:234-238`) return `1-t`, `t`, `-1` and `1` — the exact
+  derivatives of `q_h` and `dq_h/dt` with respect to the two endpoint unknowns — and nothing
+  in `src/`, `test/`, `scripts/`, `benchmark/` or `docs/` reads them. `components!` writes
+  those same four quantities out by hand where it assembles the Jacobian. Either call them
+  there or drop them. Surfaced while renaming `*_anstaz_*` to `*_ansatz_*`, which had to touch
+  all four.
+
+- **`src/nvi/shallownet_autodiff_reversible.jl:218-244` is a commented-out duplicate** of the
+  ansatz definitions that live, uncommented, in `shallownet_autodiff.jl:212-238`. It is
+  already stale: it still spells the boundary factors `1.0 - t` where the live copy uses
+  `one(t) - t`, so it predates the precision-generic refactor and would silently upcast if
+  it were ever uncommented. It also has to be hand-edited to keep it in step — the
+  `*_anstaz_*` rename did exactly that, for a block no compiler checks. It should be deleted;
+  the reversible integrator gets these functions from the module, not from this block.
 
 - **`docs/src/index.md` renders past Documenter's `size_threshold_warn`** (117 KiB against
   100 KiB), warning on every build. Still well under the 200 KiB hard threshold. It wants
