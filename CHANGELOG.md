@@ -5,7 +5,59 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-08-16
+
+### Breaking
+
+- **`integrate` returns `(sol, internal_values)` for every network integrator.**
+  `NonLinear_OneLayer_GML` used to return a named tuple carrying per-step instrumentation
+  (`sol`, `mse_err_list`, `abs_err_list`, `training_time_list`, `solving_time_list`, …)
+  while the other four returned the two-element tuple, so nothing could be written
+  generically across them. The instrumentation cache fields are gone with it; the benchmark
+  harness therefore reports only `total_secs`, the wall clock around `integrate`, and its
+  CSV drops the `solve_secs` column (17 → 16 fields). Callers reading `res.sol` must
+  destructure: `sol, internal_values = integrate(...)`.
+- **Constructor keywords renamed.** `nstages` → `extrapolation_substep` (it counts
+  sub-steps of the warm-start extrapolation, not quadrature stages) and
+  `initial_trajectory` → `initial_trajectory_method` (to match `initial_guess_method`).
+  Applies to all five network integrators and to `PR_Integrator`. New keyword
+  `record_grid_points = 41` replaces the hard-coded 41-point recording grid.
+- **`stages_compute!` is renamed `record_finer_solution!`.** It never computed quadrature
+  stages; it samples the converged ansatz on a finer grid for plotting.
+- Removed the unused `use_hamiltonian_loss` keyword from all one-layer integrators and
+  `problem_initial_hamitltonian` from `NonLinear_OneLayer_GML`.
+- `issymplectic` now genuinely returns `missing` for every `NetworkIntegratorMethod`.
+  The previous per-integrator definitions were *bare*, so — `GeometricIntegratorsBase`
+  exporting the name and the module only doing `using` — they defined a shadowing
+  `NonlinearIntegrators.issymplectic` that nothing ever called; the trait fell through to
+  the framework's `missing`. The definitions are now qualified and therefore live, and the
+  value is stated as `missing` rather than the `true` that a refactor would otherwise have
+  introduced by accident: symplecticity is not established for an ansatz whose parameters
+  are refitted every step.
+- **`OGA1d_Legacy` is renamed `OGA1dNormalEquations`.** The new name says what the
+  variant *is* — the reference implementation from the original paper, solving the fit
+  through the normal equations in a `Float64` island — rather than merely that it came
+  first. Callers passing `initial_guess_method = OGA1d_Legacy()` must update; there is no
+  deprecation shim: the type only ever existed on `main`, never in a tagged release. The
+  argument for a version bump that this entry used to carry — that a downstream `[compat]`
+  bound on `0.2` should fail at resolve time rather than at run time with an `UndefVarError`
+  — no longer applies: 0.2.0 *is* this release, so there is no earlier tag for such a bound
+  to name. Known downstream: SolverBenchmark's `nonlinear_onelayer_method` defaults to this
+  seed, and takes it from `main` rather than from a registered version.
+- **`Time_reversible_OneLayer` and `Time_Reversible_Hardcode` now reject a basis with an
+  odd number of neurons.** Both represent the step with neurons in mirrored pairs and store
+  only the `S/2` independent hidden parameters, so an odd `S` was never usable: it
+  previously failed at the first time step with an `InexactError` out of `Int(S/2)` in
+  `components!`, several call levels from the cause. It is now an `ArgumentError` at
+  construction. `oga_fit` enforces the same condition for any caller of the shared greedy
+  loop — an odd `nneurons` under a mirrored symmetry would place one neuron fewer than
+  asked and leave the last at `(0, 0)`, which is the duplicated-neuron state `fill_unused`
+  exists to prevent.
+- `initial_params!` is unified on the three-argument form `initial_params!(int, method,
+  sol)`. The two boundary-ansatz integrators already needed `sol`; the two `OneLayer` ones
+  and `NonLinear_DenseNet_GML` took two arguments, so the seed could not be written
+  generically across all of them. Only relevant to code defining its own
+  `InitialParametersMethod`.
 
 ### Added
 
@@ -73,7 +125,147 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accepts. The report measures that amplification rather than asserting it away. See
   `benchmark/README.md`.
 
+- **New dictionaries.** `WeightBiasGrid2d` is a genuine 2-D grid over `(w, b)`, with
+  log₂-spaced weight magnitudes crossed with the bias grid. For a positively homogeneous
+  activation the weight magnitude is redundant — `σ(wx+b) = |w|ᵏσ(sign(w)x + b/|w|)`, so
+  only the sign carries shape information, which is why the `{±1} × (bias grid)` set is
+  complete for `ReLUᵏ` — but ELU and GELU are not homogeneous, and for them `|w|` is a real
+  length-scale parameter. Restricting the weight axis to `{±1}` recovers the 1-D
+  dictionary exactly, so this is a strict generalisation. `AngularGrid` places atoms on
+  rays through the origin of `(w, b)` space, which is the dictionary the underlying
+  approximation theory is stated for, and samples uniformly in atom space rather than
+  uniformly in bias. `Refined` wraps any dictionary and polishes the selected atom off the
+  grid by a derivative-free local search, decoupling accuracy from dictionary size.
+- **New selection rules.** `NormalizedProjection` scores by
+  `|⟨r,g⟩_w| / ‖g‖_w`, the textbook greedy criterion, which is scale-invariant and so
+  mandatory for a 2-D dictionary. `OrthogonalProjection` scores against the part of the
+  atom orthogonal to those already selected — the actual orthogonal-greedy criterion rather
+  than matching pursuit — and refuses any atom whose orthogonal part has collapsed. That
+  is the direct fix for the observed reduced-precision failure: an atom adding no new
+  direction can no longer be selected, which is the condition that used to surface as
+  `SingularException: zero pivot found at index 3` out of four neurons.
+- **New fits.** `IncrementalQR` maintains the factorisation across greedy steps
+  (`O(k·n)` per step instead of `O(k²·n)`, and its `Q` powers the orthogonal selection
+  score for free). `PivotedQR` and `TruncatedSVD` are rank-revealing; both are hand-rolled
+  because `qr(A, ColumnNorm())` and `svd` are LAPACK-only and therefore do not exist at
+  `Float16`, the precision that needs them. `NormalEquationsFit` exposes the Gram solve
+  with the ridge and the `Float64` island as independent switches, so "island vs working
+  precision" and "ridge vs no ridge" are ablations on one code path.
+- `oga_check_precision`, called once per fit: throws if the activation does not evaluate at
+  the working precision. The `max(0.0, x)^k`-instead-of-`max(zero(x), x)^k` trap promotes
+  the whole seed to `Float64` and is otherwise visible only as suspiciously good
+  half-precision accuracy.
+- `test/unit/oga_kernels.jl`: direct coverage of the OGA numerics at `Float16`, `Float32`
+  and `Float64` — previously they were exercised only through full integrations. Includes
+  the `eltype === T` / `@inferred` no-upcast gate over every dictionary × selection × fit
+  combination, the `OGA1d` atom-selection pin, verification of the hand-rolled
+  factorisations against LAPACK, and a check that the normalised and orthogonal selection
+  rules find the brute-force optimal first atom (which raw projection, by design, does
+  not).
+- **The Orthogonal Greedy Algorithm documentation is now a six-page section** — Overview,
+  Theory, Algorithms, Usage, Precision, Studies — replacing the single page. *Theory* derives
+  the selection criterion from the one-step residual reduction (which is also where the
+  rank-gain floor comes from), gives the dictionary-completeness argument for positively
+  homogeneous activations and shows where it fails for smooth ones, and sets out the
+  conditioning analysis. *Algorithms* documents each of the four dictionaries, three selection
+  rules, five fits and four guard rails with its mechanism, implementation, cost and when to
+  choose it. *Usage* covers presets, composing configurations, per-integrator behaviour,
+  reading `OGAResult`'s diagnostics, and extending with a new component. *Precision* states the
+  no-implicit-conversion invariant and how it is enforced. *Studies* reports the measurements
+  with their methodology and caveats.
+- New studies in `scripts/` (not `benchmark/`, which holds the integrator-suite benchmarks and
+  is driven by the docs build), replacing `benchmark/oga_comparison.jl`: `oga_fit_study.jl` measures seed
+  quality with no integrator and no Newton solve (the two are otherwise confounded),
+  `oga_sweep.jl` runs the end-to-end harmonic-oscillator sweep over variant × precision ×
+  regularization factor × activation in a `ReLUᵏ` stage and a smooth-activation stage, and
+  `oga_double_pendulum.jl` repeats a reduced grid at a single λ on the problem the seed
+  fails hardest on. `regularization_factor` is swept as `2^k √eps(T)` rather than as
+  absolute values, so the shift is scaled to the precision it protects — and `f_abstol` is
+  scaled the same way, at `256·eps(T)`. The latter is not cosmetic: the solver's default
+  `f_abstol` is `1.78e-15`, an absolute `Float64`-scaled value that `Float32` and `Float16`
+  cannot reach, so a reduced-precision run sits at its residual floor and burns the whole
+  iteration budget while parked on the right answer. Measured before the fix, `ReLU³` at
+  `Float32` reported 1000 iterations at every regularization factor with an accuracy of
+  `1.8e-7` — read as
+  non-convergence, that made the entire `Float32` column an artefact of the tolerance rather
+  than a fact about the seed. Runs that do exhaust the budget are recorded as `maxiter`
+  rather than `ok`, and runs whose final state leaves the working precision as `upcast`.
+- Shared OGA numerical helpers, now in `src/oga/numerics.jl`:
+  - `weighted_lstsq(Φ, w, y)` — quadrature-weighted least squares via QR on the
+    `√w`-scaled design matrix, with a Tikhonov-ridged fallback that only engages
+    when the plain solve returns a non-finite result (the genuinely
+    rank-deficient `Float16` case).
+  - `oga_norm_floor(T, ref) = sqrt(eps(T)) · ref` — precision-scaled floor for
+    the dictionary-normalization guard.
+  - `oga_tikhonov(G; C = 100) = C · eps(T) · tr(G) / n` — precision-scaled
+    Tikhonov floor (used as the ridge in the `weighted_lstsq` fallback).
+  - `bias_grid(lo, hi, n, T)` — index-based construction of the bias grid.
+- A coherence guard in the greedy selection that blocks atoms whose
+  quadrature-weighted L² coherence with an already-selected atom exceeds
+  `1 - sqrt(eps(T))`. It is inert at `Float64`/`Float32` and only bites at
+  `Float16`, where it keeps the selected neurons linearly independent.
+- Documentation section describing the findings, the reformulated algorithm and
+  its references, with a self-contained didactic `Float16` example.
+
 ### Changed
+
+- **`SimpleSolvers` 0.11 → 0.12.1, and `GeometricOptimizers` comes from the registry.** The
+  `[sources]` git pin is **gone**: GeometricOptimizers 0.2.0 is now in General, and its registered
+  copy requires SimpleSolvers 0.12, which is what forces the SimpleSolvers bump here. Two of the
+  three entries under *Known issues* below close with it — this package can be tagged again, and
+  **Julia 1.10 can install it again**, `[sources]` having been the Pkg 1.11 feature that made the
+  three 1.10 CI jobs unsatisfiable. The `[sources]` explanations in `benchmark/Project.toml` and
+  `scripts/Project.toml`, which existed only to say why the pin was *not* repeated there, go with
+  it.
+
+  SimpleSolvers 0.12 is breaking in one way that reaches this package: a `NonlinearSolver` no
+  longer emits line-search warnings from inside its iteration, so a rejected line search reports to
+  its caller through the returned status and to nobody at all if the caller drops it. See the next
+  entry. Its other two breaks do not apply — nothing here constructs a `NonlinearSolverStatus`, and
+  the one third-party `LinesearchMethod` in the dependency graph is GeometricOptimizers'
+  `DecayingStatic`, which implements `solve_with_status` — the side of the rewritten contract that
+  is now the one to implement — and has `solve` derived from it, so it was unaffected.
+
+- **The nonlinear solves use `solve_with_status!`**, and hand the status to
+  `check_solver_status`, which GeometricIntegratorsBase 0.6.3 adds as the single place a step's
+  solve outcome is acted on. All three sites: the network integrators' shared `integrate_step!`,
+  `CGVINodal`'s and `VISE`'s. `check_solver_status` is silent by default — SimpleSolvers remains
+  the one voice that reports a failed solve — so nothing changes in what a run prints. It replaces
+  the commented-out `print_solver_status` / `check_solver_status` stubs, which named this exact
+  function and had never been able to call it.
+
+  `CGVINodal` and `VISE` also move to the **state-taking** form. Both are `GeometricIntegrator`s
+  and so carry a persistent `solverstate`, which the three-argument call they used ignored,
+  allocating a fresh `NonlinearSolverState` on every time step. The network integrators already
+  passed theirs. That form of `solve_with_status!` is new in SimpleSolvers 0.12.1.
+
+- **`ShallowNet`'s `TrainingMethod` seeding runs through `GeometricOptimizers.solve!`** instead of
+  a hand-rolled epoch loop, and reads the `OptimizerResult` it returns. The epoch budget moves from
+  a `for` range to `max_iterations`, because `solve!` runs its own loop against
+  `meets_stopping_criteria`; `warn_iterations = 0` goes with it, since reaching a 50 000-epoch
+  budget is the normal outcome here rather than a diagnosis, and at the default of 1000 `solve!`
+  would print its warning once per dimension per time step.
+
+  **The trained seed can differ.** The loop makes the same `solver_step!` calls in the same order,
+  so a run that uses its whole budget is unchanged; but `solve!` may also stop *early*, on the
+  convergence criteria or on a non-finite iterate, where the old loop always burned all `nepochs`.
+  Since this only produces the initial guess for the Newton solve that follows, an earlier stop
+  costs iterations in that solve rather than accuracy in the result. The debug line now reports the
+  epochs actually spent and whether the optimizer converged, instead of asserting the budget.
+
+  In practice it does *not* stop early at these settings, and that is by construction rather than
+  by luck: `allow_f_increases` defaults to `true`, so `Adam` overshooting on one step does not end
+  the solve, and `DecayingStatic` is still taking steps of `η₂ = 5e-5` at the horizon — eleven
+  orders of magnitude above the `x_abstol` of `2eps`, which is the gate that would have to fire.
+  What the assessment costs is one extra objective evaluation per epoch: `solve!` builds an
+  `OptimizerStatus` after every `solver_step!`, which the hand-rolled loop did not.
+
+  There is no `solve_with_status!` for a GeometricOptimizers optimizer — see *Open Issues*.
+
+- **The two `DenseNet` seeding loops stay hand-rolled**, deliberately. `TrainingMethod`'s breaks
+  early on the loss, and `LSGD`'s re-solves the `L3` layer by least squares *inside* every epoch;
+  `solve!` has a hook for neither. They therefore still check no optimizer status — recorded under
+  *Open Issues*.
 
 - **The hardcoded-ansatz helpers of `ShallowNetAutodiff` / `ShallowNetAutodiffReversible`
   spell "ansatz" correctly.** `NN_anstaz`, `VNN_anstaz`, `VNN_anstaz_zygote`,
@@ -246,165 +438,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `optimizer_params` returned an abstract `NamedTuple` and `network_params` — which runs inside
   the differentiated loss on every gradient evaluation — was inferred no better.
 
-### Removed
-
-- **`GeometricIntegrators` is no longer a dependency**; the package builds on
-  `GeometricIntegratorsBase` alone. Every `GeometricIntegrators.Integrators.X` extension point was
-  already a `GeometricIntegratorsBase` generic imported into that module, so those call sites are
-  simply requalified. `GeometricEquations` replaces it in `[deps]` because GeometricIntegrators was
-  re-exporting it — that is where `AbstractProblemIODE`, `StateVariable` and `initial_conditions`
-  come from, and GeometricIntegratorsBase does not pass them on. `create_internal_stage_vector` was
-  the only genuinely GeometricIntegrators-local name and is now defined in
-  `src/nvi/utilities.jl`. Consequences: `RungeKutta` and `GenericLinearAlgebra`
-  leave the dependency graph entirely. Runge-Kutta reference integrators such as `Gauss(8)` are
-  only ever needed by the `benchmark/` and `scripts/` environments, which declare
-  GeometricIntegrators themselves.
-- **`GeometricMachineLearning` is no longer a dependency.** Once the optimizer calls moved to
-  GeometricOptimizers, its only remaining use was `GeometricMachineLearning.NeuralNetwork`, which
-  it `import`s straight from `AbstractNeuralNetworks` — the same object — so the call site now
-  names `AbstractNeuralNetworks.NeuralNetwork` directly. The `_GML` suffixes on the basis and
-  integrator types, which recorded that provenance, are dropped by the renaming above.
-- `ContinuumArrays` is no longer a dependency; it had no use in `src/`. The quasi-array indexing
-  and `grid` come from `CompactBasisFunctions`, which carries `ContinuumArrays` itself.
-- `GeometricProblems` moved from `[deps]` to the test target — its only use in `src/` was the
-  dead `SINDy_methods/PR_Pretraining.jl`, now retired to `obsolete/script/`. That file was
-  never `include`d and called into `Flux`, which was never a dependency.
-- Unused imports in `src/NonlinearIntegrators.jl`: `relative_maximum_error` (replaced by the
-  `GeometricSolution` and `timesteps` the source actually names), `Options`, `NonlinearSolver`,
-  `DogLeg`, and a no-op `using Base`.
-- `Optimisers` is no longer a dependency. It was carried as a bare `using` with no call site
-  anywhere in `src/`; the training loops it once served moved to GeometricMachineLearning long
-  before this release and now to GeometricOptimizers.
-
-### Known issues
-
-- `GeometricOptimizers` 0.2.0 is taken from git via `[sources]`, the registry carrying only 0.1.0.
-  A git `[sources]` entry blocks registration in General, so this package cannot be tagged until
-  GeometricOptimizers is released; drop the `[sources]` section then.
-- **Julia 1.10 cannot install this package while that `[sources]` pin is present.** `[sources]`
-  is a Pkg 1.11 feature; 1.10 ignores the table, so `GeometricOptimizers = "0.2"` has no
-  candidate and `Pkg` fails with *"Unsatisfiable requirements detected for package
-  GeometricOptimizers … restricted to versions 0.2 by NonlinearIntegrators — no versions left"*.
-  This is a resolver limitation and not a source incompatibility: the `julia = "1.10"` compat
-  entry is accurate for the code and is deliberately left in place, and 1.10 starts working
-  again the moment the `[sources]` section can be dropped. The three Julia 1.10 CI jobs are
-  expected to be red until then.
-- **The test suite takes hours on Julia 1.12** — 287 minutes in CI against ~20 on 1.13 and ~10
-  on `main` before this release. Measured locally, a two-step `ShallowNet` run with
-  `initial_guess_method = TrainingMethod()` takes over 30 minutes on 1.12 and 28.8 seconds on
-  1.13; the same integrator with `OGA1d()`, which never touches GeometricOptimizers, takes 28.0
-  seconds on 1.12. `LSGD` is affected as well, so it is not specific to `Adam`. The process sits
-  in `jl_type_infer`, and `--trace-compile` stops emitting — an inference blowup, not numerical
-  work.
-
-  Not the same bug as GeometricOptimizers
-  [#35](https://github.com/JuliaGNI/GeometricOptimizers.jl/pull/35), which is in the manifest
-  and does not help here. Standalone reproductions of the optimizer usage — construction and
-  `solver_step!` in one body, `Adam` + `DecayingStatic`, the loss evaluating an
-  `AbstractNeuralNetworks.Chain` at `NeuralNetworkParameters` under the default ForwardDiff
-  gradient — all run in about 2 seconds on 1.12. The blowup only appears once that call sits
-  inside the `integrate` call graph. Unresolved; 1.13 and 1.10 are unaffected.
-
-### Fixed
-
-- **The `residual!` of the autodiff pair no longer accumulates in `Float64` at reduced
-  precision.** Three `Float64` literals sat in the `p̄` row of the residual — `(1.0 -
-  quad_nodes[j])` and `(-1.0)` in `src/nvi/shallownet_autodiff.jl:390-391`, `(-1.0)` in
-  `src/nvi/shallownet_autodiff_reversible.jl:401` — where they stand in for the analytic
-  boundary derivatives `∂q_h/∂q̄ = 1-t` and `∂v_h/∂q̄ = -1`. The accumulator `z` starts as
-  `zero(ST)`, and during the Newton solve `ST` is a `ForwardDiff.Dual`; multiplying by a
-  `Float64` literal promotes it, so at `Float32` the residual was summed as
-  `Dual{…,Float64}` and only rounded back on the write into `b::Vector{ST}`. That is a
-  silent upcast the suite cannot see — `assert_no_upcast` checks the eltype of the final
-  state, which is converted back — and it retypes `z` mid-loop on the Newton path. They are
-  now integer literals, `(1 - quad_nodes[j])` and `(-1)`, which is the idiom
-  `shallownet_autodiff_reversible.jl:400` already used and which takes the precision of the
-  operand instead of imposing one. `Float64` results are bit-identical; `Float32` moves by
-  round-off. Found while reviewing the `*_anstaz_*` → `*_ansatz_*` rename, which is what
-  drew attention to these hand-written copies of the boundary derivatives.
-
-- **`CGVINodal` (formerly `CGVI_standard`) can integrate problems with more than one degree of
-  freedom.** Found while diffing it against `GeometricIntegrators.CGVI` for the rename above, and
-  pre-existing rather than introduced by it: a `D = 2` run (Lagrange basis on 4 Lobatto nodes)
-  died in the first step with `SingularException: Zero pivot found at index 6`, against
-  `D*(S-1) = 6` unknowns.
-
-  Four places index the flat vector of `S-1` free basis coefficients per degree of freedom, and
-  two of them — `initial_guess!` (`x[D*(i-1)+k]`) and `residual!` (`b[D + D*(i-1)+k]`) — already
-  agreed on *degree of freedom fastest, basis index slowest*. The other two did not:
-
-  - `components!` unpacked the solution as `C.X[s+1][d] = x[D*(d-1)+s]`, which is neither
-    convention. At `D = 2, S = 4` that read `x[3]` twice and never read `x[6]`, leaving column 6
-    of the Jacobian identically zero — the zero pivot. It now reads `x[D*(s-1)+d]`.
-  - `update!` assigned `sol.q .= nlsolution(int)[end]`, broadcasting one scalar across all `D`
-    components of `q`. It now takes the last basis coefficient per degree of freedom from `C.X`,
-    which the basis being interpolatory at the end of the interval makes the new position.
-
-  Both corrections are the identity at `D = 1`, so the existing `D = 1` guards are unchanged to
-  the last bit. `test/unit/cgvi_unit.jl` gains a `D = 2` regression test built on
-  `CoupledHarmonicOscillator` with the coupling parameter set to zero, which decouples it into two
-  independent oscillators with different frequencies and different initial conditions, so each
-  degree of freedom is checked against its own closed-form solution and a layout mistake cannot
-  hide behind a merely worse number. Only this reference integrator was affected; the network
-  integrators and `VISE` already handled `D > 1`.
-- The package loads on Julia 1.13 again. `GenericLinearAlgebra` overwrites a `LinearAlgebra`
-  method, which 1.13 forbids during precompilation, and that took `RungeKutta` and hence
-  `GeometricIntegrators` down with it. Both have left the dependency graph.
-
-## [0.3.0] - 2026-08-11
-
-### Breaking
-
-- **`integrate` returns `(sol, internal_values)` for every network integrator.**
-  `NonLinear_OneLayer_GML` used to return a named tuple carrying per-step instrumentation
-  (`sol`, `mse_err_list`, `abs_err_list`, `training_time_list`, `solving_time_list`, …)
-  while the other four returned the two-element tuple, so nothing could be written
-  generically across them. The instrumentation cache fields are gone with it; the benchmark
-  harness therefore reports only `total_secs`, the wall clock around `integrate`, and its
-  CSV drops the `solve_secs` column (17 → 16 fields). Callers reading `res.sol` must
-  destructure: `sol, internal_values = integrate(...)`.
-- **Constructor keywords renamed.** `nstages` → `extrapolation_substep` (it counts
-  sub-steps of the warm-start extrapolation, not quadrature stages) and
-  `initial_trajectory` → `initial_trajectory_method` (to match `initial_guess_method`).
-  Applies to all five network integrators and to `PR_Integrator`. New keyword
-  `record_grid_points = 41` replaces the hard-coded 41-point recording grid.
-- **`stages_compute!` is renamed `record_finer_solution!`.** It never computed quadrature
-  stages; it samples the converged ansatz on a finer grid for plotting.
-- Removed the unused `use_hamiltonian_loss` keyword from all one-layer integrators and
-  `problem_initial_hamitltonian` from `NonLinear_OneLayer_GML`.
-- `issymplectic` now genuinely returns `missing` for every `NetworkIntegratorMethod`.
-  The previous per-integrator definitions were *bare*, so — `GeometricIntegratorsBase`
-  exporting the name and the module only doing `using` — they defined a shadowing
-  `NonlinearIntegrators.issymplectic` that nothing ever called; the trait fell through to
-  the framework's `missing`. The definitions are now qualified and therefore live, and the
-  value is stated as `missing` rather than the `true` that a refactor would otherwise have
-  introduced by accident: symplecticity is not established for an ansatz whose parameters
-  are refitted every step.
-- **`OGA1d_Legacy` is renamed `OGA1dNormalEquations`.** The new name says what the
-  variant *is* — the reference implementation from the original paper, solving the fit
-  through the normal equations in a `Float64` island — rather than merely that it came
-  first. Callers passing `initial_guess_method = OGA1d_Legacy()` must update; there is no
-  deprecation shim: the type only ever existed on `main`, never in a tagged release. The
-  version is bumped to `0.3.0` so that a downstream `[compat]` bound on `0.2` fails at
-  resolve time with a clear message, rather than at run time with an `UndefVarError`.
-  Known downstream: SolverBenchmark's `nonlinear_onelayer_method` defaults to this seed.
-- **`Time_reversible_OneLayer` and `Time_Reversible_Hardcode` now reject a basis with an
-  odd number of neurons.** Both represent the step with neurons in mirrored pairs and store
-  only the `S/2` independent hidden parameters, so an odd `S` was never usable: it
-  previously failed at the first time step with an `InexactError` out of `Int(S/2)` in
-  `components!`, several call levels from the cause. It is now an `ArgumentError` at
-  construction. `oga_fit` enforces the same condition for any caller of the shared greedy
-  loop — an odd `nneurons` under a mirrored symmetry would place one neuron fewer than
-  asked and leave the last at `(0, 0)`, which is the duplicated-neuron state `fill_unused`
-  exists to prevent.
-- `initial_params!` is unified on the three-argument form `initial_params!(int, method,
-  sol)`. The two boundary-ansatz integrators already needed `sol`; the two `OneLayer` ones
-  and `NonLinear_DenseNet_GML` took two arguments, so the seed could not be written
-  generically across all of them. Only relevant to code defining its own
-  `InitialParametersMethod`.
-
-### Changed
-
 - **Shared code for the five network integrators is extracted into
   `NetworkIntegratorCore` and `NetworkBasisCore`.** Each method struct now holds a
   `common::NetworkIntegratorCore` (with `getproperty` forwarding, so `method.basis` and
@@ -514,91 +547,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   convergence counts on the Benchmarks page drop accordingly; they were measured, not
   estimated, and the earlier ones overstated convergence.
 
-### Added
+### Removed
 
-- **New dictionaries.** `WeightBiasGrid2d` is a genuine 2-D grid over `(w, b)`, with
-  log₂-spaced weight magnitudes crossed with the bias grid. For a positively homogeneous
-  activation the weight magnitude is redundant — `σ(wx+b) = |w|ᵏσ(sign(w)x + b/|w|)`, so
-  only the sign carries shape information, which is why the `{±1} × (bias grid)` set is
-  complete for `ReLUᵏ` — but ELU and GELU are not homogeneous, and for them `|w|` is a real
-  length-scale parameter. Restricting the weight axis to `{±1}` recovers the 1-D
-  dictionary exactly, so this is a strict generalisation. `AngularGrid` places atoms on
-  rays through the origin of `(w, b)` space, which is the dictionary the underlying
-  approximation theory is stated for, and samples uniformly in atom space rather than
-  uniformly in bias. `Refined` wraps any dictionary and polishes the selected atom off the
-  grid by a derivative-free local search, decoupling accuracy from dictionary size.
-- **New selection rules.** `NormalizedProjection` scores by
-  `|⟨r,g⟩_w| / ‖g‖_w`, the textbook greedy criterion, which is scale-invariant and so
-  mandatory for a 2-D dictionary. `OrthogonalProjection` scores against the part of the
-  atom orthogonal to those already selected — the actual orthogonal-greedy criterion rather
-  than matching pursuit — and refuses any atom whose orthogonal part has collapsed. That
-  is the direct fix for the observed reduced-precision failure: an atom adding no new
-  direction can no longer be selected, which is the condition that used to surface as
-  `SingularException: zero pivot found at index 3` out of four neurons.
-- **New fits.** `IncrementalQR` maintains the factorisation across greedy steps
-  (`O(k·n)` per step instead of `O(k²·n)`, and its `Q` powers the orthogonal selection
-  score for free). `PivotedQR` and `TruncatedSVD` are rank-revealing; both are hand-rolled
-  because `qr(A, ColumnNorm())` and `svd` are LAPACK-only and therefore do not exist at
-  `Float16`, the precision that needs them. `NormalEquationsFit` exposes the Gram solve
-  with the ridge and the `Float64` island as independent switches, so "island vs working
-  precision" and "ridge vs no ridge" are ablations on one code path.
-- `oga_check_precision`, called once per fit: throws if the activation does not evaluate at
-  the working precision. The `max(0.0, x)^k`-instead-of-`max(zero(x), x)^k` trap promotes
-  the whole seed to `Float64` and is otherwise visible only as suspiciously good
-  half-precision accuracy.
-- `test/unit/oga_kernels.jl`: direct coverage of the OGA numerics at `Float16`, `Float32`
-  and `Float64` — previously they were exercised only through full integrations. Includes
-  the `eltype === T` / `@inferred` no-upcast gate over every dictionary × selection × fit
-  combination, the `OGA1d` atom-selection pin, verification of the hand-rolled
-  factorisations against LAPACK, and a check that the normalised and orthogonal selection
-  rules find the brute-force optimal first atom (which raw projection, by design, does
-  not).
-- **The Orthogonal Greedy Algorithm documentation is now a six-page section** — Overview,
-  Theory, Algorithms, Usage, Precision, Studies — replacing the single page. *Theory* derives
-  the selection criterion from the one-step residual reduction (which is also where the
-  rank-gain floor comes from), gives the dictionary-completeness argument for positively
-  homogeneous activations and shows where it fails for smooth ones, and sets out the
-  conditioning analysis. *Algorithms* documents each of the four dictionaries, three selection
-  rules, five fits and four guard rails with its mechanism, implementation, cost and when to
-  choose it. *Usage* covers presets, composing configurations, per-integrator behaviour,
-  reading `OGAResult`'s diagnostics, and extending with a new component. *Precision* states the
-  no-implicit-conversion invariant and how it is enforced. *Studies* reports the measurements
-  with their methodology and caveats.
-- New studies in `scripts/` (not `benchmark/`, which holds the integrator-suite benchmarks and
-  is driven by the docs build), replacing `benchmark/oga_comparison.jl`: `oga_fit_study.jl` measures seed
-  quality with no integrator and no Newton solve (the two are otherwise confounded),
-  `oga_sweep.jl` runs the end-to-end harmonic-oscillator sweep over variant × precision ×
-  regularization factor × activation in a `ReLUᵏ` stage and a smooth-activation stage, and
-  `oga_double_pendulum.jl` repeats a reduced grid at a single λ on the problem the seed
-  fails hardest on. `regularization_factor` is swept as `2^k √eps(T)` rather than as
-  absolute values, so the shift is scaled to the precision it protects — and `f_abstol` is
-  scaled the same way, at `256·eps(T)`. The latter is not cosmetic: the solver's default
-  `f_abstol` is `1.78e-15`, an absolute `Float64`-scaled value that `Float32` and `Float16`
-  cannot reach, so a reduced-precision run sits at its residual floor and burns the whole
-  iteration budget while parked on the right answer. Measured before the fix, `ReLU³` at
-  `Float32` reported 1000 iterations at every regularization factor with an accuracy of
-  `1.8e-7` — read as
-  non-convergence, that made the entire `Float32` column an artefact of the tolerance rather
-  than a fact about the seed. Runs that do exhaust the budget are recorded as `maxiter`
-  rather than `ok`, and runs whose final state leaves the working precision as `upcast`.
-- Shared OGA numerical helpers, now in `src/oga/numerics.jl`:
-  - `weighted_lstsq(Φ, w, y)` — quadrature-weighted least squares via QR on the
-    `√w`-scaled design matrix, with a Tikhonov-ridged fallback that only engages
-    when the plain solve returns a non-finite result (the genuinely
-    rank-deficient `Float16` case).
-  - `oga_norm_floor(T, ref) = sqrt(eps(T)) · ref` — precision-scaled floor for
-    the dictionary-normalization guard.
-  - `oga_tikhonov(G; C = 100) = C · eps(T) · tr(G) / n` — precision-scaled
-    Tikhonov floor (used as the ridge in the `weighted_lstsq` fallback).
-  - `bias_grid(lo, hi, n, T)` — index-based construction of the bias grid.
-- A coherence guard in the greedy selection that blocks atoms whose
-  quadrature-weighted L² coherence with an already-selected atom exceeds
-  `1 - sqrt(eps(T))`. It is inert at `Float64`/`Float32` and only bites at
-  `Float16`, where it keeps the selected neurons linearly independent.
-- Documentation section describing the findings, the reformulated algorithm and
-  its references, with a self-contained didactic `Float16` example.
+- **`GeometricIntegrators` is no longer a dependency**; the package builds on
+  `GeometricIntegratorsBase` alone. Every `GeometricIntegrators.Integrators.X` extension point was
+  already a `GeometricIntegratorsBase` generic imported into that module, so those call sites are
+  simply requalified. `GeometricEquations` replaces it in `[deps]` because GeometricIntegrators was
+  re-exporting it — that is where `AbstractProblemIODE`, `StateVariable` and `initial_conditions`
+  come from, and GeometricIntegratorsBase does not pass them on. `create_internal_stage_vector` was
+  the only genuinely GeometricIntegrators-local name and is now defined in
+  `src/nvi/utilities.jl`. Consequences: `RungeKutta` and `GenericLinearAlgebra`
+  leave the dependency graph entirely. Runge-Kutta reference integrators such as `Gauss(8)` are
+  only ever needed by the `benchmark/` and `scripts/` environments, which declare
+  GeometricIntegrators themselves.
+- **`GeometricMachineLearning` is no longer a dependency.** Once the optimizer calls moved to
+  GeometricOptimizers, its only remaining use was `GeometricMachineLearning.NeuralNetwork`, which
+  it `import`s straight from `AbstractNeuralNetworks` — the same object — so the call site now
+  names `AbstractNeuralNetworks.NeuralNetwork` directly. The `_GML` suffixes on the basis and
+  integrator types, which recorded that provenance, are dropped by the renaming above.
+- `ContinuumArrays` is no longer a dependency; it had no use in `src/`. The quasi-array indexing
+  and `grid` come from `CompactBasisFunctions`, which carries `ContinuumArrays` itself.
+- `GeometricProblems` moved from `[deps]` to the test target — its only use in `src/` was the
+  dead `SINDy_methods/PR_Pretraining.jl`, now retired to `obsolete/script/`. That file was
+  never `include`d and called into `Flux`, which was never a dependency.
+- Unused imports in `src/NonlinearIntegrators.jl`: `relative_maximum_error` (replaced by the
+  `GeometricSolution` and `timesteps` the source actually names), `Options`, `NonlinearSolver`,
+  `DogLeg`, and a no-op `using Base`.
+- `Optimisers` is no longer a dependency. It was carried as a bare `using` with no call site
+  anywhere in `src/`; the training loops it once served moved to GeometricMachineLearning long
+  before this release and now to GeometricOptimizers.
 
 ### Fixed
+
+- **The `residual!` of the autodiff pair no longer accumulates in `Float64` at reduced
+  precision.** Three `Float64` literals sat in the `p̄` row of the residual — `(1.0 -
+  quad_nodes[j])` and `(-1.0)` in `src/nvi/shallownet_autodiff.jl:390-391`, `(-1.0)` in
+  `src/nvi/shallownet_autodiff_reversible.jl:401` — where they stand in for the analytic
+  boundary derivatives `∂q_h/∂q̄ = 1-t` and `∂v_h/∂q̄ = -1`. The accumulator `z` starts as
+  `zero(ST)`, and during the Newton solve `ST` is a `ForwardDiff.Dual`; multiplying by a
+  `Float64` literal promotes it, so at `Float32` the residual was summed as
+  `Dual{…,Float64}` and only rounded back on the write into `b::Vector{ST}`. That is a
+  silent upcast the suite cannot see — `assert_no_upcast` checks the eltype of the final
+  state, which is converted back — and it retypes `z` mid-loop on the Newton path. They are
+  now integer literals, `(1 - quad_nodes[j])` and `(-1)`, which is the idiom
+  `shallownet_autodiff_reversible.jl:400` already used and which takes the precision of the
+  operand instead of imposing one. `Float64` results are bit-identical; `Float32` moves by
+  round-off. Found while reviewing the `*_anstaz_*` → `*_ansatz_*` rename, which is what
+  drew attention to these hand-written copies of the boundary derivatives.
+
+- **`CGVINodal` (formerly `CGVI_standard`) can integrate problems with more than one degree of
+  freedom.** Found while diffing it against `GeometricIntegrators.CGVI` for the rename above, and
+  pre-existing rather than introduced by it: a `D = 2` run (Lagrange basis on 4 Lobatto nodes)
+  died in the first step with `SingularException: Zero pivot found at index 6`, against
+  `D*(S-1) = 6` unknowns.
+
+  Four places index the flat vector of `S-1` free basis coefficients per degree of freedom, and
+  two of them — `initial_guess!` (`x[D*(i-1)+k]`) and `residual!` (`b[D + D*(i-1)+k]`) — already
+  agreed on *degree of freedom fastest, basis index slowest*. The other two did not:
+
+  - `components!` unpacked the solution as `C.X[s+1][d] = x[D*(d-1)+s]`, which is neither
+    convention. At `D = 2, S = 4` that read `x[3]` twice and never read `x[6]`, leaving column 6
+    of the Jacobian identically zero — the zero pivot. It now reads `x[D*(s-1)+d]`.
+  - `update!` assigned `sol.q .= nlsolution(int)[end]`, broadcasting one scalar across all `D`
+    components of `q`. It now takes the last basis coefficient per degree of freedom from `C.X`,
+    which the basis being interpolatory at the end of the interval makes the new position.
+
+  Both corrections are the identity at `D = 1`, so the existing `D = 1` guards are unchanged to
+  the last bit. `test/unit/cgvi_unit.jl` gains a `D = 2` regression test built on
+  `CoupledHarmonicOscillator` with the coupling parameter set to zero, which decouples it into two
+  independent oscillators with different frequencies and different initial conditions, so each
+  degree of freedom is checked against its own closed-form solution and a layout mistake cannot
+  hide behind a merely worse number. Only this reference integrator was affected; the network
+  integrators and `VISE` already handled `D > 1`.
+- The package loads on Julia 1.13 again. `GenericLinearAlgebra` overwrites a `LinearAlgebra`
+  method, which 1.13 forbids during precompilation, and that took `RungeKutta` and hence
+  `GeometricIntegrators` down with it. Both have left the dependency graph.
 
 - **`nbasis` resolved to an empty local function.** `CompactBasisFunctions` exports
   `basis`/`nbasis`, and a bare top-level definition under `using` creates a *new* function
@@ -661,6 +684,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed a stray `global xk_low` from the OGA fit in
   `Time_reversible_Hardcode_int.jl`.
 
+### Known issues
+
+- ~~`GeometricOptimizers` 0.2.0 is taken from git via `[sources]`~~ — **closed.**
+  GeometricOptimizers 0.2.0 is in General, the `[sources]` section is gone, and this package can
+  be tagged again.
+- ~~**Julia 1.10 cannot install this package while that `[sources]` pin is present.**~~ —
+  **closed** with the entry above. `[sources]` is a Pkg 1.11 feature that 1.10 ignores, which left
+  `GeometricOptimizers = "0.2"` with no candidate; resolving from the registry gives it one. The
+  three Julia 1.10 CI jobs should go green. Not verified locally — no 1.10 was run for this
+  change.
+- **The test suite takes hours on Julia 1.12** — 287 minutes in CI against ~20 on 1.13 and ~10
+  on `main` before this release. Measured locally, a two-step `ShallowNet` run with
+  `initial_guess_method = TrainingMethod()` takes over 30 minutes on 1.12 and 28.8 seconds on
+  1.13; the same integrator with `OGA1d()`, which never touches GeometricOptimizers, takes 28.0
+  seconds on 1.12. `LSGD` is affected as well, so it is not specific to `Adam`. The process sits
+  in `jl_type_infer`, and `--trace-compile` stops emitting — an inference blowup, not numerical
+  work.
+
+  Not the same bug as GeometricOptimizers
+  [#35](https://github.com/JuliaGNI/GeometricOptimizers.jl/pull/35), which is in the manifest
+  and does not help here. Standalone reproductions of the optimizer usage — construction and
+  `solver_step!` in one body, `Adam` + `DecayingStatic`, the loss evaluating an
+  `AbstractNeuralNetworks.Chain` at `NeuralNetworkParameters` under the default ForwardDiff
+  gradient — all run in about 2 seconds on 1.12. The blowup only appears once that call sits
+  inside the `integrate` call graph. Unresolved; 1.13 and 1.10 are unaffected.
+
+- ~~**The documentation build cannot resolve its benchmark environment.**~~ — **closed** by
+  GeometricIntegrators 0.18.2. `benchmark/Project.toml` depends on `GeometricIntegrators`, and
+  every release up to 0.18.1 pinned `SimpleSolvers = "0.11"` against the 0.12.1 this package now
+  requires, so `Pkg` reported *"Unsatisfiable requirements detected for package SimpleSolvers"*
+  and the *Install benchmark dependencies* step failed. Nothing in this package could close it —
+  the step is not removable, `docs/make.jl` running the `quick` benchmark sweep in that
+  environment to regenerate the figures the Benchmarks page embeds, and a git `[sources]` pin
+  would not have helped either, GeometricIntegrators `main` having carried the same 0.11 bound.
+
+  0.18.2 requires `GeometricIntegratorsBase = "0.6.3 - 0.6"` and `SimpleSolvers = "0.12.1 - 0.12"`,
+  which is exactly this package's pair, and the benchmark environment resolves against it. The job
+  had been red on `main` too, by way of the git-pinned GeometricOptimizers, so this was inherited
+  rather than introduced by the SimpleSolvers bump.
+
 ## Open Issues
 
 Not a release section: this is a standing list of known defects that are understood but not
@@ -669,16 +732,19 @@ release's `Fixed` when they are dealt with.
 
 ### Environment
 
-The first three are described in full under [Unreleased] → *Known issues*; they are listed here
-only so that this section is the complete index.
+The first four are described in full under [0.2.0] → *Known issues*; they are listed here only
+so that this section is the complete index.
 
-- **The git `[sources]` pin blocks registration in General.** Clears when GeometricOptimizers
-  0.2 is registered.
-- **Julia 1.10 cannot install the package**, `[sources]` being a Pkg 1.11 feature. Clears at the
-  same moment, for the same reason.
+- ~~**The git `[sources]` pin blocks registration in General.**~~ **Closed**: GeometricOptimizers
+  0.2.0 is registered and the pin is gone.
+- ~~**Julia 1.10 cannot install the package**~~ **Closed** with the entry above, for the same
+  reason. Not verified on a 1.10 locally.
 - **Julia 1.12 spends hours in type inference** on the GeometricOptimizers-driven initial-guess
-  methods. This one does not clear itself, and is the only one of the three that is a genuine
-  defect rather than a consequence of depending on an unregistered package.
+  methods. Unlike the two above it does not clear itself, and it is the only one of that trio
+  that is a genuine defect rather than a consequence of depending on an unregistered package.
+- ~~**The docs CI job cannot resolve `benchmark/Project.toml`**~~ — **closed** by
+  GeometricIntegrators 0.18.2, which requires SimpleSolvers 0.12.1 rather than the 0.11 that
+  0.18.1 and everything before it pinned.
 - **The Julia 1.13 CI test phase roughly doubled**, from about 10 minutes for the whole job on
   `main` to 19m57s of tests here, and nothing found so far explains it. No local baseline is
   available to compare against: `main`'s environment no longer resolves, which is what this
@@ -694,8 +760,34 @@ only so that this section is the complete index.
   gradient(::GradientCache)` — including via the `default_linesearch` that `Optimizer` picks
   when none is given. Recorded under *Not fixed here* in
   [GeometricOptimizers#35](https://github.com/JuliaGNI/GeometricOptimizers.jl/pull/35). The
-  LSGD loop in `NonLinear_DenseNet_GML.jl` works only because it passes `Static` explicitly,
-  and there is a comment at that call site saying so.
+  LSGD loop in `src/nvi/densenet.jl` works only because it passes `Static` explicitly, and there
+  is a comment at that call site saying so.
+
+  **Not re-checked against SimpleSolvers 0.12**, which rewrote the very contract this entry lives
+  in: a `LinesearchMethod` now implements `solve_with_status` and gets `solve` derived from it, and
+  the generic `solve_with_status` raises rather than deriving itself from `solve`. That is a change
+  to how a searching line search is *reached*, not to what `_trial_slope` asks a cache for, so the
+  entry is expected to still hold — but nothing here exercises it, because `Static` is still passed
+  explicitly. Treat as unverified rather than as confirmed.
+
+- **A GeometricOptimizers optimizer has no `solve_with_status!`.** SimpleSolvers grew one for its
+  nonlinear solvers in 0.11 and a state-taking form in 0.12.1, and this package now uses it
+  throughout; the optimizer side has no counterpart. `solve!(x, state, opt)` does return an
+  `OptimizerResult` carrying the outcome, which is what the `ShallowNet` seeding loop now reads,
+  so nothing is unreachable — but `OptimizerResult` and `OptimizerStatus`, and every accessor the
+  seeding loop reads them through (`status`, `isconverged`, `iteration_number`), are none of them
+  exported by GeometricOptimizers, so all four call sites reach past the exported surface
+  (`GeometricOptimizers.status(result)` and friends). Either exported accessors or a
+  `solve_with_status!` would close it.
+
+- **The two `DenseNet` seeding loops check no optimizer status.** They drive the optimizer by hand
+  (`increase_iteration_number!` / `solver_step!` / `update!`) because `solve!` has no hook for
+  what each of them does inside its epoch — an early exit on the loss for `TrainingMethod`, a
+  least-squares re-solve of the `L3` layer for `LSGD`. So the only thing either of them tests is
+  its own loss threshold (`5e-8` and `5e-5`, which are also the un-scaled `Float64` literals
+  recorded under *Training loops and losses*), and a non-finite iterate or a diverging optimizer
+  is invisible to both. Closing this needs either those hooks upstream or a status assembled by
+  hand from the state.
 
 ### Training loops and losses
 
@@ -709,25 +801,25 @@ All of these predate the move to GeometricOptimizers; none is a regression.
   boundary penalty `λ * |NN(x[1], ps) - y[1]|²` that is the only thing `λ` and `μ` are there
   for. No call site passes either, so the penalty is dead code at present.
 - **The early-exit thresholds are Float64 literals**: `err < 5e-8` for `TrainingMethod` and
-  `err < 5e-5` for `LSGD` in `NonLinear_DenseNet_GML.jl`. Neither is scaled to the working
+  `err < 5e-5` for `LSGD` in `src/nvi/densenet.jl`. Neither is scaled to the working
   precision, so at `Float32` — where `eps` is 1.2e-7 — the `TrainingMethod` exit is below the
   accuracy a network fit can reach and the loop always runs the full epoch budget. They should
   derive from `eps(PT)` the way the OGA guards now do.
-- **`NonLinear_OneLayer_GML`'s `TrainingMethod` has no early exit at all**, where the DenseNet
-  one does. That may well be deliberate, but the asymmetry is undocumented.
+- **`ShallowNet`'s `TrainingMethod` has no early exit at all**, where the `DenseNet` one does.
+  That may well be deliberate, but the asymmetry is undocumented.
 - **`box_init_plain` defaults to `Float32`** and the three LSGD call sites take that default,
   so a `Float64` DenseNet is seeded from `Float32` random draws that are then widened on
   assignment. The suite's no-silent-upcast gate does not catch it, being a downcast of the
   *seed* rather than of the solution. It should take the working precision, as
   `simpson_quadrature` and the OGA dictionaries do.
-- **`NonLinear_DenseNet_GML`'s `TrainingMethod` passes the whole `NeuralNetwork` to
-  `mse_loss`** where the one-layer integrator passes the bare model, so the loss closure
-  captures more than it needs. Both work; they should agree.
+- **`DenseNet`'s `TrainingMethod` passes the whole `NeuralNetwork` to `mse_loss`** where
+  `ShallowNet` passes the bare model, so the loss closure captures more than it needs. Both
+  work; they should agree.
 
 ### Loops and allocation
 
 - **Four loop-invariant assignments sit inside `for i in 1:S₁`** in
-  `NonLinear_DenseNet_GML.jl`, in both `initial_params!` methods, in `components!` and in
+  `src/nvi/densenet.jl`, in both `initial_params!` methods, in `components!` and in
   `record_finer_solution!`. Only the `ps[k].L2.W[:, i]` line depends on `i`; the other four
   slices are rewritten identically `S₁` times. `components!` runs on every residual evaluation,
   so this is on the Newton path.

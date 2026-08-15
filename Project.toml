@@ -1,6 +1,6 @@
 name = "NonlinearIntegrators"
 uuid = "4ad56de4-0342-4c02-9694-ab2f23251d8c"
-version = "0.3.0"
+version = "0.2.0"
 authors = ["Michael Kraus <michael.kraus@ipp.mpg.de> and contributors"]
 
 [deps]
@@ -28,7 +28,7 @@ CompactBasisFunctions = "0.3"
 ForwardDiff = "1"
 GeometricBase = "0.14.8"
 GeometricEquations = "0.21"
-GeometricIntegratorsBase = "0.6"
+GeometricIntegratorsBase = "0.6.3"
 GeometricOptimizers = "0.2"
 GeometricProblems = "0.8"
 GeometricSolutions = "0.6"
@@ -36,7 +36,7 @@ LinearAlgebra = "1"
 Logging = "1"
 QuadratureRules = "0.2"
 Random = "1"
-SimpleSolvers = "0.11"
+SimpleSolvers = "0.12.1"
 StaticArrays = "1"
 Statistics = "1"
 SymbolicNeuralNetworks = "0.5"
@@ -44,12 +44,6 @@ Symbolics = "7"
 Test = "1"
 Zygote = "0.6, 0.7"
 julia = "1.10"
-
-# GeometricOptimizers is not in the General registry at the version required above, so it is taken
-# from git. A git [sources] entry blocks registration in General: remove this section, and only
-# then can this package be tagged.
-[sources]
-GeometricOptimizers = {url = "https://github.com/JuliaGNI/GeometricOptimizers.jl", rev = "main"}
 
 [extras]
 GeometricProblems = "18cb22b4-ad41-5c80-9c5f-710df63fbdc9"

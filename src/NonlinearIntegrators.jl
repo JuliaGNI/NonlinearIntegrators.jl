@@ -23,10 +23,20 @@ using Zygote
 using Random
 using Statistics
 using StaticArrays
-using SimpleSolvers: Newton, solve!
-# `import`, not `using`: GeometricOptimizers re-exports SimpleSolvers' `solve!` and `Newton` (the
-# same generics, which it `import`s), so qualifying its names keeps each call site explicit about
-# which package it means.
+using SimpleSolvers: Newton, solve_with_status!
+# `import`, not `using`: `GeometricOptimizers.Newton` is a *different type* from the `Newton` on the
+# line above — an `OptimizerMethod` of its own, against SimpleSolvers' `NonlinearSolverMethod` — and
+# it is exported. A blanket `using` would therefore put a second, unrelated `Newton` in scope beside
+# the one `default_solver(::CGVINodal) = Newton()` means; the explicit `using SimpleSolvers: Newton`
+# above would still win the unqualified name, but that is a precedence rule to rely on rather than a
+# design. `import` introduces no name at all, so the question does not arise and every optimizer
+# call site has to say `GeometricOptimizers.`.
+#
+# The other two shared names are not clashes: `update!` is GeometricBase's generic in all three
+# packages, and `solve!` is SimpleSolvers' own, which GeometricOptimizers `import`s rather than
+# defines. This module no longer takes `solve!` from SimpleSolvers — the nonlinear solves go through
+# `solve_with_status!` — but qualifying the one remaining call keeps it reading as the optimizer's,
+# next to the rest of the seeding code.
 import GeometricOptimizers
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks

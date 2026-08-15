@@ -188,15 +188,27 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::
         ps_flat = optimizer_params(PNN.params)
         loss(p) = mse_loss(network_inputs, labels, NN, network_params(p, PNN.params))
         algorithm = GeometricOptimizers.Adam(PT)
+        # `max_iterations` is the epoch budget: `solve!` runs its own loop and stops on
+        # `meets_stopping_criteria`, so the budget has to be an option rather than a `for` range.
+        # `warn_iterations = 0` because reaching that budget is the normal outcome here, not a
+        # diagnosis — at the default of 1000 against 50 000 epochs, `solve!` would print its
+        # warning once per dimension per time step.
         opt = GeometricOptimizers.Optimizer(ps_flat, loss; algorithm = algorithm,
-            linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
+            linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs),
+            max_iterations = nepochs, warn_iterations = 0)
         state = GeometricOptimizers.OptimizerState(algorithm, ps_flat)
-        for ep in 1:nepochs
-            GeometricOptimizers.increase_iteration_number!(state)
-            GeometricOptimizers.solver_step!(ps_flat, state, opt)
-            GeometricOptimizers.update!(state, opt, ps_flat)
-        end
-        @debug "dimension" k "final loss:" mse_loss(network_inputs, labels, NN, PNN.params) "in" nepochs "epochs"
+        # `solve!` rather than the hand-rolled epoch loop this used to run: it makes the same
+        # `solver_step!` calls in the same order, but it also assesses the solve and hands back an
+        # `OptimizerResult` carrying the outcome. The two DenseNet loops cannot be written this way
+        # — one breaks early on the loss, the other re-solves a layer by least squares inside every
+        # epoch — so they stay hand-rolled; see the CHANGELOG.
+        result = GeometricOptimizers.solve!(ps_flat, state, opt)
+        optstatus = GeometricOptimizers.status(result)
+        # The training is a *seed* for the Newton solve that follows, so a budget spent without
+        # converging is the expected case and not an error: it is reported at debug level, like the
+        # loss beside it, rather than warned about. The epoch count comes from the state because
+        # `solve!` may stop before the budget, which the old message assumed it never did.
+        @debug "dimension" k "final loss:" mse_loss(network_inputs, labels, NN, PNN.params) "in" GeometricOptimizers.iteration_number(state) "of" nepochs "epochs; converged:" GeometricOptimizers.isconverged(optstatus)
 
         for i in 1:S
             x[D*(i-1)+k] = PNN.params[2].W[i]

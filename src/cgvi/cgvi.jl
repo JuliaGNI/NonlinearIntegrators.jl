@@ -297,15 +297,11 @@ end
 
 
 function GeometricIntegratorsBase.integrate_step!(sol, history, params, int::GeometricIntegrator{<:CGVINodal,<:AbstractProblemIODE})
-    # call nonlinear solver
-    # solve!(nlsolution(int), (b, x) -> GeometricIntegratorsBase.residual!(b, x, sol, params, int), solver(int))
-    solve!(nlsolution(int),solver(int),  (sol, params, int))
-
-    # print solver status
-    # print_solver_status(int.solver.status, int.solver.params)
-
-    # check if solution contains NaNs or error bounds are violated
-    # check_solver_status(int.solver.status, int.solver.params)
+    # Call the nonlinear solver and act on the outcome it reports. The state-taking form: this is
+    # a `GeometricIntegrator` and so carries a persistent `solverstate`, which the three-argument
+    # form used here before ignored, allocating a fresh `NonlinearSolverState` on every time step.
+    solverstatus = solve_with_status!(nlsolution(int), solver(int), solverstate(int), (sol, params, int))
+    check_solver_status(solverstatus, int)
 
     # compute final update
     GeometricIntegratorsBase.update!(sol, params, nlsolution(int), int)
