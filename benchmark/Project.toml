@@ -15,4 +15,4 @@ SimpleSolvers = "36b790f5-6434-4fbe-b711-1f64a1e2f6a2"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [sources]
-NonlinearIntegrators = {path = ".."}
+NonlinearIntegrators = {path = "/Users/mkraus/Datashare/Julia/NonlinearIntegrators"}

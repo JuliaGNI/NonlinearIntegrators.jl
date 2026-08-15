@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-08-15
+## [0.2.0] - 2026-08-16
 
 ### Breaking
 
@@ -710,21 +710,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gradient — all run in about 2 seconds on 1.12. The blowup only appears once that call sits
   inside the `integrate` call graph. Unresolved; 1.13 and 1.10 are unaffected.
 
-- **The documentation build cannot resolve its benchmark environment, and the docs CI job is red
-  because of it.** `benchmark/Project.toml` depends on `GeometricIntegrators`, whose latest
-  release — 0.18.1, which is also what `main` carries — pins `SimpleSolvers = "0.11"`. This
-  package now requires 0.12.1, so `Pkg` reports *"Unsatisfiable requirements detected for package
-  SimpleSolvers"* and the *Install benchmark dependencies* step fails. The step is not
-  removable: `docs/make.jl` runs the `quick` benchmark sweep in that environment to regenerate the
-  figures the Benchmarks page embeds.
+- ~~**The documentation build cannot resolve its benchmark environment.**~~ — **closed** by
+  GeometricIntegrators 0.18.2. `benchmark/Project.toml` depends on `GeometricIntegrators`, and
+  every release up to 0.18.1 pinned `SimpleSolvers = "0.11"` against the 0.12.1 this package now
+  requires, so `Pkg` reported *"Unsatisfiable requirements detected for package SimpleSolvers"*
+  and the *Install benchmark dependencies* step failed. Nothing in this package could close it —
+  the step is not removable, `docs/make.jl` running the `quick` benchmark sweep in that
+  environment to regenerate the figures the Benchmarks page embeds, and a git `[sources]` pin
+  would not have helped either, GeometricIntegrators `main` having carried the same 0.11 bound.
 
-  Nothing in this package closes it. It clears when GeometricIntegrators is released with
-  SimpleSolvers 0.12 compat, and only then — a git `[sources]` pin would not help, since
-  GeometricIntegrators `main` carries the same 0.11 bound. The one alternative would be to drop
-  `GeometricIntegrators` from the benchmark environment, whose only use of it is the `Gauss(8)`
-  accuracy reference in `benchmark/shallownet_benchmark_common.jl`, and that would move every
-  accuracy number the page reports. The job was already red on `main` for the same reason, by way
-  of the git-pinned GeometricOptimizers, so this is inherited rather than introduced.
+  0.18.2 requires `GeometricIntegratorsBase = "0.6.3 - 0.6"` and `SimpleSolvers = "0.12.1 - 0.12"`,
+  which is exactly this package's pair, and the benchmark environment resolves against it. The job
+  had been red on `main` too, by way of the git-pinned GeometricOptimizers, so this was inherited
+  rather than introduced by the SimpleSolvers bump.
 
 ## Open Issues
 
@@ -744,9 +742,9 @@ so that this section is the complete index.
 - **Julia 1.12 spends hours in type inference** on the GeometricOptimizers-driven initial-guess
   methods. Unlike the two above it does not clear itself, and it is the only one of that trio
   that is a genuine defect rather than a consequence of depending on an unregistered package.
-- **The docs CI job cannot resolve `benchmark/Project.toml`**, GeometricIntegrators 0.18.1
-  pinning `SimpleSolvers = "0.11"` against the 0.12.1 this package needs. Clears when
-  GeometricIntegrators is released with 0.12 compat; not actionable here.
+- ~~**The docs CI job cannot resolve `benchmark/Project.toml`**~~ — **closed** by
+  GeometricIntegrators 0.18.2, which requires SimpleSolvers 0.12.1 rather than the 0.11 that
+  0.18.1 and everything before it pinned.
 - **The Julia 1.13 CI test phase roughly doubled**, from about 10 minutes for the whole job on
   `main` to 19m57s of tests here, and nothing found so far explains it. No local baseline is
   available to compare against: `main`'s environment no longer resolves, which is what this
