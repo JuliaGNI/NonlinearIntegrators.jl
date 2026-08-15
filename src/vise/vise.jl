@@ -310,19 +310,13 @@ end
 
 
 function GeometricIntegratorsBase.integrate_step!(sol, history, params, int::GeometricIntegrator{<:VISE,<:AbstractProblemIODE})
-    # call nonlinear solver
-    # solve!(nlsolution(int), (b,x) -> GeometricIntegratorsBase.residual!(b, x, sol, params, int), solver(int))+
-    # Argument order is (x, solver, args), as in `cgvi/cgvi.jl` and the network
-    # integrators' shared `integrate_step!`. It read `solve!(solver, x, args)` here, which
-    # matches no `SimpleSolvers.solve!` method — a `MethodError` on the first step. It went
-    # unnoticed because `test/unit/vise_unit.jl` was written but never included.
-    solve!(nlsolution(int), solver(int), (sol, params, int))
-
-    # print solver status
-    # print_solver_status(int.solver.status, int.solver.params)
-
-    # check if solution contains NaNs or error bounds are violated
-    # check_solver_status(int.solver.status, int.solver.params)
+    # Call the nonlinear solver and act on the outcome it reports. Argument order is
+    # (x, solver, state, args), as in `cgvi/cgvi.jl` and the network integrators' shared
+    # `integrate_step!`. It read `solve!(solver, x, args)` here, which matches no
+    # `SimpleSolvers.solve!` method — a `MethodError` on the first step. It went unnoticed
+    # because `test/unit/vise_unit.jl` was written but never included.
+    solverstatus = solve_with_status!(nlsolution(int), solver(int), solverstate(int), (sol, params, int))
+    check_solver_status(solverstatus, int)
 
     # compute final update
     GeometricIntegratorsBase.update!(sol, params, nlsolution(int), int)

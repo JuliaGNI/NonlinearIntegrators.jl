@@ -75,6 +75,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`SimpleSolvers` 0.11 → 0.12.1, and `GeometricOptimizers` comes from the registry.** The
+  `[sources]` git pin is **gone**: GeometricOptimizers 0.2.0 is now in General, and its registered
+  copy requires SimpleSolvers 0.12, which is what forces the SimpleSolvers bump here. Two of the
+  three entries under *Known issues* below close with it — this package can be tagged again, and
+  **Julia 1.10 can install it again**, `[sources]` having been the Pkg 1.11 feature that made the
+  three 1.10 CI jobs unsatisfiable. The `[sources]` explanation in `benchmark/Project.toml`, which
+  existed only to say why the pin was *not* repeated there, goes with it.
+
+  SimpleSolvers 0.12 is breaking in one way that reaches this package: a `NonlinearSolver` no
+  longer emits line-search warnings from inside its iteration, so a rejected line search reports to
+  its caller through the returned status and to nobody at all if the caller drops it. See the next
+  entry. Its other two breaks do not apply — nothing here constructs a `NonlinearSolverStatus`, and
+  the one third-party `LinesearchMethod` in the dependency graph is GeometricOptimizers'
+  `DecayingStatic`, which implements both `solve` and `solve_with_status` and was unaffected.
+
+- **The nonlinear solves use `solve_with_status!`**, and hand the status to
+  `check_solver_status`, which GeometricIntegratorsBase 0.6.3 adds as the single place a step's
+  solve outcome is acted on. All three sites: the network integrators' shared `integrate_step!`,
+  `CGVINodal`'s and `VISE`'s. `check_solver_status` is silent by default — SimpleSolvers remains
+  the one voice that reports a failed solve — so nothing changes in what a run prints. It replaces
+  the commented-out `print_solver_status` / `check_solver_status` stubs, which named this exact
+  function and had never been able to call it.
+
+  `CGVINodal` and `VISE` also move to the **state-taking** form. Both are `GeometricIntegrator`s
+  and so carry a persistent `solverstate`, which the three-argument call they used ignored,
+  allocating a fresh `NonlinearSolverState` on every time step. The network integrators already
+  passed theirs. That form of `solve_with_status!` is new in SimpleSolvers 0.12.1.
+
+- **`ShallowNet`'s `TrainingMethod` seeding runs through `GeometricOptimizers.solve!`** instead of
+  a hand-rolled epoch loop, and reads the `OptimizerResult` it returns. The epoch budget moves from
+  a `for` range to `max_iterations`, because `solve!` runs its own loop against
+  `meets_stopping_criteria`; `warn_iterations = 0` goes with it, since reaching a 50 000-epoch
+  budget is the normal outcome here rather than a diagnosis, and at the default of 1000 `solve!`
+  would print its warning once per dimension per time step.
+
+  **The trained seed can differ.** The loop makes the same `solver_step!` calls in the same order,
+  so a run that uses its whole budget is unchanged; but `solve!` may also stop *early*, on the
+  convergence criteria or on a non-finite iterate, where the old loop always burned all `nepochs`.
+  Since this only produces the initial guess for the Newton solve that follows, an earlier stop
+  costs iterations in that solve rather than accuracy in the result. The debug line now reports the
+  epochs actually spent and whether the optimizer converged, instead of asserting the budget.
+
+  There is no `solve_with_status!` for a GeometricOptimizers optimizer — see *Open Issues*.
+
+- **The two `DenseNet` seeding loops stay hand-rolled**, deliberately. `TrainingMethod`'s breaks
+  early on the loss, and `LSGD`'s re-solves the `L3` layer by least squares *inside* every epoch;
+  `solve!` has a hook for neither. They therefore still check no optimizer status — recorded under
+  *Open Issues*.
+
 - **The hardcoded-ansatz helpers of `ShallowNetAutodiff` / `ShallowNetAutodiffReversible`
   spell "ansatz" correctly.** `NN_anstaz`, `VNN_anstaz`, `VNN_anstaz_zygote`,
   `∂NN_anstaz_∂params`, `∂VNN_anstaz_∂params`, `∂NN_anstaz_∂q̄`, `∂NN_anstaz_∂q`,
@@ -278,17 +327,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known issues
 
-- `GeometricOptimizers` 0.2.0 is taken from git via `[sources]`, the registry carrying only 0.1.0.
-  A git `[sources]` entry blocks registration in General, so this package cannot be tagged until
-  GeometricOptimizers is released; drop the `[sources]` section then.
-- **Julia 1.10 cannot install this package while that `[sources]` pin is present.** `[sources]`
-  is a Pkg 1.11 feature; 1.10 ignores the table, so `GeometricOptimizers = "0.2"` has no
-  candidate and `Pkg` fails with *"Unsatisfiable requirements detected for package
-  GeometricOptimizers … restricted to versions 0.2 by NonlinearIntegrators — no versions left"*.
-  This is a resolver limitation and not a source incompatibility: the `julia = "1.10"` compat
-  entry is accurate for the code and is deliberately left in place, and 1.10 starts working
-  again the moment the `[sources]` section can be dropped. The three Julia 1.10 CI jobs are
-  expected to be red until then.
+- ~~`GeometricOptimizers` 0.2.0 is taken from git via `[sources]`~~ — **closed.**
+  GeometricOptimizers 0.2.0 is in General, the `[sources]` section is gone, and this package can
+  be tagged again.
+- ~~**Julia 1.10 cannot install this package while that `[sources]` pin is present.**~~ —
+  **closed** with the entry above. `[sources]` is a Pkg 1.11 feature that 1.10 ignores, which left
+  `GeometricOptimizers = "0.2"` with no candidate; resolving from the registry gives it one. The
+  three Julia 1.10 CI jobs should go green. Not verified locally — no 1.10 was run for this
+  change.
 - **The test suite takes hours on Julia 1.12** — 287 minutes in CI against ~20 on 1.13 and ~10
   on `main` before this release. Measured locally, a two-step `ShallowNet` run with
   `initial_guess_method = TrainingMethod()` takes over 30 minutes on 1.12 and 28.8 seconds on
@@ -669,13 +715,13 @@ release's `Fixed` when they are dealt with.
 
 ### Environment
 
-The first three are described in full under [Unreleased] → *Known issues*; they are listed here
-only so that this section is the complete index.
+They are described in full under [Unreleased] → *Known issues*; they are listed here only so that
+this section is the complete index.
 
-- **The git `[sources]` pin blocks registration in General.** Clears when GeometricOptimizers
-  0.2 is registered.
-- **Julia 1.10 cannot install the package**, `[sources]` being a Pkg 1.11 feature. Clears at the
-  same moment, for the same reason.
+- ~~**The git `[sources]` pin blocks registration in General.**~~ **Closed**: GeometricOptimizers
+  0.2.0 is registered and the pin is gone.
+- ~~**Julia 1.10 cannot install the package**~~ **Closed** with the entry above, for the same
+  reason. Not verified on a 1.10 locally.
 - **Julia 1.12 spends hours in type inference** on the GeometricOptimizers-driven initial-guess
   methods. This one does not clear itself, and is the only one of the three that is a genuine
   defect rather than a consequence of depending on an unregistered package.
@@ -694,8 +740,33 @@ only so that this section is the complete index.
   gradient(::GradientCache)` — including via the `default_linesearch` that `Optimizer` picks
   when none is given. Recorded under *Not fixed here* in
   [GeometricOptimizers#35](https://github.com/JuliaGNI/GeometricOptimizers.jl/pull/35). The
-  LSGD loop in `NonLinear_DenseNet_GML.jl` works only because it passes `Static` explicitly,
-  and there is a comment at that call site saying so.
+  LSGD loop in `src/nvi/densenet.jl` works only because it passes `Static` explicitly, and there
+  is a comment at that call site saying so.
+
+  **Not re-checked against SimpleSolvers 0.12**, which rewrote the very contract this entry lives
+  in: a `LinesearchMethod` now implements `solve_with_status` and gets `solve` derived from it, and
+  the generic `solve_with_status` raises rather than deriving itself from `solve`. That is a change
+  to how a searching line search is *reached*, not to what `_trial_slope` asks a cache for, so the
+  entry is expected to still hold — but nothing here exercises it, because `Static` is still passed
+  explicitly. Treat as unverified rather than as confirmed.
+
+- **A GeometricOptimizers optimizer has no `solve_with_status!`.** SimpleSolvers grew one for its
+  nonlinear solvers in 0.11 and a state-taking form in 0.12.1, and this package now uses it
+  throughout; the optimizer side has no counterpart. `solve!(x, state, opt)` does return an
+  `OptimizerResult` carrying the outcome, which is what the `ShallowNet` seeding loop now reads,
+  so nothing is unreachable — but `OptimizerResult`, `OptimizerStatus` and `status` are none of
+  them exported by GeometricOptimizers, so reading it means reaching past the exported surface
+  (`GeometricOptimizers.status(result)`). Either an exported accessor or a `solve_with_status!`
+  would close it.
+
+- **The two `DenseNet` seeding loops check no optimizer status.** They drive the optimizer by hand
+  (`increase_iteration_number!` / `solver_step!` / `update!`) because `solve!` has no hook for
+  what each of them does inside its epoch — an early exit on the loss for `TrainingMethod`, a
+  least-squares re-solve of the `L3` layer for `LSGD`. So the only thing either of them tests is
+  its own loss threshold (`5e-8` and `5e-5`, which are also the un-scaled `Float64` literals
+  recorded under *Training loops and losses*), and a non-finite iterate or a diverging optimizer
+  is invisible to both. Closing this needs either those hooks upstream or a status assembled by
+  hand from the state.
 
 ### Training loops and losses
 

@@ -23,10 +23,12 @@ using Zygote
 using Random
 using Statistics
 using StaticArrays
-using SimpleSolvers: Newton, solve!
+using SimpleSolvers: Newton, solve_with_status!
 # `import`, not `using`: GeometricOptimizers re-exports SimpleSolvers' `solve!` and `Newton` (the
 # same generics, which it `import`s), so qualifying its names keeps each call site explicit about
-# which package it means.
+# which package it means. That matters most for `solve!`, which this module no longer takes from
+# SimpleSolvers at all — the nonlinear solves go through `solve_with_status!`, so an unqualified
+# `solve!` here would now unambiguously mean the optimizer's, which is worth not relying on.
 import GeometricOptimizers
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks
