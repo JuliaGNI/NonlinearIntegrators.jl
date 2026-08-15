@@ -80,15 +80,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   copy requires SimpleSolvers 0.12, which is what forces the SimpleSolvers bump here. Two of the
   three entries under *Known issues* below close with it — this package can be tagged again, and
   **Julia 1.10 can install it again**, `[sources]` having been the Pkg 1.11 feature that made the
-  three 1.10 CI jobs unsatisfiable. The `[sources]` explanation in `benchmark/Project.toml`, which
-  existed only to say why the pin was *not* repeated there, goes with it.
+  three 1.10 CI jobs unsatisfiable. The `[sources]` explanations in `benchmark/Project.toml` and
+  `scripts/Project.toml`, which existed only to say why the pin was *not* repeated there, go with
+  it.
 
   SimpleSolvers 0.12 is breaking in one way that reaches this package: a `NonlinearSolver` no
   longer emits line-search warnings from inside its iteration, so a rejected line search reports to
   its caller through the returned status and to nobody at all if the caller drops it. See the next
   entry. Its other two breaks do not apply — nothing here constructs a `NonlinearSolverStatus`, and
   the one third-party `LinesearchMethod` in the dependency graph is GeometricOptimizers'
-  `DecayingStatic`, which implements both `solve` and `solve_with_status` and was unaffected.
+  `DecayingStatic`, which implements `solve_with_status` — the side of the rewritten contract that
+  is now the one to implement — and has `solve` derived from it, so it was unaffected.
 
 - **The nonlinear solves use `solve_with_status!`**, and hand the status to
   `check_solver_status`, which GeometricIntegratorsBase 0.6.3 adds as the single place a step's
@@ -116,6 +118,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Since this only produces the initial guess for the Newton solve that follows, an earlier stop
   costs iterations in that solve rather than accuracy in the result. The debug line now reports the
   epochs actually spent and whether the optimizer converged, instead of asserting the budget.
+
+  In practice it does *not* stop early at these settings, and that is by construction rather than
+  by luck: `allow_f_increases` defaults to `true`, so `Adam` overshooting on one step does not end
+  the solve, and `DecayingStatic` is still taking steps of `η₂ = 5e-5` at the horizon — eleven
+  orders of magnitude above the `x_abstol` of `2eps`, which is the gate that would have to fire.
+  What the assessment costs is one extra objective evaluation per epoch: `solve!` builds an
+  `OptimizerStatus` after every `solver_step!`, which the hand-rolled loop did not.
 
   There is no `solve_with_status!` for a GeometricOptimizers optimizer — see *Open Issues*.
 
@@ -715,8 +724,8 @@ release's `Fixed` when they are dealt with.
 
 ### Environment
 
-They are described in full under [Unreleased] → *Known issues*; they are listed here only so that
-this section is the complete index.
+The first three are described in full under [Unreleased] → *Known issues*; they are listed here
+only so that this section is the complete index.
 
 - ~~**The git `[sources]` pin blocks registration in General.**~~ **Closed**: GeometricOptimizers
   0.2.0 is registered and the pin is gone.
@@ -754,10 +763,11 @@ this section is the complete index.
   nonlinear solvers in 0.11 and a state-taking form in 0.12.1, and this package now uses it
   throughout; the optimizer side has no counterpart. `solve!(x, state, opt)` does return an
   `OptimizerResult` carrying the outcome, which is what the `ShallowNet` seeding loop now reads,
-  so nothing is unreachable — but `OptimizerResult`, `OptimizerStatus` and `status` are none of
-  them exported by GeometricOptimizers, so reading it means reaching past the exported surface
-  (`GeometricOptimizers.status(result)`). Either an exported accessor or a `solve_with_status!`
-  would close it.
+  so nothing is unreachable — but `OptimizerResult` and `OptimizerStatus`, and every accessor the
+  seeding loop reads them through (`status`, `isconverged`, `iteration_number`), are none of them
+  exported by GeometricOptimizers, so all four call sites reach past the exported surface
+  (`GeometricOptimizers.status(result)` and friends). Either exported accessors or a
+  `solve_with_status!` would close it.
 
 - **The two `DenseNet` seeding loops check no optimizer status.** They drive the optimizer by hand
   (`increase_iteration_number!` / `solver_step!` / `update!`) because `solve!` has no hook for
@@ -780,25 +790,25 @@ All of these predate the move to GeometricOptimizers; none is a regression.
   boundary penalty `λ * |NN(x[1], ps) - y[1]|²` that is the only thing `λ` and `μ` are there
   for. No call site passes either, so the penalty is dead code at present.
 - **The early-exit thresholds are Float64 literals**: `err < 5e-8` for `TrainingMethod` and
-  `err < 5e-5` for `LSGD` in `NonLinear_DenseNet_GML.jl`. Neither is scaled to the working
+  `err < 5e-5` for `LSGD` in `src/nvi/densenet.jl`. Neither is scaled to the working
   precision, so at `Float32` — where `eps` is 1.2e-7 — the `TrainingMethod` exit is below the
   accuracy a network fit can reach and the loop always runs the full epoch budget. They should
   derive from `eps(PT)` the way the OGA guards now do.
-- **`NonLinear_OneLayer_GML`'s `TrainingMethod` has no early exit at all**, where the DenseNet
-  one does. That may well be deliberate, but the asymmetry is undocumented.
+- **`ShallowNet`'s `TrainingMethod` has no early exit at all**, where the `DenseNet` one does.
+  That may well be deliberate, but the asymmetry is undocumented.
 - **`box_init_plain` defaults to `Float32`** and the three LSGD call sites take that default,
   so a `Float64` DenseNet is seeded from `Float32` random draws that are then widened on
   assignment. The suite's no-silent-upcast gate does not catch it, being a downcast of the
   *seed* rather than of the solution. It should take the working precision, as
   `simpson_quadrature` and the OGA dictionaries do.
-- **`NonLinear_DenseNet_GML`'s `TrainingMethod` passes the whole `NeuralNetwork` to
-  `mse_loss`** where the one-layer integrator passes the bare model, so the loss closure
-  captures more than it needs. Both work; they should agree.
+- **`DenseNet`'s `TrainingMethod` passes the whole `NeuralNetwork` to `mse_loss`** where
+  `ShallowNet` passes the bare model, so the loss closure captures more than it needs. Both
+  work; they should agree.
 
 ### Loops and allocation
 
 - **Four loop-invariant assignments sit inside `for i in 1:S₁`** in
-  `NonLinear_DenseNet_GML.jl`, in both `initial_params!` methods, in `components!` and in
+  `src/nvi/densenet.jl`, in both `initial_params!` methods, in `components!` and in
   `record_finer_solution!`. Only the `ps[k].L2.W[:, i]` line depends on `i`; the other four
   slices are rewritten identically `S₁` times. `components!` runs on every residual evaluation,
   so this is on the Newton path.

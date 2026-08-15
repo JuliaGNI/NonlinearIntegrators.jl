@@ -25,10 +25,5 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
-# The GeometricOptimizers git pin is *not* repeated here. Pkg propagates `[sources]` out of a
-# path dependency, so the one in ../Project.toml already reaches this environment — and a
-# `[sources]` entry for a package that appears in neither `[deps]` nor `[extras]` is a hard
-# error ("Sources for `GeometricOptimizers` not listed in `deps` or `extras` section"), which
-# is what it was before.
 [sources]
 NonlinearIntegrators = {path = ".."}
