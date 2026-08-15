@@ -35,3 +35,35 @@ struct NetworkBasisCore{AT,NT, BT, SNNT, QWFT, VT, VWFT}
     V_func    :: VT
     dvdθ      :: VWFT
 end
+
+"""
+    build_network_derivatives(NN; cse = true, inplace = true) -> (SNN, dqdθ, V_func, dvdθ)
+
+Compile the four symbolic slots of a [`NetworkBasisCore`](@ref) for the network `NN`: the
+gradient of the output with respect to the parameters, the time derivative of the output,
+and the gradient of *that* with respect to the parameters. `cse` and `inplace` go straight
+to `SymbolicNeuralNetworks.build_nn_function`; see [`ShallowNetBasis`](@ref).
+
+Shared by [`ShallowNetBasis`](@ref) and [`DenseNetBasis`](@ref), which differ only in the
+`NN` they hand over — keeping the two in one place rather than in two copies that drifted
+apart once already. It also lets `ShallowNetBasis`'s `symbolic = false` branch read as the
+single expression it is.
+"""
+function build_network_derivatives(NN; cse::Bool = true, inplace::Bool = true)
+    SNN = SymbolicNeuralNetwork(NN)
+    build(eq) = build_nn_function(eq, SNN.params, SNN.input; cse = cse, inplace = inplace)
+
+    # The network maps a scalar to a scalar, so its output and its Jacobian are both
+    # one-element arrays. Differentiating the scalar entry rather than the array is what makes
+    # `symbolic_parameter_gradient` return the parameter-shaped gradient itself instead of an
+    # array holding one of them, which is the shape `components!` reads.
+    soutput = SNN.model(SNN.input, SNN.params)
+    dqdθ_built = build(SymbolicNeuralNetworks.symbolic_parameter_gradient(soutput[1], SNN))
+
+    VNN = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Jacobian(SNN))
+    V_built = build(VNN)
+
+    dvdθ_built = build(SymbolicNeuralNetworks.symbolic_parameter_gradient(VNN[1,1], SNN))
+
+    return SNN, dqdθ_built, V_built, dvdθ_built
+end

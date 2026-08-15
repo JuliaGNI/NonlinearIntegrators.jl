@@ -1,6 +1,5 @@
 # Derivative backends for the shallow-net variational integrator: symbolic vs ForwardDiff,
-# and — within the symbolic backend — the code generation `SymbolicNeuralNetworks` 0.4.0
-# introduced against the one it replaced.
+# and — within the symbolic backend — the two code-generation settings the bases expose.
 #
 #   julia --project=benchmark benchmark/compare_derivative_backends.jl [quick|full]
 #
@@ -12,13 +11,16 @@
 #   autodiff  — `ShallowNetAutodiff`, `ShallowNetAutodiffReversible` call
 #               `ForwardDiff.gradient` on a hand-written ansatz on every evaluation.
 #
-# The symbolic pair is run twice, under two code-generation settings:
+# The symbolic pair is run twice, under the two code-generation settings `ShallowNetBasis` and
+# `DenseNetBasis` forward to `build_nn_function`:
 #
-#   cse+inplace — the 0.4.0 defaults: common-subexpression elimination, and a batch
-#                 evaluated by an in-place kernel writing into one preallocated array;
-#   plain       — `cse = false, inplace = false`, which is what `build_nn_function`
-#                 generated before 0.4.0. Same mathematics, different emitted code, so this
-#                 is what the release bought.
+#   cse+inplace — the defaults: common-subexpression elimination, so the forward pass shared
+#                 by the gradient blocks is emitted once, and a batch evaluated by an in-place
+#                 kernel writing into one preallocated array;
+#   plain       — `cse = false, inplace = false`: the shared forward pass re-emitted per
+#                 block, and a batch evaluated out of place, one allocation per sample.
+#
+# Same mathematics, different emitted code, so what this measures is the code generation.
 #
 # Three measurements: the one-off basis build, the end-to-end solve (cold and warm), and the
 # derivative kernels in isolation.
@@ -161,7 +163,7 @@ end
 # Bases are shared across dt and problem, as in `run_sweep`, and their build time is one of
 # the three things measured. The timed build is preceded by an untimed one at S = 2 for the
 # same (T, activation, symbolic, cse, inplace) so that Julia's compilation of
-# `build_shallownet_derivatives` and of Symbolics' code generation lands there instead of in
+# `build_network_derivatives` and of Symbolics' code generation lands there instead of in
 # the number we report; what is left is the codegen work itself.
 
 const BASIS_CACHE = Dict{Any,Any}()
@@ -551,8 +553,8 @@ function write_backend_report(rows, krows, arows; mode, outdir)
         println(io, "symbolic pair is run under two code-generation settings:\n")
         println(io, "| codegen | meaning |")
         println(io, "|---|---|")
-        println(io, "| `cse+inplace` | the `SymbolicNeuralNetworks` 0.4.0 defaults — common-subexpression elimination, and a batch evaluated by an in-place kernel writing into one preallocated array |")
-        println(io, "| `plain` | `cse = false, inplace = false`: the code generation of 0.3.x. Same mathematics, different emitted code. |\n")
+        println(io, "| `cse+inplace` | the defaults — common-subexpression elimination, so the forward pass shared by the gradient blocks is emitted once, and a batch evaluated by an in-place kernel writing into one preallocated array |")
+        println(io, "| `plain` | `cse = false, inplace = false`: the shared forward pass re-emitted per block, and a batch evaluated out of place. Same mathematics, different emitted code. |\n")
         println(io, "Every axis other than problem, precision, activation and `dt` is held")
         println(io, "fixed: **$(STRAT_LABEL)**, midpoint initial trajectory, `λ = 16·√eps(T)`,")
         println(io, "10 steps per case, `timespan = (0, 10·dt)`, and the per-problem `R`/`S`")

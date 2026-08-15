@@ -93,13 +93,14 @@ respect to the network parameters.
 | `ShallowNet`, `ShallowNetReversible` | `basis.dqdθ` / `basis.dvdθ`, compiled once by `SymbolicNeuralNetworks.jl` |
 | `ShallowNetAutodiff`, `ShallowNetAutodiffReversible` | `ForwardDiff.gradient` of a hand-written ansatz, on every evaluation |
 
-The symbolic pair is run under two code-generation settings, so the comparison also covers
-what `SymbolicNeuralNetworks` 0.4.0 changed:
+The symbolic pair is run under the two code-generation settings `ShallowNetBasis` and
+`DenseNetBasis` forward to `build_nn_function`, so the comparison also covers what the
+emitted code costs:
 
 | codegen | meaning |
 |---|---|
-| `cse+inplace` | the 0.4.0 defaults — common-subexpression elimination, and a batch evaluated by an in-place kernel writing into one preallocated array |
-| `plain` | `cse = false, inplace = false`: the code generation of 0.3.x. Same mathematics, different emitted code. |
+| `cse+inplace` | the defaults — common-subexpression elimination, so the forward pass shared by the gradient blocks is emitted once, and a batch evaluated by an in-place kernel writing into one preallocated array |
+| `plain` | `cse = false, inplace = false`: the shared forward pass re-emitted per block, and a batch evaluated out of place. Same mathematics, different emitted code. |
 
 Three measurements:
 
@@ -128,7 +129,7 @@ one), because those are tuned per-integrator baselines. So accuracy and iteratio
 compare *methods*; only the timings compare backends.
 
 The same rule holds for the two codegen settings, for a different reason. At the kernel
-level they agree to machine epsilon (3e-17 at Float64), as they must. End to end they do
+level they agree to machine epsilon (≤ 8e-17 at Float64), as they must. End to end they do
 not: the residual stalls near the round-off floor, so a last-bit difference in the
 derivative decides which iterate Newton accepts, and a `ref_err` already at 1e-13 moves by
 orders of magnitude. The report measures that amplification rather than asserting it away.

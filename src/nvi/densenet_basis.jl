@@ -14,9 +14,9 @@ compiled at construction time.
 - `S::Int`: second hidden layer width (= number of basis functions)
 - `cse`, `inplace`: forwarded to `SymbolicNeuralNetworks.build_nn_function`, as for
   [`ShallowNetBasis`](@ref). This is the basis where `cse` matters most: it is the extra
-  layer that makes re-emitting the shared forward pass per pullback block expensive, and
-  turning it off costs about four times the build (3.22 s against 0.79 s for `tanh` at
-  `S₁ = S = 3`).
+  layer that makes re-emitting the shared forward pass per gradient block expensive, and
+  turning it off costs about four times the build (110 ms against 27 ms for `tanh` at
+  `S₁ = S = 3`, Float64, once the code generation itself has been compiled).
 
 There is no `symbolic = false` here: [`DenseNet`](@ref) has no `ForwardDiff` counterpart,
 so the compiled derivatives are always read.
@@ -40,16 +40,9 @@ struct DenseNetBasis{T, AT, NT, BT, SNNT, QWFT, VT, VWFT} <: AbstractDenseNetBas
             AbstractNeuralNetworks.Dense(S₁, S, activation),
             AbstractNeuralNetworks.Dense(S, 1, identity, use_bias=false))
         NP = parameterlength(NN)
-        SNN = SymbolicNeuralNetwork(NN)
-        build(eq) = build_nn_function(eq, SNN.params, SNN.input; cse = cse, inplace = inplace)
 
-        soutput = SNN.model(SNN.input, SNN.params)
-        dqdθ_built = build(SymbolicNeuralNetworks.symbolic_pullback(soutput, SNN)[1])
-
-        VNN = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Jacobian(SNN))
-        V_built = build(VNN)
-
-        dvdθ_built = build(SymbolicNeuralNetworks.symbolic_pullback(VNN, SNN))
+        SNN, dqdθ_built, V_built, dvdθ_built =
+            build_network_derivatives(NN; cse = cse, inplace = inplace)
 
         core = NetworkBasisCore(activation, NN, backend, SNN, dqdθ_built, V_built, dvdθ_built)
         new{T, typeof(activation), typeof(NN), typeof(backend), typeof(SNN),

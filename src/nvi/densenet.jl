@@ -413,7 +413,7 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
             g = DQDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
             dqdθc[j, :, d] = flatten_params(g)
 
-            gv = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))[1,1]
+            gv = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
             dvdθc[j, :, d] = flatten_params(gv)
         end
     end

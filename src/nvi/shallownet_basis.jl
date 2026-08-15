@@ -22,26 +22,28 @@ via `SymbolicNeuralNetworks.jl`, unless `symbolic = false`.
 `symbolic = false` exists for [`ShallowNetAutodiff`](@ref) and
 [`ShallowNetAutodiffReversible`](@ref): those two differentiate their ansatz with
 `ForwardDiff` at run time and never read the compiled derivatives, so building them is
-pure overhead — 0.095 s against 0.003 s for `tanh` at `S = 8`, Float64. The integrators that
+pure overhead — 15 ms against 29 ns for `tanh` at `S = 8`, Float64, once the code generation
+itself has been compiled; the basis is then just a `Chain`. The integrators that
 *do* read them ([`ShallowNet`](@ref), [`ShallowNetReversible`](@ref), [`DenseNet`](@ref))
 reject such a basis in their constructor; see [`has_symbolic_derivatives`](@ref).
 
 `cse` (common-subexpression elimination during code generation) and `inplace` (evaluate a
 batch through a kernel writing into one preallocated array) both default to `true`, which is
-also what `SymbolicNeuralNetworks` 0.4 uses. They are pinned here rather than left to the
+also what `SymbolicNeuralNetworks` 0.5 uses. They are pinned here rather than left to the
 upstream default so that a change there cannot silently change this package's code
-generation. They are exposed to be turned *off*: `cse = false, inplace = false` is the code
-generation `SymbolicNeuralNetworks` performed before 0.4.0, which is how
-`benchmark/compare_derivative_backends.jl` measures what that release bought. Note that
-`inplace = true` mutates its output and so cannot be differentiated with `Zygote`; nothing
-in this package does that, but a caller who wants to needs `inplace = false`.
+generation. They are exposed to be turned *off*: `cse = false, inplace = false` emits the
+whole shared forward pass once per gradient block and evaluates a batch out of place, one
+allocation per sample, which is what `benchmark/compare_derivative_backends.jl` measures the
+two settings against each other for. Note that `inplace = true` mutates its output and so
+cannot be differentiated with `Zygote`; nothing in this package does that, but a caller who
+wants to needs `inplace = false`.
 
 # Example
 
 ```julia
 basis = ShallowNetBasis{Float64}(tanh, 8)
 autodiff_basis = ShallowNetBasis{Float64}(tanh, 8; symbolic = false)
-legacy_codegen = ShallowNetBasis{Float64}(tanh, 8; cse = false, inplace = false)
+plain_codegen = ShallowNetBasis{Float64}(tanh, 8; cse = false, inplace = false)
 ```
 """
 struct ShallowNetBasis{T, AT, NT, BT, SNNT, QWFT, VT, VWFT} <: AbstractShallowNetBasis{T}
@@ -59,39 +61,13 @@ struct ShallowNetBasis{T, AT, NT, BT, SNNT, QWFT, VT, VWFT} <: AbstractShallowNe
         # `SNNT`/`QWFT`/`VT`/`VWFT` are `Nothing`, and every call site that only wants
         # `NN`, `activation` or `S` keeps working unchanged.
         SNN, dqdθ_built, V_built, dvdθ_built =
-            symbolic ? build_shallownet_derivatives(NN; cse = cse, inplace = inplace) :
+            symbolic ? build_network_derivatives(NN; cse = cse, inplace = inplace) :
                        (nothing, nothing, nothing, nothing)
 
         core = NetworkBasisCore(activation, NN, backend, SNN, dqdθ_built, V_built, dvdθ_built)
         new{T, typeof(activation), typeof(NN), typeof(backend), typeof(SNN),
             typeof(dqdθ_built), typeof(V_built), typeof(dvdθ_built)}(S, core)
     end
-end
-
-"""
-    build_shallownet_derivatives(NN; cse = true, inplace = true) -> (SNN, dqdθ, V_func, dvdθ)
-
-Compile the symbolic derivatives of the shallow network `NN`: the pullback of the output
-with respect to the parameters, the time derivative of the output, and the pullback of
-*that* with respect to the parameters. `cse` and `inplace` go straight to
-`SymbolicNeuralNetworks.build_nn_function`; see [`ShallowNetBasis`](@ref).
-
-Split out of the [`ShallowNetBasis`](@ref) constructor so the `symbolic = false` branch
-reads as the single expression it is.
-"""
-function build_shallownet_derivatives(NN; cse::Bool = true, inplace::Bool = true)
-    SNN = SymbolicNeuralNetwork(NN)
-    build(eq) = build_nn_function(eq, SNN.params, SNN.input; cse = cse, inplace = inplace)
-
-    soutput = SNN.model(SNN.input, SNN.params)
-    dqdθ_built = build(SymbolicNeuralNetworks.symbolic_pullback(soutput, SNN)[1,1])
-
-    VNN = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Jacobian(SNN))
-    V_built = build(VNN)
-
-    dvdθ_built = build(SymbolicNeuralNetworks.symbolic_pullback(VNN[1,1], SNN)[1])
-
-    return SNN, dqdθ_built, V_built, dvdθ_built
 end
 
 function Base.show(io::IO, basis::ShallowNetBasis)
