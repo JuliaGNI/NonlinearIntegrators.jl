@@ -22,6 +22,10 @@ SymbolicNeuralNetworks = "aed23131-dcd0-47ca-8090-d21e605652e3"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
+[sources.GeometricOptimizers]
+rev = "main"
+url = "https://github.com/JuliaGNI/GeometricOptimizers.jl"
+
 [compat]
 AbstractNeuralNetworks = "0.6.4"
 CompactBasisFunctions = "0.3"
@@ -29,7 +33,7 @@ ForwardDiff = "1"
 GeometricBase = "0.14.8"
 GeometricEquations = "0.21"
 GeometricIntegratorsBase = "0.6"
-GeometricOptimizers = "0.2"
+GeometricOptimizers = "0.2, 0.1"
 GeometricProblems = "0.8"
 GeometricSolutions = "0.6"
 LinearAlgebra = "1"
@@ -44,12 +48,6 @@ Symbolics = "7"
 Test = "1"
 Zygote = "0.6, 0.7"
 julia = "1.10"
-
-# GeometricOptimizers is not in the General registry at the version required above, so it is taken
-# from git. A git [sources] entry blocks registration in General: remove this section, and only
-# then can this package be tagged.
-[sources]
-GeometricOptimizers = {url = "https://github.com/JuliaGNI/GeometricOptimizers.jl", rev = "main"}
 
 [extras]
 GeometricProblems = "18cb22b4-ad41-5c80-9c5f-710df63fbdc9"
