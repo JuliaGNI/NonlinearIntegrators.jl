@@ -67,16 +67,6 @@
         @debug "DenseNet{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 
-    @testset "CGVINodal" begin
-        qlob = lobatto(T, 4)
-        blob = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(qlob))
-        cg = CGVINodal(blob, qlob)
-        @test cg isa GeometricIntegratorsBase.LODEMethod
-        @test eltype(cg.b) == T && eltype(cg.c) == T
-        @test eltype(cg.x) == T
-        @debug "CGVINodal{$T} ok" nnodes=length(cg.b)
-    end
-
     @testset "VISE" begin
         prb = build_vise_basis(T)
         pri = VISE(prb, gauss(T, 8), [T[-0.5, 0.707, -1.57]])

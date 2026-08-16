@@ -29,7 +29,6 @@ include("testsetup.jl")
     @testset "unit" begin
         include("unit/optimizer_params_unit.jl")
         include("unit/oga_kernels.jl")
-        include("unit/cgvi_unit.jl")
         # All five network integrators, table-driven; replaces the five near-identical
         # per-integrator files that used to sit here.
         include("unit/network_integrators_unit.jl")

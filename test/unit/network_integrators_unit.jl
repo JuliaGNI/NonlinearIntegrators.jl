@@ -84,8 +84,10 @@ end
 #
 # `components!`, `residual!`, `initial_guess!` and `update!` all index one flat vector of
 # `D × (parameters per dimension)` unknowns, and *every* layout mistake between them collapses
-# to the identity at `D = 1` — which is all the rest of this file covers. `cgvi_unit.jl` carries
-# the same guard for `CGVINodal` precisely because that class of bug was found there.
+# to the identity at `D = 1` — which is all the rest of this file covers. The guard exists here
+# because that class of bug was first found in `CGVINodal`, the linear reference integrator this
+# package used to carry; the guard went upstream with it (JuliaGNI/GeometricIntegrators.jl#219),
+# where `test/integrators/galerkin_integrators_tests.jl` runs it for both CGVI variants.
 #
 # `CoupledHarmonicOscillator` with coupling `k = 0` is two *independent* oscillators with
 # different masses, spring constants and initial conditions, so each degree of freedom has its

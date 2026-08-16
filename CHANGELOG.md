@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
+- **`CGVINodal` is removed. It now lives in GeometricIntegrators**, next to `CGVI`, which is
+  where a linear variational integrator belongs — this package is for the nonlinear ones, and
+  `CGVINodal` was only ever here as the linear reference the network integrators are compared
+  against. It arrived there in
+  [JuliaGNI/GeometricIntegrators.jl#219](https://github.com/JuliaGNI/GeometricIntegrators.jl/pull/219),
+  which also removes the duplication between the two CGVI variants by putting everything they
+  share behind one `CGVIMethod` supertype.
+
+  Replace `using NonlinearIntegrators: CGVINodal` with `using GeometricIntegrators: CGVINodal`,
+  and require **GeometricIntegrators v0.18.3** or later — that is the release the name resolves
+  in. The constructor, the coefficients and the numerics are unchanged, so results are
+  identical; upstream additionally rejects a basis whose nodes do not include the interval
+  endpoints, which was previously only documented as a requirement.
+
+  Everything `test/unit/cgvi_unit.jl` asserted moved with it — the per-precision accuracy runs,
+  the `D = 2` `CoupledHarmonicOscillator` layout regression and the trait sweep are now in
+  `test/integrators/galerkin_integrators_tests.jl` upstream, run against both `CGVI` and
+  `CGVINodal`, so the coverage is wider there than it was here. This package gains no
+  dependency on GeometricIntegrators.
+
 - **`show_status` now defaults to `false`** on all five network integrators. It defaulted to
   `true`, and in `ShallowNetReversible` and `ShallowNetAutodiffReversible` it gated a `println`
   of the full residual vector *inside* `residual!` — which runs once per Newton iteration and
