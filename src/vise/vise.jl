@@ -382,7 +382,7 @@ end
 
 function GeometricIntegratorsBase.integrate_step!(sol, history, params, int::GeometricIntegrator{<:VISE,<:AbstractProblemIODE})
     # Call the nonlinear solver and act on the outcome it reports. Argument order is
-    # (x, solver, state, args), as in `cgvi/cgvi.jl` and the network integrators' shared
+    # (x, solver, state, args), as in the network integrators' shared
     # `integrate_step!`. It read `solve!(solver, x, args)` here, which matches no
     # `SimpleSolvers.solve!` method — a `MethodError` on the first step. It went unnoticed
     # because `test/unit/vise_unit.jl` had been written but was not `include`d by `runtests.jl`;

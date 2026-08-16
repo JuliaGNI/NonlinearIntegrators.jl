@@ -420,9 +420,10 @@ end
 # fourth `update!` method meant a signature of the shape `(Any, Any, GeometricIntegrator, Any)`,
 # which is ambiguous against the framework's own `(Any, Any, Any, GeometricIntegrator)`
 # (`explicit_euler.jl`). Five of the eight ambiguities Aqua reported were exactly that pair —
-# one per DT-form definition: this default plus the four overrides in `ShallowNetAutodiff`,
-# `ShallowNetAutodiffReversible`, `CGVINodal` and `VISE` — for no benefit, since nothing
-# dispatches on this generically. Giving it its own name removes all five.
+# one per DT-form definition: this default plus the overrides in `ShallowNetAutodiff`,
+# `ShallowNetAutodiffReversible` and `VISE` (and, at the time, `CGVINodal`, since moved to
+# GeometricIntegrators) — for no benefit, since nothing dispatches on this generically.
+# Giving it its own name removes all five.
 #
 # The trailing argument is also `::Type{DT}` now rather than an untyped `DT`. It always was a
 # type — the x-form below passes the element type of `x` — so this documents it and lets it be

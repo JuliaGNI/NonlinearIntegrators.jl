@@ -25,8 +25,8 @@ using CompactBasisFunctions
 using GeometricIntegratorsBase
 using GeometricProblems.HarmonicOscillator
 # `import`, not `using`: this only binds the module name, so the two-degree-of-freedom problem in
-# `cgvi_unit.jl` can be reached as `CoupledHarmonicOscillator.lodeproblem` without its exported
-# `lodeproblem`/`podeproblem` colliding with the `HarmonicOscillator` ones that
+# `network_integrators_unit.jl` can be reached as `CoupledHarmonicOscillator.lodeproblem` without
+# its exported `lodeproblem`/`podeproblem` colliding with the `HarmonicOscillator` ones that
 # `integration/shallownet_accuracy.jl` calls unqualified.
 import GeometricProblems.CoupledHarmonicOscillator
 using GeometricSolutions: relative_maximum_error

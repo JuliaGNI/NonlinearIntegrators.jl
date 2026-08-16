@@ -31,7 +31,7 @@ using SimpleSolvers: Newton, solve_with_status!
 # `import`, not `using`: `GeometricOptimizers.Newton` is a *different type* from the `Newton` on the
 # line above — an `OptimizerMethod` of its own, against SimpleSolvers' `NonlinearSolverMethod` — and
 # it is exported. A blanket `using` would therefore put a second, unrelated `Newton` in scope beside
-# the one `default_solver(::CGVINodal) = Newton()` means; the explicit `using SimpleSolvers: Newton`
+# the one `default_solver(::VISE) = Newton()` means; the explicit `using SimpleSolvers: Newton`
 # above would still win the unqualified name, but that is a precedence rule to rely on rather than a
 # design. `import` introduces no name at all, so the question does not arise and every optimizer
 # call site has to say `GeometricOptimizers.`.
@@ -114,7 +114,7 @@ include("vise/vise.jl")
 include("vise/vise_basis.jl")
 export VISE, VISEBasis
 
-# The linear reference integrator: continuous Galerkin on a nodal basis.
-include("cgvi/cgvi.jl")
-export CGVINodal
+# The linear reference integrator this package used to carry, `CGVINodal` — continuous
+# Galerkin on a nodal basis — now lives in GeometricIntegrators alongside `CGVI`, which is
+# where a linear variational integrator belongs. Reach it as `GeometricIntegrators.CGVINodal`.
 end
