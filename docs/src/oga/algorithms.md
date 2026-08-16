@@ -9,6 +9,52 @@ Throughout, `M` is the number of quadrature nodes (11 by default), `N` the dicti
 formulas are in the ``\sqrt{w}``-scaled space, where the Euclidean inner product *is* the
 quadrature-weighted one.
 
+## At a glance
+
+The three tables below summarise the components against each other; each row is expanded in
+its own subsection later on the page. This is the *design-level* comparison — what each
+component computes and costs. For how the variants actually performed when measured, see
+[Studies](@ref); for a prescriptive "which one should I pick", see *Choosing a variant* on the
+[Usage](@ref) page.
+
+**Dictionaries** — which candidate neurons are on offer.
+
+| Dictionary | Atom set | Size `N` | Needs | Reach for it when |
+|---|---|---|---|---|
+| [`BiasGrid1d`](@ref) | `{±1} ×` bias grid | ``2(\texttt{dict\_amount}+1)`` | — | `ReLUᵏ`, where it is provably complete |
+| [`WeightBiasGrid2d`](@ref) | log-spaced ``\lvert w\rvert`` × bias grid | ``n_w (n_b + 1)`` | [`NormalizedProjection`](@ref) | ELU, GELU, tanh — `w` is a real length scale |
+| [`AngularGrid`](@ref) | rays ``r(\cos\theta, \sin\theta)`` | ``\lvert\texttt{radii}\rvert (\texttt{amount}+1)`` | [`NormalizedProjection`](@ref) | uniform coverage in atom space; smooth activations, and `ReLUᵏ` too |
+| [`Refined`](@ref) | any of the above, polished off-grid | unchanged, ``+4\,\texttt{iterations}`` scores | — | the grid is coarse, or `N` is a cost problem |
+
+`WeightBiasGrid2d` restricted to ``\lvert w\rvert = 1`` reproduces `BiasGrid1d` exactly, so the
+2-D dictionaries are strict generalisations rather than alternatives.
+
+**Selection rules** — how the greedy step ranks candidates against the residual.
+
+| Rule | Score | Extra cost per step | Scale-invariant | Reach for it when |
+|---|---|---|---|---|
+| [`RawProjection`](@ref) | ``\lvert\langle r, g\rangle_w\rvert`` | — | no | the `±1` grid at `Float64`; the pinned default |
+| [`NormalizedProjection`](@ref) | ``\lvert\langle r, g\rangle_w\rvert / \lVert g\rVert_w`` | precomputed norms | yes | any 2-D dictionary — mandatory there |
+| [`OrthogonalProjection`](@ref) | ``\lvert\langle r, g\rangle_w\rvert / \lVert g^{\perp}\rVert_w`` | one ``O(NMk)`` product | yes | reduced precision: it makes a rank-deficient selected set impossible |
+
+All three cost the ``O(NM)`` scan that dominates the whole algorithm; the column above is what
+each adds on top of it. Only `OrthogonalProjection` can *refuse* an atom.
+
+**Fits** — how the output weights are refit after every selection.
+
+| Fit | Factorisation | Cost per step | On a dependent atom | Reach for it when |
+|---|---|---|---|---|
+| [`WeightedQR`](@ref) | fresh QR of ``\hat A`` | ``O(Mk^2)`` | solves through it (ridged fallback if non-finite) | the default; conditioning ``\kappa(\hat A)`` is enough |
+| [`IncrementalQR`](@ref) | QR maintained across steps | ``O(Mk)`` | same, but the rank gain is reported | paired with `OrthogonalProjection`, whose `Q` it supplies |
+| [`PivotedQR`](@ref) | pivoted Householder QR | ``O(Mk^2)`` | detects it, gives it a zero coefficient | rank deficiency should be visible, not absorbed |
+| [`TruncatedSVD`](@ref) | one-sided Jacobi SVD | ``O(Mk^2)`` per sweep | drops the direction, returns the minimum-norm solution | one configuration must hold at every precision |
+| [`NormalEquationsFit`](@ref) | Gram solve, ``\kappa^2`` | ``O(Mk^2 + k^3)`` | throws; caught and ridged | measuring the baseline, not solving a problem |
+
+Every one of them is wrapped by [`oga_solve`](@ref NonlinearIntegrators.oga_solve), which
+guarantees a finite result of the right length whatever the factorisation does — and, as the
+note under *Fits* argues, all five are free at this problem size, so the choice is purely a
+numerical one.
+
 ## The greedy loop
 
 [`oga_fit`](@ref) is the single implementation shared by all four network integrators. It
@@ -22,6 +68,12 @@ oga_fit(oga, σ, nodes, w, y, nneurons;
         bias_interval, dict_amount, modulation = nothing, symmetry = NoSymmetry())
     -> OGAResult
 ```
+
+Before the loop starts, the whole dictionary is rescaled by a single **power of two** so that
+the largest atom has norm ≈ 1. Being a power of two, that is an exact operation, so `Float64`
+and `Float32` atom selection is unchanged bit for bit; it exists for `Float16`, where squared
+norms overflow long before the norms themselves do. The argument is on the [Precision](@ref)
+page.
 
 Per step it:
 
@@ -303,6 +355,14 @@ detect, and at ``k \le 8`` columns the recomputation is free; the reflector foll
 LAPACK convention
 (``v_1 = 1``, unnormalised) to avoid a division that can underflow at half precision.
 
+The default `rtol` is ``\varepsilon(T)\max(4, k)``, following `pinv`'s convention of
+``\varepsilon(T)`` times the dimension — the level at which a singular direction is
+indistinguishable from accumulated rounding. Deliberately *not* ``\sqrt{\varepsilon(T)}``: that
+is the scale of [`OrthogonalProjection`](@ref)'s rank-gain floor, which admits a column whose
+orthogonal part is exactly that fraction of its norm, so truncating there would discard the very
+directions the selection rule has just decided are usable. Measured at `Float16`, the two
+thresholds differ by a factor of 20 in the resulting fit residual.
+
 *Cost.* ``O(Mk^2)`` per step, plus the pivot search.
 
 ### [`TruncatedSVD`](@ref)
@@ -331,6 +391,10 @@ independent.
     threshold becomes `Inf`, every column pair tests as "already orthogonal", and the routine
     silently returns the **unrotated** matrix: wrong singular values, no error raised. This
     was a real bug, caught by comparing against LAPACK at `Float16`.
+
+The default `rtol` is ``\varepsilon(T)\max(4, k)``, for the same reason as
+[`PivotedQR`](@ref) above: a ``\sqrt{\varepsilon(T)}`` cut would collide with the rank-gain
+floor and drop directions the selection rule just admitted.
 
 *Cost.* ``O(Mk^2)`` per sweep, a handful of sweeps at ``k \le 8``.
 

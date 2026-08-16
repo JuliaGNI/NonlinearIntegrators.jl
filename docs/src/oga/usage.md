@@ -106,7 +106,39 @@ integrator's estimate), `ShallowNetAutodiffReversible` uses the cache's endpoint
 and both write that endpoint into the nonlinear solution vector, which the symbolic-derivative
 variants do not (there the corresponding slot is the momentum, set by `initial_trajectory!`).
 
-`DenseNet` has no OGA seed; it uses `TrainingMethod` or `LSGD`.
+The OGA is the default seed but not the only one: `initial_guess_method = TrainingMethod()` trains
+the network by gradient descent instead, for `training_epochs` epochs. `DenseNet` has no OGA seed
+at all; it uses `TrainingMethod` or `LSGD`.
+
+### How the seed reaches the integrator
+
+`initial_params!` is the extension point the framework calls once per time step, and the glue
+between it and the integrator-agnostic `oga_fit` is `src/oga/adapters.jl`. Three properties of
+that layer are worth knowing, because they are not visible from `oga_fit`'s signature.
+
+**One greedy fit per degree of freedom.** `oga_seed` loops over the `D` components of the problem
+and calls [`oga_fit`](@ref) separately for each, so a double pendulum performs two independent
+greedy fits per time step, each selecting its own atoms. Only the dictionary configuration and the
+quadrature are shared. Nothing couples the components at the seeding stage — the coupling enters
+with the Newton solve.
+
+**The fit target is the initial trajectory.** It is the integrator's `network_labels`, i.e. the
+trajectory estimate produced by `initial_trajectory_method` (`IntegratorExtrapolation` by default,
+which integrates a sub-problem with `ImplicitMidpoint`), sampled at the network's input nodes. So
+the OGA does not fit the *solution*; it fits a cheap approximation of it, and its job is to place
+neurons where that approximation has structure. For the two boundary-ansatz integrators the
+straight line between the endpoints is subtracted first, and the `t(1-t)` factor is passed as
+`oga_fit`'s `modulation` — that is all `_ansatz_modulation` does.
+
+**The node count and the quadrature come from `extrapolation_substep`.** The nodes are
+`0 : 1/extrapolation_substep : 1` and the weights are
+`simpson_quadrature(extrapolation_substep, T)` — always at `T`, see [Precision](@ref). The default
+of 10 sub-steps is where the `M = 11` quadrature nodes assumed throughout [Algorithms](@ref) come
+from, and Simpson's rule is why the value must be even.
+
+Per-step diagnostics are printed by default: `show_status = true` on the method makes each seed
+report, per component, how many neurons it placed, the weighted residual it reached, and how many
+atoms were rejected for adding no new direction. Set `show_status = false` to silence it.
 
 ## Reading the result
 
