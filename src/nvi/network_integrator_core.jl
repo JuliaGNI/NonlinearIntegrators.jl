@@ -422,8 +422,8 @@ end
 # (`explicit_euler.jl`). Five of the eight ambiguities Aqua reported were exactly that pair —
 # one per DT-form definition: this default plus the overrides in `ShallowNetAutodiff`,
 # `ShallowNetAutodiffReversible` and `VISE` (and, at the time, `CGVINodal`, since moved to
-# GeometricIntegrators) — for no benefit, since nothing dispatches on this generically.
-# Giving it its own name removes all five.
+# GeometricIntegrators — JuliaGNI/GeometricIntegrators.jl#219) — for no benefit, since nothing
+# dispatches on this generically. Giving it its own name removes all five.
 #
 # The trailing argument is also `::Type{DT}` now rather than an untyped `DT`. It always was a
 # type — the x-form below passes the element type of `x` — so this documents it and lets it be

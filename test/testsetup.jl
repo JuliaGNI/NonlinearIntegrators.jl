@@ -54,7 +54,6 @@ function build_vise_basis(::Type{T}) where {T}
 end
 
 gauss(::Type{T}, R = 8) where {T} = QuadratureRules.GaussLegendreQuadrature(T, R)
-lobatto(::Type{T}, R = 4) where {T} = QuadratureRules.LobattoLegendreQuadrature(T, R)
 
 # Memoised basis builder.
 #

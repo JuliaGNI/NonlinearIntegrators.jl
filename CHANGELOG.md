@@ -9,20 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking
 
-- **`CGVINodal` is removed. It now lives in GeometricIntegrators**, next to `CGVI`, which is
+- **`CGVINodal` is removed. It moves to GeometricIntegrators**, next to `CGVI`, which is
   where a linear variational integrator belongs — this package is for the nonlinear ones, and
   `CGVINodal` was only ever here as the linear reference the network integrators are compared
   against. See [JuliaGNI/GeometricIntegrators.jl#219](https://github.com/JuliaGNI/GeometricIntegrators.jl/pull/219).
 
-  Replace `using NonlinearIntegrators: CGVINodal` with `using GeometricIntegrators: CGVINodal`.
-  The constructor, the coefficients and the numerics are unchanged, so results are identical;
-  upstream additionally rejects a basis whose nodes do not include the interval endpoints,
-  which was previously only documented as a requirement.
+  Replace `using NonlinearIntegrators: CGVINodal` with `using GeometricIntegrators: CGVINodal`
+  — **once #219 has landed and shipped in a tagged GeometricIntegrators release**, which is
+  what makes that name resolvable. Until then the integrator is reachable only from this
+  package's history. The constructor, the coefficients and the numerics are unchanged, so
+  results are identical; upstream additionally rejects a basis whose nodes do not include the
+  interval endpoints, which was previously only documented as a requirement.
 
-  Everything `test/unit/cgvi_unit.jl` asserted moved with it — the per-precision accuracy runs,
-  the `D = 2` `CoupledHarmonicOscillator` layout regression and the trait sweep are now in
+  Everything `test/unit/cgvi_unit.jl` asserted moves with it — the per-precision accuracy runs,
+  the `D = 2` `CoupledHarmonicOscillator` layout regression and the trait sweep go to
   `test/integrators/galerkin_integrators_tests.jl` upstream, run against both `CGVI` and
-  `CGVINodal`. This package gains no dependency on GeometricIntegrators.
+  `CGVINodal`. This package gains no dependency on GeometricIntegrators, so the removal merges
+  independently of #219; the *release* is what is ordered, since `CGVINodal` was exported from
+  the registered v0.2.0 and the next tag is what takes it away from users. Do not tag that
+  release before a GeometricIntegrators release containing #219 exists.
 
 - **`show_status` now defaults to `false`** on all five network integrators. It defaulted to
   `true`, and in `ShallowNetReversible` and `ShallowNetAutodiffReversible` it gated a `println`
