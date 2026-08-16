@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The documentation deploys again on a tag.** `deploydocs` was called with `devurl = "stable"`,
+  publishing `main` at `/stable/`. Its default `versions` is `["stable" => "v^", "v#.#", devurl =>
+  devurl]`, so that put two entries under the one name — the symlink to the newest release, and the
+  devurl directory — and the `v0.2.0` tag build died with *``link `"stable" => "v0.2.0"` cannot
+  overwrite `devurl = stable` with the same name``* after building and cloning `gh-pages`, before
+  pushing. Nothing was published.
+
+  The misconfiguration is as old as the `deploydocs` call and could not have shown up earlier: the
+  Documenter workflow only deploys a *release* build on a tag push, and the repository had no
+  version tags at all until 0.2.0, so `v^` matched nothing and the link was never attempted.
+  Making the first release is what exposed it.
+
+  `devurl` is now absent, i.e. Documenter's default of `"dev"`: `main` goes to `/dev/`, each tag to
+  `/vX.Y.Z/`, and `/stable/` is the symlink to the newest release. **This moves published URLs** —
+  `/stable/` served `main` before and now means the release. `/v0.2.0/` itself will not appear
+  retroactively, the tag carrying the `make.jl` it was built with; it lands from the next tagged
+  release onwards. The `/stable/` tree currently on `gh-pages` was built from the `main` commit the
+  tag points at, so it holds the 0.2.0 documentation already.
+
 ## [0.2.0] - 2026-08-16
 
 ### Breaking

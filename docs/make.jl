@@ -101,8 +101,22 @@ makedocs(
     ],
 )
 
+# `devurl` is deliberately absent, i.e. left at Documenter's default of `"dev"`. It used to be
+# `"stable"`, which published `main` at `/stable/` — and that is unusable once the package has a
+# tagged release. `deploydocs` defaults to `versions = ["stable" => "v^", "v#.#", devurl =>
+# devurl]`, so `devurl = "stable"` puts two entries under the one name: the symlink to the newest
+# release, and the devurl directory. On a tag build Documenter creates `v0.2.0/`, then tries the
+# link and finds the name taken:
+#
+#     ArgumentError: link `"stable" => "v0.2.0"` cannot overwrite `devurl = stable` with the same
+#     name.
+#
+# It never surfaced before v0.2.0 because this workflow only deploys a release build on a tag push
+# and the repository had no version tags at all — `v^` matched nothing, so no link was attempted.
+# The first release is exactly what exposes it. With the default, `main` goes to `/dev/`, each tag
+# to `/vX.Y.Z/`, and `/stable/` is the symlink to the newest release, which is what "stable" should
+# mean for a registered package.
 deploydocs(;
     repo="github.com/JuliaGNI/NonlinearIntegrators.jl",
     devbranch="main",
-    devurl="stable",
 )
