@@ -1,6 +1,10 @@
-struct VISE{T,NNODES,basisType<:Basis{T}} <: LODEMethod
+# `quadrature` is typed. It was the one untyped field of this struct, and
+# `int.method.quadrature.nodes` is read at the top of `components!` — so `quad_nodes` came back
+# `Any` and poisoned every expression it appeared in, including the arguments of the compiled
+# basis functions.
+struct VISE{T,NNODES,basisType<:Basis{T},quadType} <: LODEMethod
     basis::basisType
-    quadrature
+    quadrature::quadType
 
     b::SVector{NNODES,T}
     c::SVector{NNODES,T}
@@ -13,7 +17,7 @@ struct VISE{T,NNODES,basisType<:Basis{T}} <: LODEMethod
         quad_weights = quadrature.weights
         quad_nodes = quadrature.nodes
         NNODES = nnodes(quadrature)
-        new{T,NNODES,typeof(basis)}(basis, quadrature, quad_weights, quad_nodes, init_w, extrapolation_substep)
+        new{T,NNODES,typeof(basis),typeof(quadrature)}(basis, quadrature, quad_weights, quad_nodes, init_w, extrapolation_substep)
     end
 end
 
@@ -21,10 +25,20 @@ basis(method::VISE) = method.basis
 quadrature(method::VISE) = method.quadrature
 nnodes(method::VISE) = nnodes(method.quadrature)
 
-isexplicit(::Union{VISE,Type{<:VISE}}) = false
-isimplicit(::Union{VISE,Type{<:VISE}}) = true
-issymmetric(::Union{VISE,Type{<:VISE}}) = missing
-issymplectic(::Union{VISE,Type{<:VISE}}) = missing
+# Qualified with `GeometricIntegratorsBase.`, which these four were not.
+#
+# None of `isexplicit`, `isimplicit`, `issymmetric`, `issymplectic` is imported into this module
+# (see the import list at the top of `src/NonlinearIntegrators.jl`), so a bare definition here
+# did not extend the framework's generic — it created a *new*, shadowing
+# `NonlinearIntegrators.isexplicit` that nothing outside this package ever calls. The framework
+# therefore answered `isexplicit(::VISE) === missing` and `isimplicit(::VISE) === missing`,
+# i.e. "unknown", where the intent was `false` and `true`. Any downstream code selecting an
+# integrator on those properties saw the wrong answer. The network integrators got this right
+# (`network_integrator_core.jl` qualifies all four); VISE was the copy that did not.
+GeometricIntegratorsBase.isexplicit(::Union{VISE,Type{<:VISE}}) = false
+GeometricIntegratorsBase.isimplicit(::Union{VISE,Type{<:VISE}}) = true
+GeometricIntegratorsBase.issymmetric(::Union{VISE,Type{<:VISE}}) = missing
+GeometricIntegratorsBase.issymplectic(::Union{VISE,Type{<:VISE}}) = missing
 
 default_solver(::VISE) = Newton()
 extrapolation_substep(method::VISE) = method.extrapolation_substep
@@ -41,7 +55,6 @@ struct VISECache{ST,R} <: IODEIntegratorCache{ST}
     p̃::Vector{ST}
     ṽ::Vector{ST}
     f̃::Vector{ST}
-    s̃::Vector{ST}
 
     # X::Vector{Vector{ST}}
     Q::Vector{Vector{ST}}
@@ -49,18 +62,20 @@ struct VISECache{ST,R} <: IODEIntegratorCache{ST}
     V::Vector{Vector{ST}}
     F::Vector{Vector{ST}}
 
-    dqdWc
-    dvdWc
+    # All eight of these were untyped (`::Any`), and their *contents* were `Vector{Any}` as
+    # well, because the builders started from `mat = []`.
+    dqdWc::Vector{Matrix{ST}}
+    dvdWc::Vector{Matrix{ST}}
 
-    dqdWr₁
-    dqdWr₀
-    dvdWr₁
-    dvdWr₀
-    tem_W
+    dqdWr₁::Vector{Vector{ST}}
+    dqdWr₀::Vector{Vector{ST}}
+    dvdWr₁::Vector{Vector{ST}}
+    dvdWr₀::Vector{Vector{ST}}
+    tem_W::Vector{Vector{ST}}
 
-    stage_values
+    stage_values::Matrix{ST}
 
-    function VISECache{ST,R}(W_sizes, ics) where {ST,R}
+    function VISECache{ST,R}(W_sizes, ics; record_grid_points::Int = 41) where {ST,R}
         D = length(vec(ics.q))
         S = sum(W_sizes)
         x = zeros(ST, sum(S) + D)
@@ -74,7 +89,6 @@ struct VISECache{ST,R} <: IODEIntegratorCache{ST}
         p̃ = zeros(ST, D)
         ṽ = zeros(ST, D)
         f̃ = zeros(ST, D)
-        s̃ = zeros(ST, D)
 
         # create internal stage vectors
         # X = create_internal_stage_vector(ST, D, S)
@@ -102,9 +116,9 @@ struct VISECache{ST,R} <: IODEIntegratorCache{ST}
 
         tem_W = create_boundary_derivative_vector(ST, D, W_sizes)
 
-        stage_values = zeros(ST, 41, D)
+        stage_values = zeros(ST, record_grid_points, D)
 
-        new{ST,R}(x, int_x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, Q, P, V, F, dqdWc, dvdWc, dqdWr₁, dqdWr₀, dvdWr₁, dvdWr₀, tem_W, stage_values)
+        new{ST,R}(x, int_x, q̄, p̄, q̃, p̃, ṽ, f̃, Q, P, V, F, dqdWc, dvdWc, dqdWr₁, dqdWr₀, dvdWr₁, dvdWr₀, tem_W, stage_values)
     end
 end
 
@@ -121,7 +135,9 @@ function GeometricIntegratorsBase.internal_variables(method::VISE, problem::Abst
     # intermidiate_x = [zeros(Int, length(x)) for x in method(int).init_w]
     S = sum(method.basis.W_sizes)
 
-    intermidiate_x = zeros(S)
+    # `datatype(problem)`, not the `zeros(S)` default: this used to hand back a `Float64`
+    # buffer whatever precision the run was started at.
+    intermidiate_x = zeros(datatype(problem), S)
     (int_x=intermidiate_x,)
 end
 
@@ -137,12 +153,20 @@ function GeometricIntegratorsBase.initial_guess!(sol, history, params, int::Geom
     local integrator = default_iguess_integrator(method(int))
     local h = timestep(int)
     local problem = int.problem
-    if sol.t == h || LinearAlgebra.norm(cache(int).int_x .- vcat(method(int).init_w...)) > 1.0
-        x[1:S] = vcat(method(int).init_w...)
+    # `w₀` is built once: the old form spelled `vcat(method(int).init_w...)` twice, once in the
+    # condition and once in the branch, and both are splatted allocations on every step.
+    local w₀ = reduce(vcat, method(int).init_w)
+    # `sol.t == h` was exact floating-point equality against accumulated time, standing in for
+    # "this is the first step". Compare against the problem's own initial time with a tolerance.
+    local isfirststep = sol.t ≤ initialtime(problem) + h * (1 + sqrt(eps(typeof(h))))
+    if isfirststep || LinearAlgebra.norm(cache(int).int_x .- w₀) > 1.0
+        copyto!(view(x, 1:S), w₀)
     else
-        x[1:S] = cache(int).int_x
+        copyto!(view(x, 1:S), cache(int).int_x)
     end
-    println("current time: $(sol.t), initial guess x: $(x[1:S])")
+    # `@debug`, not `println`: this ran unconditionally on every time step (VISE has no
+    # `show_status` field to gate it) and the interpolation allocated a copy of `x[1:S]`.
+    @debug "VISE initial guess" t = sol.t x_init = view(x, 1:S)
 
     tem_ode = similar(problem, [zero(h), h], h / 100, (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, integrator)
@@ -189,7 +213,7 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     # copy x to X.
     start_idx = 1
     for (d, W_size) in enumerate(W_sizes)
-        tem_W[d][:] = x[start_idx:start_idx+W_size-1]
+        copyto!(tem_W[d], view(x, start_idx:start_idx+W_size-1))
         start_idx += W_size
     end
 
@@ -206,26 +230,32 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
                 dvdWc[d][j, p] = DVDW[d][p](tem_W[d], sol.t - timestep(int) + quad_nodes[j] * timestep(int))
             end
         end
-        dqdWr₀[d][:] = map(f -> f(tem_W[d][:], sol.t - timestep(int)), DQDW[d])
-        dqdWr₁[d][:] = map(f -> f(tem_W[d][:], sol.t), DQDW[d])
+        # `tem_W[d]`, not `tem_W[d]`: the compiled function only reads its argument, so
+        # the `[:]` copy of the whole weight vector was pure waste — and it was made once per
+        # quadrature node per dimension per residual evaluation everywhere it appeared below.
+        # A loop replaces `map`, which allocated a fresh vector to immediately copy out of.
+        for p in eachindex(DQDW[d])
+            dqdWr₀[d][p] = DQDW[d][p](tem_W[d], sol.t - timestep(int))
+            dqdWr₁[d][p] = DQDW[d][p](tem_W[d], sol.t)
+        end
     end
 
     # compute Q : q at quadrature points
     for i in eachindex(Q)
         for d in eachindex(Q[i])
-            Q[i][d] = q_expr[d](tem_W[d][:], sol.t - timestep(int) + quad_nodes[i] * timestep(int))
+            Q[i][d] = q_expr[d](tem_W[d], sol.t - timestep(int) + quad_nodes[i] * timestep(int))
         end
     end
 
     # compute q[t_{n+1}]
     for d in eachindex(q)
-        q[d] = q_expr[d](tem_W[d][:], sol.t)
+        q[d] = q_expr[d](tem_W[d], sol.t)
     end
 
     # compute V volicity at quadrature points
     for i in eachindex(V)
         for d in eachindex(V[i])
-            V[i][d] = v_expr[d](tem_W[d][:], sol.t - timestep(int) + quad_nodes[i] * timestep(int))
+            V[i][d] = v_expr[d](tem_W[d], sol.t - timestep(int) + quad_nodes[i] * timestep(int))
             # V[i][d] = V[i][d] / timestep(int) #TODO:??? why divide by timestep
         end
     end
@@ -291,7 +321,7 @@ function GeometricIntegratorsBase.residual!(b::AbstractVector{ST}, x::AbstractVe
 end
 
 
-function GeometricIntegratorsBase.update!(sol, params, int::GeometricIntegrator{<:VISE}, DT)
+function update_solution!(sol, params, int::GeometricIntegrator{<:VISE}, ::Type{DT}) where {DT}
     sol.q .= cache(int, DT).q̃
     sol.p .= cache(int, DT).p̃
 
@@ -305,7 +335,7 @@ function GeometricIntegratorsBase.update!(sol, params, x::AbstractVector{DT}, in
     GeometricIntegratorsBase.components!(x, sol, params, int)
 
     # compute final update
-    GeometricIntegratorsBase.update!(sol, params, int, DT)
+    update_solution!(sol, params, int, DT)
 end
 
 
@@ -339,7 +369,7 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:VISE})
 
     start_idx = 1
     for (d, W_size) in enumerate(W_sizes)
-        tem_W[d][:] = x[start_idx:start_idx+W_size-1]
+        tem_W[d] = x[start_idx:start_idx+W_size-1]
         start_idx += W_size
     end
 
@@ -350,28 +380,24 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:VISE})
     # end
     for d in 1:D
         for i in eachindex(network_inputs)
-            stage_values[i, d] = q_expr[d](tem_W[d][:], sol.t - timestep(int) + network_inputs[i] * timestep(int))
+            stage_values[i, d] = q_expr[d](tem_W[d], sol.t - timestep(int) + network_inputs[i] * timestep(int))
         end
     end
 
 end
 
 
-function create_quadrature_points_derivative_vector(ST::Type, R::Int, D::Int, W_sizes::Vector{Int})
-    mat = []
-    for d in 1:D
-        push!(mat, zeros(ST, R, W_sizes[d]))
-    end
-    return mat
-end
+# `::Type{ST}`, not `ST::Type`, and a comprehension rather than `push!` onto `[]`.
+#
+# `ST::Type` passes the element type as a *value*, so the function is not specialised on it and
+# `zeros(ST, …)` cannot be inferred. Starting from `mat = []` then made the result a
+# `Vector{Any}` whose elements were `Any` too — so `dqdWc[d][j, p] = …` in `components!` was
+# three dynamic operations deep, `R × W_size × D` times per residual evaluation.
+create_quadrature_points_derivative_vector(::Type{ST}, R::Int, D::Int, W_sizes::Vector{Int}) where {ST} =
+    [zeros(ST, R, W_sizes[d]) for d in 1:D]
 
-function create_boundary_derivative_vector(ST::Type, D::Int, W_sizes::Vector{Int})
-    mat = []
-    for d in 1:D
-        push!(mat, zeros(ST, W_sizes[d]))
-    end
-    return mat
-end
+create_boundary_derivative_vector(::Type{ST}, D::Int, W_sizes::Vector{Int}) where {ST} =
+    [zeros(ST, W_sizes[d]) for d in 1:D]
 
 
 function GeometricIntegratorsBase.integrate!(sol::GeometricSolution, int::GeometricIntegrator{<:VISE}, n₁::Int, n₂::Int)
@@ -382,8 +408,12 @@ function GeometricIntegratorsBase.integrate!(sol::GeometricSolution, int::Geomet
 
     # copy initial condition from solution to solutionstep and initialize
     solstep = solutionstep(int, sol[n₁-1])
-    internal_values = Vector{Matrix}(undef, n₂ - n₁ + 1)
-    each_step_solution = Vector{Vector}(undef, n₂ - n₁ + 1)
+    # Concrete element types, and offset by n₁: these are sized n₂-n₁+1, so indexing by `n`
+    # would leave the first n₁-1 slots `#undef` and run off the end for any restart with
+    # n₁ > 1. This is the same fix `network_integrator_core.jl` already carries; the VISE
+    # copy of the loop had been left behind.
+    internal_values = Vector{typeof(cache(int).stage_values)}(undef, n₂ - n₁ + 1)
+    each_step_solution = Vector{typeof(nlsolution(int))}(undef, n₂ - n₁ + 1)
     # loop over time steps
     for n in n₁:n₂
         # integrate one step and copy solution from cache to solution
@@ -391,8 +421,8 @@ function GeometricIntegratorsBase.integrate!(sol::GeometricSolution, int::Geomet
         integrate!(solstep, int)
         copy!(sol, current(solstep), n)
 
-        internal_values[n] = deepcopy(cache(int).stage_values)
-        each_step_solution[n] = deepcopy(nlsolution(int))
+        internal_values[n-n₁+1] = copy(cache(int).stage_values)
+        each_step_solution[n-n₁+1] = copy(nlsolution(int))
     end
 
     return sol, internal_values, each_step_solution

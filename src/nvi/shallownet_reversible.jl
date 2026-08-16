@@ -25,16 +25,16 @@ struct ShallowNetReversible{T, NNODES, basisType <: Basis{T},
     function ShallowNetReversible(basis::Basis{T}, quadrature::QuadratureRule{T};
         extrapolation_substep      :: Int  = 10,
         training_epochs           :: Int  = 50000,
-        show_status               :: Bool = true,
+        show_status               :: Bool = false,
         initial_trajectory_method :: ET   = IntegratorExtrapolation(),
         initial_guess_method      :: IPMT = OGA1d(),
         record_grid_points        :: Int  = 41,
         bias_interval = [-pi, pi],
         dict_amount   :: Int = 50000) where {T, ET, IPMT}
         # The ansatz pairs every neuron with its reflection about t = 1/2 and stores only
-        # the independent half, so `S` must be even. Caught here rather than in
-        # `components!`, where `Int(S/2)` would throw an `InexactError` several call levels
-        # from the basis that caused it.
+        # the independent half, so `S` must be even. Caught here rather than several call
+        # levels down in `components!`, which now indexes with `S ÷ 2` and would silently
+        # drop the last neuron for odd `S` rather than complain.
         iseven(basis.S) || throw(ArgumentError(
             "ShallowNetReversible requires a basis with an even number of neurons, " *
             "got S = $(basis.S). Neurons come in mirrored pairs and only the S/2 independent " *
@@ -55,102 +55,20 @@ end
 
 GeometricIntegratorsBase.issymmetric(::Union{ShallowNetReversible, Type{<:ShallowNetReversible}}) = true
 
-default_iparams(::ShallowNetReversible) = OGA1d()
-
-struct ShallowNetReversibleCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
-    x::Vector{ST}
-
-    q̄::Vector{ST}
-    p̄::Vector{ST}
-
-    q̃::Vector{ST}
-    p̃::Vector{ST}
-    ṽ::Vector{ST}
-    f̃::Vector{ST}
-    s̃::Vector{ST}
-
-    X::Vector{Vector{ST}}
-    Q::Vector{Vector{ST}}
-    P::Vector{Vector{ST}}
-    V::Vector{Vector{ST}}
-    F::Vector{Vector{ST}}
-
-    ps::Vector{@NamedTuple{L1::@NamedTuple{W::Matrix{ST}, b::Vector{ST}},L2::@NamedTuple{W::Matrix{ST}}}}
-
-    r₀::Matrix{ST}
-    r₁::Matrix{ST}
-    m::Array{ST,3}
-    a::Array{ST,3}
-
-    dqdWc::Array{ST,3}
-    dqdbc::Array{ST,3}
-    dvdWc::Array{ST,3}
-    dvdbc::Array{ST,3}
-
-    dqdWr₁::Matrix{ST}
-    dqdWr₀::Matrix{ST}
-
-    dqdbr₁::Matrix{ST}
-    dqdbr₀::Matrix{ST}
-
-    stage_values::Matrix{ST}
-    network_labels::Matrix{ST}
-
-    function ShallowNetReversibleCache{ST,S,R,N}(ics; record_grid_points::Int = 41) where {ST,S,R,N}
-        D = length(vec(ics.q))
-        x = zeros(ST, D * (1 + 2 * S)) # Last layer Weight S (no bias for now) + P + hidden layer W S/2 + hidden layer bias S/2
-
-        q̄ = zeros(ST, D)
-        p̄ = zeros(ST, D)
-
-        # create temporary vectors
-        q̃ = zeros(ST, D)
-        p̃ = zeros(ST, D)
-        ṽ = zeros(ST, D)
-        f̃ = zeros(ST, D)
-        s̃ = zeros(ST, D)
-
-        # create internal stage vectors
-        X = create_internal_stage_vector(ST, D, S)
-        Q = create_internal_stage_vector(ST, D, R)
-        P = create_internal_stage_vector(ST, D, R)
-        V = create_internal_stage_vector(ST, D, R)
-        F = create_internal_stage_vector(ST, D, R)
-
-        # create parameter vectors
-        ps = [(L1=(W=zeros(ST, S, 1), b=zeros(ST, S)), L2=(W=zeros(ST, 1, S),)) for k in 1:D]
-
-        r₀ = zeros(ST, S, D)
-        r₁ = zeros(ST, S, D)
-        m = zeros(ST, R, S, D)
-        a = zeros(ST, R, S, D)
-
-        dqdWc = zeros(ST, R, S, D)
-        dqdbc = zeros(ST, R, S, D)
-        dvdWc = zeros(ST, R, S, D)
-        dvdbc = zeros(ST, R, S, D)
-
-        dqdWr₁ = zeros(ST, S, D)
-        dqdWr₀ = zeros(ST, S, D)
-        dqdbr₁ = zeros(ST, S, D)
-        dqdbr₀ = zeros(ST, S, D)
-
-        stage_values = zeros(ST, record_grid_points, D)
-        network_labels = zeros(ST, N + 1, D)
-
-        new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a,
-            dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
-            stage_values, network_labels)
-    end
-end
+# The cache lives in `network_integrator_core.jl` and is shared with this integrator's
+# sibling; the only thing that differs is the number of unknowns per dimension, passed
+# below. `CacheType` returns `SymbolicShallowNetCache{ST}` — a *concrete* type, which it was
+# not while the basis size and sub-step count were (runtime-computed) type parameters.
 
 function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::ShallowNetReversible; kwargs...) where {ST}
-    ShallowNetReversibleCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
+    local S = nbasis(method)
+    SymbolicShallowNetCache{ST}(initial_conditions(problem), 2 * S + 1, S, nnodes(method),
+        extrapolation_substep(method);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
 @inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::ShallowNetReversible) =
-    ShallowNetReversibleCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}
+    SymbolicShallowNetCache{ST}
 
 function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:ShallowNetReversible}) where {ST}
     local D = length(cache(int).q̃)
@@ -170,6 +88,7 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     local NN = method(int).basis.NN
     local ps = cache(int, ST).ps
 
+    local tbuf = cache(int, ST).tbuf
     local r₀ = cache(int, ST).r₀
     local r₁ = cache(int, ST).r₁
     local m = cache(int, ST).m
@@ -202,43 +121,47 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
         for i in 1:S
             ps[k][2].W[i] = x[D*(i-1)+k]
         end
-        for i in 1:Int(S/2)
-            ps[k][1].W[Int(2i-1)] = x[Int(D*(S+1)+D*(i-1)+k)]
-            ps[k][1].b[Int(2i-1)] = x[Int(D*(S+1+S/2)+D*(i-1)+k)]
-            ps[k][1].W[Int(2i)] = -1 * ps[k][1].W[Int(2i-1)]
-            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)]
+        for i in 1:(S ÷ 2)
+            ps[k][1].W[2i-1] = x[D*(S+1)+D*(i-1)+k]
+            ps[k][1].b[2i-1] = x[D*(S+1+S÷2)+D*(i-1)+k]
+            ps[k][1].W[2i] = -ps[k][1].W[2i-1]
+            ps[k][1].b[2i] = ps[k][1].W[2i-1] + ps[k][1].b[2i-1]
         end
     end
 
-    # compute coefficients
+    # Coefficients and their parameter derivatives, at the quadrature nodes and the two
+    # interval boundaries. See the equivalent block in shallownet.jl: merging the two passes
+    # over `d` lets `DVDθ` be evaluated once per node instead of twice, builds
+    # `NeuralNetworkParameters(ps[d])` once per dimension instead of four times per node, and
+    # replaces the `[:]`-copy-then-slice-assign with `copyto!` into a view.
     for d in 1:D
-        r₀[:, d] = (NN.layers[1])([zero(ST)], ps[d][1])
-        r₁[:, d] = (NN.layers[1])([one(ST)], ps[d][1])
+        psd = NeuralNetworkParameters(ps[d])
+
+        tbuf[1] = zero(ST)
+        copyto!(view(r₀, :, d), (NN.layers[1])(tbuf, ps[d][1]))
+        g0 = DQDθ(tbuf, psd)
+        copyto!(view(dqdWr₀, :, d), g0.L1.W)
+        copyto!(view(dqdbr₀, :, d), g0.L1.b)
+
+        tbuf[1] = one(ST)
+        copyto!(view(r₁, :, d), (NN.layers[1])(tbuf, ps[d][1]))
+        g1 = DQDθ(tbuf, psd)
+        copyto!(view(dqdWr₁, :, d), g1.L1.W)
+        copyto!(view(dqdbr₁, :, d), g1.L1.b)
+
         for j in eachindex(quad_nodes)
-            m[j, :, d] = (NN.layers[1])([quad_nodes[j]], ps[d][1])
-            a[j, :, d] = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d])).L2.W[:]
+            tbuf[1] = quad_nodes[j]
+            copyto!(view(m, j, :, d), (NN.layers[1])(tbuf, ps[d][1]))
+
+            g = DQDθ(tbuf, psd)
+            copyto!(view(dqdWc, j, :, d), g.L1.W)
+            copyto!(view(dqdbc, j, :, d), g.L1.b)
+
+            gv = DVDθ(tbuf, psd)
+            copyto!(view(a, j, :, d), gv.L2.W)
+            copyto!(view(dvdWc, j, :, d), gv.L1.W)
+            copyto!(view(dvdbc, j, :, d), gv.L1.b)
         end
-    end
-
-    # compute the derivatives of the coefficients on the quadrature nodes and at the boundaries
-    for d in 1:D
-        for j in eachindex(quad_nodes)
-            g = DQDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
-            dqdWc[j, :, d] = g.L1.W[:]
-            dqdbc[j, :, d] = g.L1.b[:]
-
-            gv = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
-            dvdWc[j, :, d] = gv.L1.W[:]
-            dvdbc[j, :, d] = gv.L1.b[:]
-        end
-
-        g0 = DQDθ([zero(ST)], NeuralNetworkParameters(ps[d]))
-        dqdWr₀[:, d] = g0.L1.W[:]
-        dqdbr₀[:, d] = g0.L1.b[:]
-
-        g1 = DQDθ([one(ST)], NeuralNetworkParameters(ps[d]))
-        dqdWr₁[:, d] = g1.L1.W[:]
-        dqdbr₁[:, d] = g1.L1.b[:]
     end
 
     # compute Q : q at quaadurature points
@@ -304,7 +227,6 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
     local dqdWr₀ = cache(int, ST).dqdWr₀
     local dqdbr₁ = cache(int, ST).dqdbr₁
     local dqdbr₀ = cache(int, ST).dqdbr₀
-    local show_status = method(int).show_status
     # compute b = - [(P-AF)], the residual in actual action, vatiation with respect to Q_{n,i}
     for i in 1:S
         for k in 1:D
@@ -326,37 +248,40 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
         b[D*S+k] = q̄[k] - y
     end
 
-    for i in 1:1:Int(S/2)
+    for i in 1:(S ÷ 2)
         for k in 1:D
             z = zero(ST)
             for j in eachindex(P, F)
-                z += timestep(int) * method(int).b[j] * F[j][k] * dqdWc[j, Int(2*i-1), k]
-                z += method(int).b[j] * P[j][k] * dvdWc[j, Int(2*i-1), k]
+                z += timestep(int) * method(int).b[j] * F[j][k] * dqdWc[j, 2i-1, k]
+                z += method(int).b[j] * P[j][k] * dvdWc[j, 2i-1, k]
             end
-            b[Int(D*(S+1)+D*(i-1)+k)] = dqdWr₁[Int(2*i-1), k] * p̃[k] - z
+            b[D*(S+1)+D*(i-1)+k] = dqdWr₁[2i-1, k] * p̃[k] - z
         end
     end
 
-    for i in 1:1:Int(S/2)
+    for i in 1:(S ÷ 2)
         for k in 1:D
             z = zero(ST)
             for j in eachindex(P, F)
-                z += timestep(int) * method(int).b[j] * F[j][k] * dqdbc[j, Int(2*i-1), k]
-                z += method(int).b[j] * P[j][k] * dvdbc[j, Int(2*i-1), k]
+                z += timestep(int) * method(int).b[j] * F[j][k] * dqdbc[j, 2i-1, k]
+                z += method(int).b[j] * P[j][k] * dvdbc[j, 2i-1, k]
             end
-            b[Int(D*(S+1+S/2)+D*(i-1)+k)] = (dqdbr₁[Int(2*i-1), k] * p̃[k] - dqdbr₀[Int(2*i-1), k] * p̄[k]) - z
+            b[D*(S+1+S÷2)+D*(i-1)+k] = (dqdbr₁[2i-1, k] * p̃[k] - dqdbr₀[2i-1, k] * p̄[k]) - z
         end
     end
-    show_status ? println(" Residual vector b: \n", b) : nothing
-    show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
+    # `@debug`, not `show_status ? println(...)`: `residual!` runs once per Newton iteration
+    # *and* once per ForwardDiff Jacobian column, with `b` a vector of `Dual`s, so printing it
+    # under a flag that defaulted to `true` dumped O(iterations × unknowns) residual vectors
+    # per time step. The non-reversible siblings had already dropped these two lines.
+    @debug "residual" b norm_b = norm(b)
 end
 
 
 
-function GeometricIntegratorsBase.update!(sol, params, int::GeometricIntegrator{<:ShallowNetReversible}, DT)
-    sol.q .= cache(int, DT).q̃
-    sol.p .= cache(int, DT).p̃
-end
+# No `update!` override here: this integrator uses the shared DT-form `update!` in
+# `network_integrator_core.jl`, of which the override that used to sit here was a verbatim
+# copy. (The two *autodiff* integrators do override it — they recompute `p` from the
+# quadrature rather than reading it out of the cache.)
 
 
 
@@ -368,43 +293,28 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNetRevers
     local S = nbasis(method(int))
     local NN = method(int).basis.NN
     local ps = cache(int).ps
-    local show_status = method(int).show_status
 
     local N_plot = method(int).record_grid_points
     local T = eltype(x)
     network_inputs = reshape(collect(range(zero(T), one(T), N_plot)), 1, N_plot)
 
-    if show_status
-        print("\n solution x after solving by Newton \n")
-        print(x)
-    end
+    @debug "solution x after solving by Newton" x
 
     for k in 1:D
         for i in 1:S
             ps[k][2].W[i] = x[D*(i-1)+k]
         end
-        for i in 1:Int(S/2)
-            ps[k][1].W[Int(2i-1)] = x[Int(D*(S+1)+D*(i-1)+k)]
-            ps[k][1].b[Int(2i-1)] = x[Int(D*(S+1+S/2)+D*(i-1)+k)]
-            ps[k][1].W[Int(2i)] = -1 * ps[k][1].W[Int(2i-1)]
-            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)]
+        for i in 1:(S ÷ 2)
+            ps[k][1].W[2i-1] = x[D*(S+1)+D*(i-1)+k]
+            ps[k][1].b[2i-1] = x[D*(S+1+S÷2)+D*(i-1)+k]
+            ps[k][1].W[2i] = -ps[k][1].W[2i-1]
+            ps[k][1].b[2i] = ps[k][1].W[2i-1] + ps[k][1].b[2i-1]
         end
         stage_values[:, k] = NN(network_inputs, ps[k])[:]
-        if show_status
-            @show ps[k][2].W[:]
-            @show ps[k][1].W[:]
-            @show ps[k][1].b[:]
-        end
+        @debug "parameters after solving" dim = k W2 = ps[k][2].W W1 = ps[k][1].W b1 = ps[k][1].b
     end
 
-    if show_status
-        print("\n stages prediction after solving \n")
-        print(stage_values)
-        print("\n sol from this step \n")
-        print("q:", sol.q, "\n")
-        print("p:", sol.p, "\n")
-
-    end
+    @debug "stages prediction after solving" stage_values q = sol.q p = sol.p
 
 end
 

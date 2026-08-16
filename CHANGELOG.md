@@ -7,7 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **`show_status` now defaults to `false`** on all five network integrators. It defaulted to
+  `true`, and in `ShallowNetReversible` and `ShallowNetAutodiffReversible` it gated a `println`
+  of the full residual vector *inside* `residual!` — which runs once per Newton iteration and
+  once per ForwardDiff Jacobian column, with `b` a vector of `Dual`s. The default configuration
+  therefore printed O(iterations × unknowns) residual vectors per time step. The two
+  non-reversible siblings had already had those lines removed; the reversible copies were
+  missed. All such output is now `@debug`.
+
+- **`Zygote` is no longer a dependency.** Its single call site is described under *Fixed* below.
+
+- **`mse_loss` is renamed `mae_loss`.** The name said squared error, the docstring said absolute
+  error, and the body computed absolute error. The body is authoritative, so renaming leaves the
+  numerics of every `TrainingMethod` seed exactly as they were; switching to a squared error
+  would have changed them silently. A dead `μ` keyword was dropped and `λ` made type-generic (it
+  defaulted to a `Float64` literal, which promoted a `Float32`/`Float16` loss to `Float64`).
+
+- **`box_init_plain` requires an element type and takes an `rng`.** See *Fixed*.
+
 ### Fixed
+
+- **`VISE.integrate!` corrupted its output on any restart.** It sized `internal_values` and
+  `each_step_solution` as `n₂-n₁+1` but indexed them by `n`, so every `n₁ > 1` left the first
+  `n₁-1` slots `#undef` and ran off the end. This is the same bug that had already been found
+  and fixed in the network integrators' `integrate!`, comment and all; the VISE copy of the loop
+  was never updated. Both containers also had abstract element types (`Vector{Matrix}`,
+  `Vector{Vector}`), now concrete.
+
+- **`box_init_plain` reseeded Julia's global RNG as a side effect of a default argument.** The
+  keyword defaulted to the *expression* `Random.seed!(1)`, which is evaluated on every call that
+  omits it: `DenseNet`'s LSGD seed calls it three times in a row, so it reseeded the global RNG
+  three times and drew all three layers from the same freshly-seeded stream — correlated, not
+  independent — discarding the `Random.seed!(42)` the caller had just done. It also defaulted to
+  `Float32` while every call site omitted the type, so a `Float64` DenseNet drew its weights at
+  single precision and converted on assignment, in contradiction of the package's "no silent
+  upcast" invariant and invisible to a test that checks the `eltype` of the result.
+
+- **`VISE` and `CGVINodal` trait functions did not reach the framework.** `isexplicit`,
+  `isimplicit`, `issymmetric` and `issymplectic` were defined *unqualified*. None of the four is
+  imported into this module, so each definition created a new, shadowing
+  `NonlinearIntegrators.isexplicit` rather than extending `GeometricIntegratorsBase`'s generic —
+  and the framework kept answering `missing` for all of them. It mattered most for
+  `CGVINodal`, where `issymplectic = true` is a real claim about the continuous-Galerkin
+  construction and was the one property downstream code could have selected the integrator on.
+  The network integrators had always qualified theirs.
+
+- **`VISEBasis` no longer builds its compiled functions with `eval`.**
+  `Symbolics.eval(Symbolics.build_function(…))` added methods in a newer world age than the
+  caller's, so constructing a basis and evaluating it within one function body raised
+  `MethodError: … The applicable method may be too new`. It only appeared to work because the
+  sole test built the basis at top level, where world age advances between statements.
+  `build_function(…; expression = Val(false))` returns a `RuntimeGeneratedFunction` instead —
+  no `eval`, no world-age barrier, and a concrete type.
 
 - **The documentation deploys again on a tag.** `deploydocs` was called with `devurl = "stable"`,
   publishing `main` at `/stable/`. Its default `versions` is `["stable" => "v^", "v#.#", devurl =>
@@ -27,6 +80,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retroactively, the tag carrying the `make.jl` it was built with; it lands from the next tagged
   release onwards. The `/stable/` tree currently on `gh-pages` was built from the `main` commit the
   tag points at, so it holds the 0.2.0 documentation already.
+
+### Changed
+
+- **The Newton hot path no longer allocates gratuitously.** Measured bytes per `residual!` call
+  (Float64, S = 4, R = 8, D = 1), before → after:
+
+  | integrator | before | after | |
+  |---|---|---|---|
+  | `ShallowNet` | 21 344 | 11 424 | 1.9× |
+  | `ShallowNetReversible` | 26 176 | 11 424 | 2.3× |
+  | `ShallowNetAutodiff` | 211 968 | 51 584 | 4.1× |
+  | `ShallowNetAutodiffReversible` | 216 800 | 51 584 | 4.2× |
+
+  The substantive items: six cache arrays in the autodiff integrators were written on every
+  residual evaluation and **never read anywhere**, along with the two `ForwardDiff.gradient`
+  calls that existed only to fill them; `DVDθ` was evaluated *twice* per quadrature node in the
+  symbolic pair, once for `a` and again for `dvdWc`/`dvdbc`, although one call returns both;
+  `apply_NN` materialised three slices of its parameter vector plus three broadcast temporaries
+  per call, inside a `ForwardDiff.gradient` and again inside a nested gradient-of-a-derivative;
+  `ps_vec` was allocated up to `2D+1` times per `components!` call across three loops that each
+  recomputed the same gather; the one-element network inputs `[quad_nodes[j]]`, `[zero(ST)]`,
+  `[one(ST)]` allocated per node per dimension; and `s̃` was allocated in all seven caches and
+  never read or written.
+
+- **`cache(int, ST)` is now inferable.** `CacheType` built its return type from *runtime* fields
+  (`method.basis.S`, `method.common.extrapolation_substep`), so it returned
+  `ShallowNetCache{Float64, _A, 8, _B} where {_A, _B}` — not concrete. That is the type the
+  framework's `CacheDict` lookup asserts against, so every value read out of the cache was `Any`.
+  Those parameters were phantom: no field type mentioned them and nothing dispatched on them.
+  They are ordinary constructor arguments now. For the autodiff integrators this was the root of
+  thirteen runtime dispatches, `ps_vec::Any` poisoning every gradient call downstream.
+
+- **`ForwardDiff.gradient` replaced by `gradient!` on the ansatz derivatives.** `gradient(f, x)`
+  chooses its chunk size from `length(x)`, a runtime value here, so its return type is not
+  inferable and came back `Any`. The in-place form returns the buffer it was given.
+
+- **The four shallow-net caches are two.** Within each pair they were byte-identical apart from
+  the struct name and one line — the length of the unknown vector — which is now a constructor
+  argument. `SymbolicShallowNetCache` and `AutodiffShallowNetCache` live in
+  `network_integrator_core.jl`. Likewise `DenseNet`'s parameter packing, which appeared verbatim
+  in four places as a loop in which four of the five assignments did not depend on the loop
+  variable, is now `densenet_pack!`/`densenet_unpack!`.
+
+- **`update!`'s package-local second form is now `update_solution!`.** Splitting the update into
+  "run `components!`, then write the cache into `sol`" is this package's own convention — the
+  framework has no such form — and defining it as a fourth `update!` method gave it a signature
+  ambiguous against the framework's own. Five of the eight ambiguities Aqua reported were this;
+  the three that remain come from following the framework's documented extension signature and
+  are not reachable.
+
+- **VISE is typed.** `VISE.quadrature` and eight `VISECache` fields were `::Any`, and their
+  contents `Vector{Any}` because the builders started from `mat = []`. The `41`-row
+  `stage_values` buffer now honours `record_grid_points` like the network integrators.
+
+- **Dead code removed:** `default_iparams` (three definitions, no call sites),
+  `GaussQuadrature64`/`GaussQuadrature128`, four unused ansatz partial derivatives, a duplicate
+  `update!` override in `ShallowNetReversible`, and a commented-out second copy of the ansatz in
+  `shallownet_autodiff_reversible.jl` that made the file look self-contained when it in fact
+  depends on its sibling being included first. `Int(S/2)`-style float arithmetic in index
+  expressions became `S ÷ 2`.
+
+### Tests
+
+- **The five per-integrator unit files are one table-driven file.** They were structurally
+  identical — each declared its own copy of the same three-element extrapolation list, then
+  repeated the same accuracy block and cross-product loop, varying only the constructor and one
+  tolerance. Two of them differed in 27 of 44 lines, every one a type-name substitution plus a
+  single number. `testsetup.jl` gains the shared `EXTRAPOLATIONS`, `ho_accuracy_problem`,
+  `accuracy_guard`, `dispatch_case` and `assert_finite_endpoint`.
+
+- **Bases are memoised.** The suite performed ~72 SymbolicNeuralNetworks code-generation runs to
+  obtain about two distinct objects per element type, and `.githooks/pre-push` pays that on
+  every push.
+
+- **New gates:** per-integrator `@allocated` budgets on `residual!` and `@inferred`; Aqua's full
+  suite; and a `D = 2` layout guard for the network integrators — every layout mistake between
+  `components!`, `residual!` and `update!` collapses to the identity at `D = 1`, which is why
+  `cgvi_unit.jl` already carried the equivalent guard. VISE's test went from one Float64 step
+  asserting only finiteness to a five-step accuracy assertion (its ansatz is exact for the
+  harmonic oscillator), a restart guard, and trait checks.
+
+- **Test dependencies moved to `test/Project.toml`**, so Aqua and JET stay out of the package's
+  own dependency graph. JET's analysis is a developer script,
+  `test/quality/jet_residual.jl`, rather than a suite assertion — see the note in
+  `test/quality/aqua_jet.jl` for why.
 
 ## [0.2.0] - 2026-08-16
 

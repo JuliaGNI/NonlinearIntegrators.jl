@@ -70,12 +70,17 @@ quadrature(method::CGVINodal) = method.quadrature
 nbasis(::CGVINodal{T,NB,NN}) where {T,NB,NN} = NB
 nnodes(::CGVINodal{T,NB,NN}) where {T,NB,NN} = NN
 
-isexplicit(::Union{CGVINodal,Type{<:CGVINodal}}) = false
-isimplicit(::Union{CGVINodal,Type{<:CGVINodal}}) = true
-issymmetric(::Union{CGVINodal,Type{<:CGVINodal}}) = missing
-issymplectic(::Union{CGVINodal,Type{<:CGVINodal}}) = true
+# Qualified with `GeometricIntegratorsBase.` — see the note on the same four traits in
+# `src/vise/vise.jl`. Unqualified, these created a shadowing `NonlinearIntegrators.isexplicit`
+# and the framework kept answering `missing`. It matters most here: `issymplectic = true` is a
+# real claim about the continuous-Galerkin construction on a linear basis, and it was the one
+# property of this integrator that downstream code could have selected on.
+GeometricIntegratorsBase.isexplicit(::Union{CGVINodal,Type{<:CGVINodal}}) = false
+GeometricIntegratorsBase.isimplicit(::Union{CGVINodal,Type{<:CGVINodal}}) = true
+GeometricIntegratorsBase.issymmetric(::Union{CGVINodal,Type{<:CGVINodal}}) = missing
+GeometricIntegratorsBase.issymplectic(::Union{CGVINodal,Type{<:CGVINodal}}) = true
 
-isiodemethod(::Union{CGVINodal,Type{<:CGVINodal}}) = true
+GeometricIntegratorsBase.isiodemethod(::Union{CGVINodal,Type{<:CGVINodal}}) = true
 
 default_solver(::CGVINodal) = Newton()
 default_iguess(::CGVINodal) = HermiteExtrapolation()
@@ -96,14 +101,16 @@ function Base.show(io::IO, method::CGVINodal)
 end
 
 
-struct CGVINodalCache{ST,S,R} <: IODEIntegratorCache{ST}
+# `{ST}` only — see the note on `ShallowNetCache`. Unlike the network methods, `CGVINodal`
+# already carried `NBASIS`/`NNODES` as type parameters, so `CacheType` did fold here; dropping
+# the phantom parameters keeps the seven caches uniform and removes the dependency on that.
+struct CGVINodalCache{ST} <: IODEIntegratorCache{ST}
     x::Vector{ST}
 
     q̃::Vector{ST}
     p̃::Vector{ST}
     ṽ::Vector{ST}
     f̃::Vector{ST}
-    s̃::Vector{ST}
 
     X::Vector{Vector{ST}}
     Q::Vector{Vector{ST}}
@@ -112,7 +119,7 @@ struct CGVINodalCache{ST,S,R} <: IODEIntegratorCache{ST}
     F::Vector{Vector{ST}}
 
 
-    function CGVINodalCache{ST,S,R}(ics) where {ST,S,R}
+    function CGVINodalCache{ST}(ics, S::Int, R::Int) where {ST}
         D = length(vec(ics.q))
         x = zeros(ST, D * (S-1))
 
@@ -121,7 +128,6 @@ struct CGVINodalCache{ST,S,R} <: IODEIntegratorCache{ST}
         p̃ = zeros(ST, D)
         ṽ = zeros(ST, D)
         f̃ = zeros(ST, D)
-        s̃ = zeros(ST, D)
 
         # create internal stage vectors
         X = create_internal_stage_vector(ST, D, S)
@@ -130,17 +136,17 @@ struct CGVINodalCache{ST,S,R} <: IODEIntegratorCache{ST}
         V = create_internal_stage_vector(ST, D, R)
         F = create_internal_stage_vector(ST, D, R)
 
-        new(x, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F)
+        new(x, q̃, p̃, ṽ, f̃, X, Q, P, V, F)
     end
 end
 
 GeometricIntegratorsBase.nlsolution(cache::CGVINodalCache) = cache.x
 
 function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::CGVINodal; kwargs...) where {ST}
-    CGVINodalCache{ST,nbasis(method),nnodes(method)}(initial_conditions(problem); kwargs...)
+    CGVINodalCache{ST}(initial_conditions(problem), nbasis(method), nnodes(method); kwargs...)
 end
 
-@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::CGVINodal) = CGVINodalCache{ST,nbasis(method),nnodes(method)}
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::CGVINodal) = CGVINodalCache{ST}
 
 
 function GeometricIntegratorsBase.initial_guess!(sol, history, params, int::GeometricIntegrator{<:CGVINodal})
@@ -264,7 +270,7 @@ function GeometricIntegratorsBase.residual!(b::AbstractVector{ST}, x::AbstractVe
 end
 
 
-function GeometricIntegratorsBase.update!(sol, params, int::GeometricIntegrator{<:CGVINodal}, DT)
+function update_solution!(sol, params, int::GeometricIntegrator{<:CGVINodal}, ::Type{DT}) where {DT}
    local C = cache(int, DT)
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
@@ -292,7 +298,7 @@ function GeometricIntegratorsBase.update!(sol, params, x::AbstractVector{DT}, in
     GeometricIntegratorsBase.components!(x, sol, params, int)
 
     # compute final update
-    GeometricIntegratorsBase.update!(sol, params, int, DT)
+    update_solution!(sol, params, int, DT)
 end
 
 

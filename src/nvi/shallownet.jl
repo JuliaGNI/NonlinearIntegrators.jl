@@ -44,7 +44,7 @@ struct ShallowNet{T, NNODES, basisType <: Basis{T},
     function ShallowNet(basis::Basis{T}, quadrature::QuadratureRule{T};
         extrapolation_substep      :: Int  = 10,
         training_epochs           :: Int  = 50000,
-        show_status               :: Bool = true,
+        show_status               :: Bool = false,
         initial_trajectory_method :: ET   = IntegratorExtrapolation(),
         initial_guess_method      :: IPMT = OGA1d(),
         record_grid_points = 41,
@@ -63,102 +63,20 @@ struct ShallowNet{T, NNODES, basisType <: Basis{T},
     end
 end
 
-struct ShallowNetCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
-    x::Vector{ST}
-
-    q̄::Vector{ST}
-    p̄::Vector{ST}
-
-    q̃::Vector{ST}
-    p̃::Vector{ST}
-    ṽ::Vector{ST}
-    f̃::Vector{ST}
-    s̃::Vector{ST}
-
-    X::Vector{Vector{ST}}
-    Q::Vector{Vector{ST}}
-    P::Vector{Vector{ST}}
-    V::Vector{Vector{ST}}
-    F::Vector{Vector{ST}}
-
-    ps::Vector{@NamedTuple{L1::@NamedTuple{W::Matrix{ST}, b::Vector{ST}},L2::@NamedTuple{W::Matrix{ST}}}}
-
-    r₀::Matrix{ST}
-    r₁::Matrix{ST}
-    m::Array{ST,3}
-    a::Array{ST,3}
-
-    dqdWc::Array{ST,3}
-    dqdbc::Array{ST,3}
-    dvdWc::Array{ST,3}
-    dvdbc::Array{ST,3}
-
-    dqdWr₁::Matrix{ST}
-    dqdWr₀::Matrix{ST}
-
-    dqdbr₁::Matrix{ST}
-    dqdbr₀::Matrix{ST}
-
-    stage_values::Matrix{ST}
-    network_labels::Matrix{ST}
-
-    function ShallowNetCache{ST,S,R,N}(ics; record_grid_points::Int = 41) where {ST,S,R,N}
-        D = length(vec(ics.q))
-        x = zeros(ST, D * (S + 1 + 2 * S)) # Last layer Weight S (no bias for now) + P + hidden layer W (S*S₁) + hidden layer bias S
-
-        q̄ = zeros(ST, D)
-        p̄ = zeros(ST, D)
-
-        # create temporary vectors
-        q̃ = zeros(ST, D)
-        p̃ = zeros(ST, D)
-        ṽ = zeros(ST, D)
-        f̃ = zeros(ST, D)
-        s̃ = zeros(ST, D)
-
-        # create internal stage vectors
-        X = create_internal_stage_vector(ST, D, S)
-        Q = create_internal_stage_vector(ST, D, R)
-        P = create_internal_stage_vector(ST, D, R)
-        V = create_internal_stage_vector(ST, D, R)
-        F = create_internal_stage_vector(ST, D, R)
-
-        # create parameter vectors
-        ps = [(L1=(W=zeros(ST, S, 1), b=zeros(ST, S)), L2=(W=zeros(ST, 1, S),)) for k in 1:D]
-
-        r₀ = zeros(ST, S, D)
-        r₁ = zeros(ST, S, D)
-        m = zeros(ST, R, S, D)
-        a = zeros(ST, R, S, D)
-
-        dqdWc = zeros(ST, R, S, D)
-        dqdbc = zeros(ST, R, S, D)
-        dvdWc = zeros(ST, R, S, D)
-        dvdbc = zeros(ST, R, S, D)
-
-        dqdWr₁ = zeros(ST, S, D)
-        dqdWr₀ = zeros(ST, S, D)
-        dqdbr₁ = zeros(ST, S, D)
-        dqdbr₀ = zeros(ST, S, D)
-
-        stage_values = zeros(ST, record_grid_points, D)
-        network_labels = zeros(ST, N + 1, D)
-
-        new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a,
-            dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
-            stage_values, network_labels)
-    end
-end
+# The cache lives in `network_integrator_core.jl` and is shared with this integrator's
+# sibling; the only thing that differs is the number of unknowns per dimension, passed
+# below. `CacheType` returns `SymbolicShallowNetCache{ST}` — a *concrete* type, which it was
+# not while the basis size and sub-step count were (runtime-computed) type parameters.
 
 function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::ShallowNet; kwargs...) where {ST}
-    ShallowNetCache{ST, nbasis(method), nnodes(method),
-        extrapolation_substep(method),}(initial_conditions(problem);
+    local S = nbasis(method)
+    SymbolicShallowNetCache{ST}(initial_conditions(problem), 3 * S + 1, S, nnodes(method),
+        extrapolation_substep(method);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
 @inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::ShallowNet) =
-    ShallowNetCache{ST, nbasis(method), nnodes(method),
-        extrapolation_substep(method),}
+    SymbolicShallowNetCache{ST}
 
 function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::TrainingMethod, sol)
     local D = length(cache(int).q̃)
@@ -186,7 +104,7 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::
         # the learning rate is the line search, decaying from 1e-3 to 5e-5 over the epoch budget.
         local PT = eltype(PNN.params[1].W)
         ps_flat = optimizer_params(PNN.params)
-        loss(p) = mse_loss(network_inputs, labels, NN, network_params(p, PNN.params))
+        loss(p) = mae_loss(network_inputs, labels, NN, network_params(p, PNN.params))
         algorithm = GeometricOptimizers.Adam(PT)
         # `max_iterations` is the epoch budget: `solve!` runs its own loop and stops on
         # `meets_stopping_criteria`, so the budget has to be an option rather than a `for` range.
@@ -208,7 +126,7 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::
         # converging is the expected case and not an error: it is reported at debug level, like the
         # loss beside it, rather than warned about. The epoch count comes from the state because
         # `solve!` may stop before the budget, which the old message assumed it never did.
-        @debug "dimension" k "final loss:" mse_loss(network_inputs, labels, NN, PNN.params) "in" GeometricOptimizers.iteration_number(state) "of" nepochs "epochs; converged:" GeometricOptimizers.isconverged(optstatus)
+        @debug "dimension" k "final loss:" mae_loss(network_inputs, labels, NN, PNN.params) "in" GeometricOptimizers.iteration_number(state) "of" nepochs "epochs; converged:" GeometricOptimizers.isconverged(optstatus)
 
         for i in 1:S
             x[D*(i-1)+k] = PNN.params[2].W[i]
@@ -237,6 +155,7 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     local NN = method(int).basis.NN
     local ps = cache(int, ST).ps
 
+    local tbuf = cache(int, ST).tbuf
     local r₀ = cache(int, ST).r₀
     local r₁ = cache(int, ST).r₁
     local m = cache(int, ST).m
@@ -273,35 +192,46 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
         end
     end
 
-    # compute coefficients
+    # Coefficients and their parameter derivatives, at the quadrature nodes and the two
+    # interval boundaries. This used to be two passes over `d`; merging them is what lets the
+    # per-`(j, d)` work be shared:
+    #
+    #   * `DVDθ` is evaluated once per node instead of twice. The first pass called it for `a`
+    #     (taking `.L2.W`) and the second called it again at the same node for `dvdWc`/`dvdbc`
+    #     (taking `.L1.W`/`.L1.b`) — one call returns all three. This is the most expensive
+    #     kernel in the integrator, so it is a straight 2× on the dominant cost.
+    #   * `NeuralNetworkParameters(ps[d])` is loop-invariant in `j` and is now built once per
+    #     dimension rather than four times per node.
+    #   * `copyto!` into a `view` replaces `dst[j, :, d] = src.L1.W[:]`, whose `[:]` allocated
+    #     a copy of the source only to read it once.
     for d in 1:D
-        r₀[:, d] = (NN.layers[1])([zero(ST)], ps[d][1])
-        r₁[:, d] = (NN.layers[1])([one(ST)], ps[d][1])
+        psd = NeuralNetworkParameters(ps[d])
+
+        tbuf[1] = zero(ST)
+        copyto!(view(r₀, :, d), (NN.layers[1])(tbuf, ps[d][1]))
+        g0 = DQDθ(tbuf, psd)
+        copyto!(view(dqdWr₀, :, d), g0.L1.W)
+        copyto!(view(dqdbr₀, :, d), g0.L1.b)
+
+        tbuf[1] = one(ST)
+        copyto!(view(r₁, :, d), (NN.layers[1])(tbuf, ps[d][1]))
+        g1 = DQDθ(tbuf, psd)
+        copyto!(view(dqdWr₁, :, d), g1.L1.W)
+        copyto!(view(dqdbr₁, :, d), g1.L1.b)
+
         for j in eachindex(quad_nodes)
-            m[j, :, d] = (NN.layers[1])([quad_nodes[j]], ps[d][1])
-            a[j, :, d] = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d])).L2.W[:]
+            tbuf[1] = quad_nodes[j]
+            copyto!(view(m, j, :, d), (NN.layers[1])(tbuf, ps[d][1]))
+
+            g = DQDθ(tbuf, psd)
+            copyto!(view(dqdWc, j, :, d), g.L1.W)
+            copyto!(view(dqdbc, j, :, d), g.L1.b)
+
+            gv = DVDθ(tbuf, psd)
+            copyto!(view(a, j, :, d), gv.L2.W)
+            copyto!(view(dvdWc, j, :, d), gv.L1.W)
+            copyto!(view(dvdbc, j, :, d), gv.L1.b)
         end
-    end
-
-    # compute the derivatives of the coefficients on the quadrature nodes and at the boundaries
-    for d in 1:D
-        for j in eachindex(quad_nodes)
-            g = DQDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
-            dqdWc[j, :, d] = g.L1.W[:]
-            dqdbc[j, :, d] = g.L1.b[:]
-
-            gv = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
-            dvdWc[j, :, d] = gv.L1.W[:]
-            dvdbc[j, :, d] = gv.L1.b[:]
-        end
-
-        g0 = DQDθ([zero(ST)], NeuralNetworkParameters(ps[d]))
-        dqdWr₀[:, d] = g0.L1.W[:]
-        dqdbr₀[:, d] = g0.L1.b[:]
-
-        g1 = DQDθ([one(ST)], NeuralNetworkParameters(ps[d]))
-        dqdWr₁[:, d] = g1.L1.W[:]
-        dqdbr₁[:, d] = g1.L1.b[:]
     end
 
     # compute Q : q at quaadurature points

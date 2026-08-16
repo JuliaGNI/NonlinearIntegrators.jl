@@ -67,3 +67,21 @@ end
     @test maximum(abs.(qend .- qref)) < 1e-8
     @test maximum(abs.(pend .- pref)) < 1e-8
 end
+
+# `CGVINodal`'s traits used to be defined unqualified, which created a shadowing
+# `NonlinearIntegrators.isexplicit` rather than extending the framework generic — so
+# `GeometricIntegratorsBase.issymplectic(::CGVINodal)` answered `missing` even though the
+# continuous-Galerkin construction on a linear basis *is* symplectic, and that was the one
+# property downstream code could have selected this integrator on. Asserted through
+# `GeometricIntegratorsBase` so a bare definition cannot pass.
+@testset "CGVINodal traits reach the framework" begin
+    qlob = lobatto(Float64, 4)
+    blob = CompactBasisFunctions.Lagrange(QuadratureRules.nodes(qlob))
+    m = CGVINodal(blob, qlob)
+    @test GeometricIntegratorsBase.isexplicit(m) === false
+    @test GeometricIntegratorsBase.isimplicit(m) === true
+    @test GeometricIntegratorsBase.issymmetric(m) === missing
+    @test GeometricIntegratorsBase.issymplectic(m) === true
+    @test GeometricIntegratorsBase.isiodemethod(m) === true
+    @test sprint(show, m) isa String
+end
