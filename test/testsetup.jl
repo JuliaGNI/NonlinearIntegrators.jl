@@ -46,12 +46,6 @@ relu_k(k::Int = 3) = x -> max(zero(x), x)^k
 
 # ---- basis / quadrature builders -------------------------------------------
 
-build_shallownet_basis(::Type{T}; S = 4, k = 3) where {T} =
-    ShallowNetBasis{T}(relu_k(k), S)
-
-build_densenet_basis(::Type{T}; S₁ = 3, S = 3) where {T} =
-    DenseNetBasis{T}(tanh, S₁, S)
-
 function build_vise_basis(::Type{T}) where {T}
     @variables tvar
     @variables Wv[1:3]
@@ -62,7 +56,48 @@ end
 gauss(::Type{T}, R = 8) where {T} = QuadratureRules.GaussLegendreQuadrature(T, R)
 lobatto(::Type{T}, R = 4) where {T} = QuadratureRules.LobattoLegendreQuadrature(T, R)
 
-# ---- problem builder --------------------------------------------------------
+# Memoised basis builder.
+#
+# Building a `ShallowNetBasis` runs SymbolicNeuralNetworks' code generation, which is the
+# single largest cost in this suite: the tests used to perform ~72 of these builds to obtain
+# about two distinct objects per element type, and `.githooks/pre-push` pays that on every
+# push. A basis is immutable and stateless once built, so one instance can back every testset
+# that asks for the same `(kind, T, sizes, options)`.
+#
+# Anything that varies the *construction* (`symbolic = false`, `cse`/`inplace`) is part of the
+# key, so `dispatch_variants_unit.jl` and `bases_smoke.jl` still get their own objects.
+const _BASIS_CACHE = Dict{Any,Any}()
+
+function cached_shallownet_basis(::Type{T}; S = 4, k = 3, kwargs...) where {T}
+    key = (:shallow, T, S, k, NamedTuple(kwargs))
+    get!(_BASIS_CACHE, key) do
+        ShallowNetBasis{T}(relu_k(k), S; kwargs...)
+    end
+end
+
+function cached_densenet_basis(::Type{T}; S₁ = 3, S = 3, kwargs...) where {T}
+    key = (:dense, T, S₁, S, NamedTuple(kwargs))
+    get!(_BASIS_CACHE, key) do
+        DenseNetBasis{T}(tanh, S₁, S; kwargs...)
+    end
+end
+
+# The plain names route through the memoised builders above. Only `bases_smoke.jl`, which tests
+# *construction*, calls the concrete constructors directly and gets fresh objects.
+build_shallownet_basis(::Type{T}; kwargs...) where {T} = cached_shallownet_basis(T; kwargs...)
+build_densenet_basis(::Type{T}; kwargs...) where {T} = cached_densenet_basis(T; kwargs...)
+
+# A smooth target on the unit interval and the Simpson weights the integrators use — the
+# fixture the OGA kernels are exercised on. Lives here rather than in oga_kernels.jl because
+# the allocation gates in test/quality use it too.
+function oga_testcase(::Type{T}; n = 10) where {T}
+    nodes = T.((0:n) ./ n)
+    weights = NI.simpson_quadrature(n, T)
+    y = T.(cos.(3 .* Float64.(nodes)))
+    return (nodes, weights, y)
+end
+
+# ---- problem builders -------------------------------------------------------
 
 # Minimal Harmonic Oscillator LODE problem at precision `T`. A short time span and
 # a single/couple of steps keep the network solves fast; smoke/unit tests only
@@ -71,6 +106,17 @@ function ho_problem(::Type{T}; timespan = (T(0.0), T(0.2)), timestep = T(0.1)) w
     params = HarmonicOscillator.default_parameters(T)
     HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];
         timespan = timespan, timestep = timestep, parameters = params)
+end
+
+# The ten-step problem the accuracy guards run on, plus its analytic endpoint. Five test
+# files used to spell this out by hand — build `default_parameters`, build the problem, call
+# `exact_solution_q` with the same six literals — and the copies could drift apart silently.
+function ho_accuracy_problem(::Type{T}; tend = T(1.0), timestep = T(0.1)) where {T}
+    params = HarmonicOscillator.default_parameters(T)
+    prob = HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];
+        timespan = (T(0.0), tend), timestep = timestep, parameters = params)
+    qref = HarmonicOscillator.exact_solution_q(tend, T(0.5), T(0.0), T(0.0), params)
+    return prob, qref
 end
 
 # ---- assertions -------------------------------------------------------------
@@ -109,4 +155,124 @@ hermite_kw(extrap) = extrap isa HermiteExtrapolation ? (; initialguess = Hermite
 # convergence claim (see `benchmark/shallownet_benchmark_common.jl`, which records the same situation
 # as a distinct `maxiter` status rather than as `ok`).
 const MAX_NEWTON_ITERATIONS = 100
+
+# The three extrapolation variants every network integrator is driven over. This literal used
+# to be repeated, identically, in five separate unit files.
+const EXTRAPOLATIONS = [
+    (NoExtrapolation(),          "NoExtrapolation"),
+    (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
+    (HermiteExtrapolation(),     "HermiteExtrapolation"),
+]
+
+# ---- the integrator table ---------------------------------------------------
+#
+# The five network integrators and what genuinely differs between them. Lives here, not in
+# `unit/network_integrators_unit.jl`, because `quality/inference_and_allocations.jl` drives the
+# same rows: keeping it in a unit file made `quality/` silently depend on `unit/` having been
+# included first.
+#
+#   name   — used in testset names and to look up the allocation budget
+#   make   — the constructor, taking `T` and forwarding keywords
+#   seeds  — the `initial_guess_method`s to drive. `ShallowNet` supports all four OGA
+#            variants; the reversible and autodiff ones are only meaningful with a single
+#            seed; `DenseNet` takes the two gradient-descent seeds instead.
+#   tol    — endpoint tolerance for the accuracy guard, `nothing` to skip it. The symbolic
+#            pair reaches 1e-8; the autodiff pair is limited to 1e-4 by the Newton floor of
+#            the hand-written ansatz. `DenseNet` has no guard at all: its Training/LSGD seeds
+#            are not stable enough for one, so its rows assert dispatch and finiteness only
+#            (this is deliberate — see the note in runtests.jl).
+
+shallow_kw(::Type{T}) where {T} = (; show_status = false, bias_interval = [-T(pi), T(pi)],
+                                     dict_amount = 400)
+
+const NETWORK_INTEGRATORS = [
+    (name  = "ShallowNet",
+     make  = (T; kw...) -> ShallowNet(cached_shallownet_basis(T; S = 4), gauss(T, 8);
+                                      shallow_kw(T)..., kw...),
+     seeds = [(OGA1d(),                "OGA1d"),
+              (OGA1dNormalized(),      "OGA1dNormalized"),
+              (OGA1dStable(),          "OGA1dStable"),
+              (OGA1dNormalEquations(), "OGA1dNormalEquations")],
+     tol   = (Float64 = 1e-8, Float32 = 1e-3)),
+
+    (name  = "ShallowNetReversible",
+     make  = (T; kw...) -> ShallowNetReversible(cached_shallownet_basis(T; S = 4), gauss(T, 8);
+                                                shallow_kw(T)..., kw...),
+     seeds = [(OGA1d(), "OGA1d")],
+     tol   = (Float64 = 1e-8, Float32 = 1e-3)),
+
+    # `symbolic = false`: the autodiff integrators differentiate their own ansatz with
+    # ForwardDiff and never read the compiled derivative slots, so building them is wasted
+    # work. This also keeps the cached basis distinct from the symbolic one above.
+    (name  = "ShallowNetAutodiff",
+     make  = (T; kw...) -> ShallowNetAutodiff(
+                 cached_shallownet_basis(T; S = 4, symbolic = false), gauss(T, 8);
+                 shallow_kw(T)..., kw...),
+     seeds = [(OGA1dNormalized(), "OGA1dNormalized")],
+     tol   = (Float64 = 1e-4, Float32 = 1e-3)),
+
+    (name  = "ShallowNetAutodiffReversible",
+     make  = (T; kw...) -> ShallowNetAutodiffReversible(
+                 cached_shallownet_basis(T; S = 4, symbolic = false), gauss(T, 8);
+                 shallow_kw(T)..., kw...),
+     seeds = [(OGA1d(), "OGA1d")],
+     tol   = (Float64 = 1e-4, Float32 = 1e-3)),
+
+    (name  = "DenseNet",
+     make  = (T; kw...) -> DenseNet(cached_densenet_basis(T; S₁ = 3, S = 3), gauss(T, 8);
+                                    show_status = false, training_epochs = 3, kw...),
+     seeds = [(TrainingMethod(), "TrainingMethod"), (LSGD(), "LSGD")],
+     tol   = nothing),
+]
+
+# The endpoint of a run must be finite *and* still at the working element type. Spelled out
+# in seven places before.
+function assert_finite_endpoint(sol, ::Type{T}) where {T}
+    assert_no_upcast(sol.q, T)
+    @test all(isfinite, collect(sol.q[:, 1])[end])
+end
+
+# ---- the two shared run shapes ----------------------------------------------
+#
+# `make(T; kwargs...)` builds the method under test. Both helpers take it rather than a
+# constructed method so that each case gets a fresh method (and hence a fresh cache), which is
+# what the per-case testsets used to do by hand.
+
+"""
+    accuracy_guard(name, make, T; tol, kwargs...)
+
+Ten-step Harmonic Oscillator run against the analytic solution: asserts no silent upcast and
+an absolute endpoint error below `tol`. This is the block that was copied, with only the
+constructor and the tolerance varying, into five unit files.
+"""
+function accuracy_guard(name, make, ::Type{T}; tol, kwargs...) where {T}
+    @testset "$name accuracy ($T)" begin
+        prob, qref = ho_accuracy_problem(T)
+        sol, _ = integrate(prob, make(T; kwargs...);
+            regularization_factor = T(1e-5), max_iterations = MAX_NEWTON_ITERATIONS)
+        assert_no_upcast(sol.q, T)
+        qend = collect(sol.q[:, 1])[end]
+        err = abs(Float64(qend) - Float64(qref))
+        @debug "$name ($T)" q_end=Float64(qend) q_ref=Float64(qref) abs_err=err
+        @test err < tol
+    end
+end
+
+"""
+    dispatch_case(name, make, T, extrap; kwargs...)
+
+Two-step run asserting dispatch, element type and finiteness — deliberately **not**
+convergence. These combinations exhaust whatever Newton budget they are given (see the note on
+`MAX_NEWTON_ITERATIONS`), so the claim is that every (seed, extrapolation) pair reaches a
+finite state at the working precision, not that it converges.
+
+See `hermite_kw` for why the Hermite rows also pass `initialguess`.
+"""
+function dispatch_case(name, make, ::Type{T}, extrap; kwargs...) where {T}
+    prob = ho_problem(T)
+    sol, _ = integrate(prob, make(T; initial_trajectory_method = extrap, kwargs...);
+        regularization_factor = T(1e-5), max_iterations = MAX_NEWTON_ITERATIONS,
+        hermite_kw(extrap)...)
+    assert_finite_endpoint(sol, T)
+end
 

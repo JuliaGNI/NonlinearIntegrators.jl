@@ -29,33 +29,61 @@ function simpson_quadrature(N::Int, ::Type{T}=Float64) where {T}
     return w
 end
 
-function GaussQuadrature64()
-    points = [0.99930504173577213946, 0.99634011677195527935, 0.99101337147674432074, 0.98333625388462595693, 0.97332682778991096374, 0.96100879965205371892, 0.94641137485840281606, 0.92956917213193957582, 0.91052213707850280576, 0.88931544599511410585, 0.86599939815409281976, 0.84062929625258036275, 0.81326531512279755974, 0.78397235894334140761, 0.75281990726053189661, 0.71988185017161082685, 0.68523631305423324256, 0.64896547125465733986, 0.61115535517239325025, 0.57189564620263403428, 0.53127946401989454566, 0.48940314570705295748, 0.44636601725346408798, 0.4022701579639916037, 0.35722015833766811595, 0.31132287199021095616, 0.26468716220876741637, 0.21742364374000708415, 0.16964442042399281804, 0.12146281929612055447, 0.07299312178779903945, 0.024350292663424432509]
-    weight = [0.0017832807216964329473, 0.0041470332605624676353, 0.0065044579689783628561, 0.0088467598263639477231, 0.011168139460131128819, 0.013463047896718642598, 0.015726030476024719322, 0.017951715775697343085, 0.020134823153530209372, 0.022270173808383254159, 0.024352702568710873338, 0.026377469715054658672, 0.028339672614259483228, 0.030234657072402478868, 0.032057928354851553585, 0.033805161837141609392, 0.035472213256882383811, 0.03705512854024004604, 0.038550153178615629129, 0.039953741132720341387, 0.04126256324262352861, 0.042473515123653589007, 0.043583724529323453377, 0.04459055816375656306, 0.04549162792741814448, 0.046284796581314417296, 0.046968182816210017325, 0.047540165714830308662, 0.047999388596458307728, 0.04834476223480295717, 0.048575467441503426935, 0.048690957009139720383]
-    
-    nodes = 0.5 .* ([-1 .* points...,reverse(points)...] .+ 1)
-    weights = 0.5 .* [weight...,reverse(weight)...]
-    return (nodes = nodes, weights = weights)
-end
-function GaussQuadrature128()
-    points = [0.99982488794713191447, 0.99907745997737589501, 0.99773324862551401988, 0.99579275853498118687, 0.9932571129002129353, 0.99012781849173438334, 0.98640674272458620887, 0.98209610843571853603, 0.97719849146390738716, 0.9717168187471365809, 0.96565436643196526864, 0.9590147578536999281, 0.95180196134126438622, 0.94402028783022018212, 0.93567438827791637578, 0.92676925087894784333, 0.91731019808096053704, 0.90730288340175681392, 0.89675328804915818439, 0.88566771734539721741, 0.8740527969580317987, 0.86191546893954846059, 0.84926298757796896916, 0.83610291506090684712, 0.82244311695564384246, 0.80829175750791366012, 0.79365729476219329024, 0.77854847550641196685, 0.76297433004409472278, 0.74694416679706198117, 0.73046756674190880647, 0.71355437768358741334, 0.69621470836951433239, 0.67845892244771925937, 0.66029763227264605211, 0.64174169256230755715, 0.62280219391058491076, 0.6034904561585486242, 0.58381802162876308955, 0.56379664822661808391, 0.54343830241281036344, 0.52275515205117547845, 0.50175955913614446429, 0.48046407240417202586, 0.45888141983355219545, 0.43702450103710416294, 0.41490637955227501549, 0.39254027503326744274, 0.36993955534985902662, 0.34711772859763550843, 0.32408843502441337518, 0.30086543887767720267, 0.27746262017790440281, 0.25389396642269432086, 0.23017356422665998641, 0.20631559090207921715, 0.18233430598533718241, 0.158244042714224934, 0.13405919946118778512, 0.10979423112764374667, 0.085463640504515498637, 0.061081969604139568104, 0.03666379096873349333, 0.012223698960615764198]
-    weight = [0.00044938096029209037639, 0.0010458126793403487793, 0.0016425030186690295388, 0.0022382884309626187436, 0.0028327514714579910953, 0.0034255260409102157743, 0.0040162549837386423132, 0.0046045842567029551183, 0.0051901618326763302051, 0.0057726375428656985893, 0.0063516631617071887872, 0.0069268925668988135634, 0.0074979819256347286877, 0.0080645898904860579729, 0.008626377798616749705, 0.0091830098716608743345, 0.0097341534150068058636, 0.010279479015832157133, 0.010818660739503076248, 0.011351376324080416693, 0.011877307372740279576, 0.012396139543950922969, 0.01290756273926734722, 0.013411271288616332315, 0.013906964132951985244, 0.014394345004166846177, 0.014873122602147314252, 0.015343010768865144086, 0.015803728659399346859, 0.016255000909785187052, 0.016696557801589204589, 0.017128135423111376831, 0.017549475827117704649, 0.01796032718500868594, 0.018360443937331343221, 0.018749586940544708651, 0.019127523609950945487, 0.019494028058706602823, 0.01984888123283086222, 0.020191871042130041181, 0.020522792486960069432, 0.020841447780751149114, 0.021147646468221348537, 0.021441205539208460137, 0.021721949538052075375, 0.021989710668460491434, 0.022244328893799765105, 0.022485652032744966872, 0.02271353585023646131, 0.02292784414368684692, 0.023128448824387027879, 0.023315229994062760122, 0.023488076016535913153, 0.023646883584447615144, 0.023791557781003400639, 0.023922012136703455672, 0.024038168681024052638, 0.024139957989019284998, 0.02422731922281524812, 0.024300200167971865323, 0.024358557264690625853, 0.024402355633849582093, 0.024431569097850045055, 0.024446180196262518211]
-    
-    nodes = 0.5 .* ([-1 .* points...,reverse(points)...] .+ 1)
-    weights = 0.5 .* [weight...,reverse(weight)...]
-    return (nodes = nodes, weights = weights)
-end
+"""
+    _param_arrays(params) -> Tuple
 
-function flatten_params(params::NeuralNetworkParameters)
-    flat_list = []
-    for layer in values(params)
-        for field in fieldnames(typeof(layer))
-            val = getfield(layer, field)
-            push!(flat_list, vec(val))
+Every layer parameter array of `params`, `vec`'d, in layer-then-field order. The backing tuple
+for [`flatten_params!`](@ref) and [`flatten_params`](@ref); it aliases `params` rather than
+copying.
+
+`@generated` for the same reason as [`optimizer_params`](@ref): the layer/field structure is in
+the *type*, so the sequence can be emitted once at compile time. Walking it at run time is what
+made the old `flatten_params` type-unstable — `values(params)` iterates a heterogeneous
+`NamedTuple`, so `fieldnames(typeof(layer))` inside the loop cannot be folded.
+"""
+@generated function _param_arrays(params::NamedTuple{LN,LT}) where {LN,LT}
+    entries = Expr[]
+    for (i, lname) in enumerate(LN)
+        for f in fieldnames(LT.parameters[i])
+            push!(entries, :(vec(params.$lname.$f)))
         end
     end
-    return vcat(flat_list...)
+    Expr(:tuple, entries...)
 end
+
+_param_arrays(params::NeuralNetworkParameters) =
+    _param_arrays(AbstractNeuralNetworks.params(params))
+
+"""
+    flatten_params!(dest, params) -> dest
+
+Copy every layer parameter array of `params`, in layer-then-field order, into the flat vector
+`dest`.
+
+Replaces an allocating `flatten_params` that built a `flat_list = []` — a `Vector{Any}` — and
+returned `vcat(flat_list...)`, which infers as `Any` when splatted. `DenseNet`'s `components!`
+calls this `2 + 2R` times per dimension per residual evaluation, i.e. per Newton iteration and
+per Jacobian column, so it is worth having a form that writes into a caller-supplied buffer.
+"""
+function flatten_params!(dest::AbstractVector, params)
+    off = 0
+    # A homogeneous tuple (`vec` of a `Matrix` and of a `Vector` are both `Vector{T}`), so this
+    # loop is unrolled and concretely typed.
+    for v in _param_arrays(params)
+        copyto!(dest, off + 1, v, 1, length(v))
+        off += length(v)
+    end
+    return dest
+end
+
+"""
+    flatten_params(params) -> Vector
+
+Allocating form of [`flatten_params!`](@ref). Not on any hot path; kept because it reads better
+in one-off code and in the benchmarks. `reduce(vcat, ...)` over the concretely typed tuple keeps
+the element type generic, where the old splatted `vcat` over a `Vector{Any}` inferred as `Any`.
+"""
+flatten_params(params) = reduce(vcat, _param_arrays(params))
 
 
 """
@@ -123,13 +151,30 @@ end
     :(NamedTuple{$LN}(($(layers...),)))
 end
 
-function box_init_plain(input_dim::Int, output_dim::Int, ::Type{T}=Float32;Random_rng = Random.seed!(1)) where {T}
+"""
+    box_init_plain(input_dim, output_dim, ::Type{T}; rng = Random.default_rng())
+
+Draw a "box" initialisation of a `output_dim × input_dim` weight matrix and its bias at
+element type `T`.
+
+`T` is mandatory. It used to default to `Float32`, and every call site omitted it, so a
+`Float64` network was initialised at single precision and then converted on assignment —
+invisible to a test that checks the `eltype` of the result. The package's central invariant
+is that a run started at `T` stays at `T`, so the initialiser has to be told which `T`.
+
+`rng` is drawn from, not re-seeded. It used to be a keyword defaulting to the *expression*
+`Random.seed!(1)`, which is evaluated afresh on every call that omits it: each call silently
+reseeded Julia's global RNG and then drew from it, so consecutive calls returned correlated
+draws and any seeding the caller had done was discarded. Seed at the call site instead.
+"""
+function box_init_plain(input_dim::Int, output_dim::Int, ::Type{T};
+                        rng::Random.AbstractRNG = Random.default_rng()) where {T}
     W = zeros(T, output_dim, input_dim)
     b = zeros(T, output_dim)
 
     for i in 1:output_dim
-        p = rand(Random_rng,T, input_dim)
-        n = randn(Random_rng,T, input_dim)
+        p = rand(rng, T, input_dim)
+        n = randn(rng, T, input_dim)
         n ./= norm(n)
         p_max = map((n_i) -> n_i ≥ 0 ? one(T) : zero(T), n)
         k = 1 / dot((p_max .- p), n)
@@ -145,12 +190,20 @@ function lsgd_loss(network_inputs,labels,NN,ps)
 end
 
 """
-    mse_loss(x, y, NN, ps; λ=0.0, μ=0.00001)
+    mae_loss(x, y, NN, ps; λ = 0)
 
-Mean absolute error of `NN(x, ps)` against target `y`, with optional boundary penalty
+Mean **absolute** error of `NN(x, ps)` against target `y`, with optional boundary penalty
 `λ * |NN(x[1], ps) - y[1]|²`. Used as the training objective for `TrainingMethod`.
+
+Named `mse_loss` until the audit: the name said squared error, the docstring said absolute
+error, and the body computed absolute error. The body is authoritative — renaming leaves the
+numerics of every `TrainingMethod` seed exactly as they were, where switching to a squared
+error would have changed them silently. A dead `μ = 0.00001` keyword was also dropped.
+
+`λ` defaults to an untyped `0`, not `0.0`: a `Float64` literal here promoted the whole loss
+to `Float64` for a `Float32` or `Float16` network.
 """
-function mse_loss(x, y::AbstractArray{T}, NN, ps; λ=0.0, μ=0.00001) where T
+function mae_loss(x, y::AbstractArray{T}, NN, ps; λ = 0) where {T}
     y_pred = NN(x, ps)
     loss = mean(abs, y_pred - y) + λ * abs2(y_pred[1] - y[1])
     return loss

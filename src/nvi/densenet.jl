@@ -36,7 +36,7 @@ struct DenseNet{T, NNODES, basisType <: Basis{T},
     function DenseNet(basis::Basis{T}, quadrature::QuadratureRule{T};
         extrapolation_substep      :: Int  = 10,
         training_epochs           :: Int  = 50000,
-        show_status               :: Bool = true,
+        show_status               :: Bool = false,
         initial_trajectory_method :: ET   = IntegratorExtrapolation(),
         initial_guess_method  :: IPMT = LSGD(),
         record_grid_points        :: Int  = 41,) where {T, ET, IPMT}
@@ -55,7 +55,10 @@ end
 # The only integrator that does not take the shared `IntegratorExtrapolation` default.
 default_iguess(::DenseNet) = MidpointExtrapolation()
 
-struct DenseNetCache{ST,S₁,S,NP,R,N} <: NetworkIntegratorCache{ST}
+# `{ST}` only — see the note on `SymbolicShallowNetCache` in `network_integrator_core.jl`.
+# `S₁`, `S`, `NP`, `R` and `N` were phantom type parameters computed from runtime fields, which
+# made `CacheType` non-concrete and every read out of `cache(int, ST)` an `Any`.
+struct DenseNetCache{ST} <: NetworkIntegratorCache{ST}
     x::Vector{ST}
 
     q̄::Vector{ST}
@@ -65,7 +68,6 @@ struct DenseNetCache{ST,S₁,S,NP,R,N} <: NetworkIntegratorCache{ST}
     p̃::Vector{ST}
     ṽ::Vector{ST}
     f̃::Vector{ST}
-    s̃::Vector{ST}
     q0::Vector{ST}
 
     X::Vector{Vector{ST}}
@@ -86,7 +88,8 @@ struct DenseNetCache{ST,S₁,S,NP,R,N} <: NetworkIntegratorCache{ST}
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
-    function DenseNetCache{ST,S₁,S,NP,R,N}(ics; record_grid_points::Int = 41) where {ST,S₁,S,NP,R,N}
+    function DenseNetCache{ST}(ics, S₁::Int, S::Int, NP::Int, R::Int, N::Int;
+                               record_grid_points::Int = 41) where {ST}
         D = length(vec(ics.q))
         x = zeros(ST,D*(NP+1))
 
@@ -98,7 +101,6 @@ struct DenseNetCache{ST,S₁,S,NP,R,N} <: NetworkIntegratorCache{ST}
         p̃ = zeros(ST,D)
         ṽ = zeros(ST,D)
         f̃ = zeros(ST,D)
-        s̃ = zeros(ST,D)
 
         q0 = zeros(ST,D)
 
@@ -123,21 +125,61 @@ struct DenseNetCache{ST,S₁,S,NP,R,N} <: NetworkIntegratorCache{ST}
         stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N+1, D)
 
-        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, q0, X, Q, P, V, F, ps,
+        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, q0, X, Q, P, V, F, ps,
         g0_params, g1_params, dqdθc, dvdθc,
         stage_values,network_labels)
     end
 end
 
+# ---- flat solution vector ↔ nested layer parameters -------------------------
+#
+# One dimension's parameters occupy `NP` consecutive entries of `x`, laid out as
+#
+#     [ L1.W (S₁) | L1.b (S₁) | L2.W (S×S₁, by hidden unit) | L2.b (S) | L3.W (S) ]
+#
+# This packing appeared verbatim in four places (`components!`, `record_finer_solution!` and
+# both `initial_params!` methods), and in all four it was written as a loop `for i in 1:S₁`
+# in which *four of the five* assignments do not depend on `i` — so `L1.W`, `L1.b`, `L2.b` and
+# `L3.W` were re-copied `S₁` times, each from a freshly allocated slice of `x`. In
+# `components!` that is per Newton iteration and per Jacobian column.
+
+function densenet_unpack!(ps_d, x, d::Int, S₁::Int, S::Int, NP::Int)
+    off = (d - 1) * NP
+    copyto!(view(ps_d.L1.W, :, 1), view(x, off+1:off+S₁))
+    copyto!(ps_d.L1.b, view(x, off+S₁+1:off+2S₁))
+    base = off + 2S₁
+    for i in 1:S₁
+        copyto!(view(ps_d.L2.W, :, i), view(x, base+(i-1)*S+1:base+i*S))
+    end
+    tail = base + S * S₁
+    copyto!(ps_d.L2.b, view(x, tail+1:tail+S))
+    copyto!(view(ps_d.L3.W, 1, :), view(x, tail+S+1:tail+2S))
+    return ps_d
+end
+
+function densenet_pack!(x, ps_d, d::Int, S₁::Int, S::Int, NP::Int)
+    off = (d - 1) * NP
+    copyto!(view(x, off+1:off+S₁), view(ps_d.L1.W, :, 1))
+    copyto!(view(x, off+S₁+1:off+2S₁), ps_d.L1.b)
+    base = off + 2S₁
+    for i in 1:S₁
+        copyto!(view(x, base+(i-1)*S+1:base+i*S), view(ps_d.L2.W, :, i))
+    end
+    tail = base + S * S₁
+    copyto!(view(x, tail+1:tail+S), ps_d.L2.b)
+    copyto!(view(x, tail+S+1:tail+2S), view(ps_d.L3.W, 1, :))
+    return x
+end
+
 function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::DenseNet; kwargs...) where {ST}
-    DenseNetCache{ST, method.basis.S₁, method.basis.S, method.basis.NP,
-        nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
+    DenseNetCache{ST}(initial_conditions(problem),
+        method.basis.S₁, method.basis.S, method.basis.NP,
+        nnodes(method), extrapolation_substep(method);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
 @inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::DenseNet) =
-    DenseNetCache{ST, method.basis.S₁, method.basis.S, method.basis.NP,
-        nnodes(method), extrapolation_substep(method)}
+    DenseNetCache{ST}
 
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:DenseNet}, initial_trajectory_method::HermiteExtrapolation)
     local D = length(cache(int).q̃)
@@ -228,7 +270,7 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::Tr
         # respectively — the rate decaying from 1e-3 to 5e-5 over the epoch budget.
         local PT = eltype(PNN.params[1].W)
         ps_flat = optimizer_params(PNN.params)
-        loss(p) = mse_loss(network_inputs, labels, PNN, network_params(p, PNN.params))
+        loss(p) = mae_loss(network_inputs, labels, PNN, network_params(p, PNN.params))
         algorithm = GeometricOptimizers.Adam(PT)
         opt = GeometricOptimizers.Optimizer(ps_flat, loss; algorithm = algorithm,
             linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
@@ -238,7 +280,7 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::Tr
             GeometricOptimizers.increase_iteration_number!(state)
             GeometricOptimizers.solver_step!(ps_flat, state, opt)
             GeometricOptimizers.update!(state, opt, ps_flat)
-            err = mse_loss(network_inputs,labels,PNN,PNN.params)
+            err = mae_loss(network_inputs,labels,PNN,PNN.params)
 
             if err < 5e-8
                 @debug "dimension $k,final loss: $err by $ep epochs"
@@ -250,13 +292,7 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::Tr
 
         ps[k] = PNN.params[:]
 
-        for i in 1:S₁
-            x[(k-1)*NP+1:(k-1)*NP+S₁] = ps[k].L1.W[:,1]
-            x[(k-1)*NP+S₁+1:(k-1)*NP+S₁+S₁] = ps[k].L1.b[:]
-            x[(k-1)*NP+S₁+S₁ + (i-1)*S+1:(k-1)*NP+S₁+S₁+i*S] = ps[k].L2.W[:,i]
-            x[(k-1)*NP+2*S₁+S*S₁+1:(k-1)*NP+2*S₁+S*S₁+S] = ps[k].L2.b[:]
-            x[(k-1)*NP+2*S₁+S*S₁+S+1:(k-1)*NP+2*S₁+S*S₁+S+S] = ps[k].L3.W[1, :]
-        end
+        densenet_pack!(x, ps[k], k, S₁, S, NP)
     end
 
     @debug "network parameters" ps
@@ -286,11 +322,13 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::LS
         labels = reshape(network_labels[:,k],1,extrapolation_substep+1)
 
         PNN = NeuralNetwork(NN)
-        PNN.params.L1.W[:], PNN.params.L1.b[:] = box_init_plain(1, S₁)
-        PNN.params.L2.W[:], PNN.params.L2.b[:] = box_init_plain(S₁, S)
-        PNN.params.L3.W[:], _ = box_init_plain(S, 1)
-        tem_ps = (L1 = PNN.params.L1, L2 = PNN.params.L2)
         local PT = eltype(PNN.params.L1.W)
+        # `PT` is passed explicitly: `box_init_plain` used to default to `Float32`, so a
+        # Float64 DenseNet drew its weights at single precision and converted on assignment.
+        PNN.params.L1.W[:], PNN.params.L1.b[:] = box_init_plain(1, S₁, PT)
+        PNN.params.L2.W[:], PNN.params.L2.b[:] = box_init_plain(S₁, S, PT)
+        PNN.params.L3.W[:], _ = box_init_plain(S, 1, PT)
+        tem_ps = (L1 = PNN.params.L1, L2 = PNN.params.L2)
         # Only L1 and L2 are optimised; L3 is re-solved by least squares inside the loop
         # below. The flat view aliases L1/L2, so the optimizer writes through to `PNN.params`,
         # and the loss reads the *current* L3 through the closure.
@@ -328,13 +366,7 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::LS
 
         ps[k] = PNN.params[:]
 
-        for i in 1:S₁
-            x[(k-1)*NP+1:(k-1)*NP+S₁] = ps[k].L1.W[:,1]
-            x[(k-1)*NP+S₁+1:(k-1)*NP+S₁+S₁] = ps[k].L1.b[:]
-            x[(k-1)*NP+S₁+S₁ + (i-1)*S+1:(k-1)*NP+S₁+S₁+i*S] = ps[k].L2.W[:,i]
-            x[(k-1)*NP+2*S₁+S*S₁+1:(k-1)*NP+2*S₁+S*S₁+S] = ps[k].L2.b[:]
-            x[(k-1)*NP+2*S₁+S*S₁+S+1:(k-1)*NP+2*S₁+S*S₁+S+S] = ps[k].L3.W[1, :]
-        end
+        densenet_pack!(x, ps[k], k, S₁, S, NP)
     end
 
     @debug "network parameters" ps
@@ -386,15 +418,7 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
 
     # Fill ps from x (network parameters)
     for d in 1:D
-        for i in 1:S₁
-            ps[d].L1.W[:,1] = x[(d-1)*NP+1:(d-1)*NP+S₁]
-            ps[d].L1.b[:] = x[(d-1)*NP+S₁+1:(d-1)*NP+S₁+S₁]
-
-            ps[d].L2.W[:,i] = x[(d-1)*NP+S₁+S₁+(i-1)*S+1:(d-1)*NP+S₁+S₁+i*S]
-
-            ps[d].L2.b[:] = x[(d-1)*NP+2*S₁+S*S₁+1:(d-1)*NP+2*S₁+S*S₁+S]
-            ps[d].L3.W[1, :] = x[(d-1)*NP+2*S₁+S*S₁+S+1:(d-1)*NP+2*S₁+S*S₁+S+S]
-        end
+        densenet_unpack!(ps[d], x, d, S₁, S, NP)
     end
 
     # compute coefficients
@@ -404,17 +428,17 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
         # r₁[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([1.0],intermidiate_ps)
         # for i in 1:S
         g0 = DQDθ([zero(ST)], NeuralNetworkParameters(ps[d]))
-        g0_params[:,d] = flatten_params(g0)
+        flatten_params!(view(g0_params, :, d), g0)
 
         g1 = DQDθ([one(ST)], NeuralNetworkParameters(ps[d]))
-        g1_params[:,d] = flatten_params(g1)
+        flatten_params!(view(g1_params, :, d), g1)
 
         for j in eachindex(quad_nodes)
             g = DQDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
-            dqdθc[j, :, d] = flatten_params(g)
+            flatten_params!(view(dqdθc, j, :, d), g)
 
             gv = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
-            dvdθc[j, :, d] = flatten_params(gv)
+            flatten_params!(view(dvdθc, j, :, d), gv)
         end
     end
 
@@ -508,15 +532,7 @@ function record_finer_solution!(sol,int::GeometricIntegrator{<:DenseNet})
     @debug "solution x after solving by Newton" x
 
     for d in 1:D
-        for i in 1:S₁
-            ps[d].L1.W[:,1] = x[(d-1)*NP+1:(d-1)*NP+S₁]
-            ps[d].L1.b[:] = x[(d-1)*NP+S₁+1:(d-1)*NP+S₁+S₁]
-
-            ps[d].L2.W[:,i] = x[(d-1)*NP+S₁+S₁ + (i-1)*S+1:(d-1)*NP+S₁+S₁+i*S]
-
-            ps[d].L2.b[:] = x[(d-1)*NP+2*S₁+S*S₁+1:(d-1)*NP+2*S₁+S*S₁+S]
-            ps[d].L3.W[1, :] = x[(d-1)*NP+2*S₁+S*S₁+S+1:(d-1)*NP+2*S₁+S*S₁+S+S]
-        end
+        densenet_unpack!(ps[d], x, d, S₁, S, NP)
         stage_values[:,d] = NN(network_inputs,ps[d])[:]
     end
 

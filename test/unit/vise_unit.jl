@@ -1,28 +1,97 @@
-# Unit test for VISE / VISEBasis (the symbolic regression integrator).
+# Unit tests for VISE / VISEBasis (the symbolic-regression integrator).
 #
-# Unlike the neural-network integrators, VISE uses Symbolics.jl to compile
-# basis functions; the compiled functions evaluate in Float64 regardless of the type
-# parameter T, so this test is restricted to Float64. VISE keeps its own
+# Restricted to Float64: VISE compiles its basis functions with Symbolics.jl and the compiled
+# functions evaluate in Float64 regardless of the type parameter. VISE also keeps its own
 # `integrate!` override — it is not a `NetworkIntegratorMethod` and so does not pick up the
-# shared one — and returns a 3-tuple (sol, internal_values, x_list) rather than the
-# shared (sol, internal_values).
+# shared one — and returns a 3-tuple `(sol, internal_values, x_list)` rather than the shared
+# 2-tuple.
 #
-# The initial parameters `init_w` are set close to the exact HO solution
-# q(t) = A·cos(ω·t) with A=0.5, ω≈0.707 (=√0.5, the default HO spring constant),
-# φ=0, giving Newton a convergent starting point.
+# The ansatz here is `q(t) = W₁·cos(W₂·t + W₃)`, which is *exact* for the harmonic oscillator:
+# with the default parameters (m = 1, k = 0.5) the solution is `0.5·cos(√0.5·t)`, and `init_w`
+# starts Newton at exactly that point. So this file can assert real accuracy rather than mere
+# finiteness — which is what it used to do, on a single time step, making it the weakest guard
+# in the suite and no basis at all for the type-stability work on `VISECache`/`VISEBasis`.
+
+vise_method(; kwargs...) = VISE(build_vise_basis(Float64), gauss(Float64, 4),
+                                [Float64[0.5, sqrt(0.5), 0.0]]; kwargs...)
 
 @testset "VISE (Float64)" begin
-    prb = build_vise_basis(Float64)
-    init_w = [Float64[0.5, sqrt(0.5), 0.0]]
-    method = VISE(prb, gauss(Float64, 4), init_w)
+    params = HarmonicOscillator.default_parameters(Float64)
 
-    prob = HarmonicOscillator.lodeproblem([Float64(0.5)], [Float64(0.0)];
-        timespan = (Float64(0.0), Float64(0.1)), timestep = Float64(0.1))
+    @testset "accuracy over $nsteps step(s)" for nsteps in (1, 5)
+        tend = 0.1 * nsteps
+        prob = HarmonicOscillator.lodeproblem([0.5], [0.0];
+            timespan = (0.0, tend), timestep = 0.1, parameters = params)
 
-    sol, internal_values, x_list = integrate(prob, method)
+        sol, internal_values, x_list = integrate(prob, vise_method())
 
-    @test eltype(sol.q[end]) == Float64
-    @test all(isfinite, collect(sol.q[:, 1])[end])
-    @test internal_values isa AbstractArray
-    @test x_list isa AbstractArray
+        @test eltype(sol.q[end]) == Float64
+        qend = collect(sol.q[:, 1])[end]
+        qref = HarmonicOscillator.exact_solution_q(tend, 0.5, 0.0, 0.0, params)
+        @debug "VISE" nsteps q_end=qend q_ref=qref abs_err=abs(qend - qref)
+        # The ansatz spans the exact solution, so the only error is the Newton residual.
+        @test abs(qend - qref) < 1e-12
+
+        # `internal_values` and `x_list` are sized `n₂-n₁+1` and must be *fully* populated.
+        @test length(internal_values) == nsteps
+        @test length(x_list) == nsteps
+        @test all(i -> isassigned(internal_values, i), eachindex(internal_values))
+        @test all(i -> isassigned(x_list, i), eachindex(x_list))
+        # Concrete element types, not `Vector{Matrix}` / `Vector{Vector}`.
+        @test isconcretetype(eltype(internal_values))
+        @test isconcretetype(eltype(x_list))
+    end
+
+    # `record_grid_points` used to be a `VISECache` keyword that nothing could reach: `VISE`
+    # had no such field, `Cache{ST}` passed no value, and `record_finer_solution!` filled a
+    # hard-coded 41-point grid. A non-default value is what distinguishes "wired through" from
+    # "defaults happen to agree" — with the old code this row is a `BoundsError`.
+    @testset "record_grid_points is honoured" begin
+        prob = HarmonicOscillator.lodeproblem([0.5], [0.0];
+            timespan = (0.0, 0.2), timestep = 0.1, parameters = params)
+
+        _, internal_default, _ = integrate(prob, vise_method())
+        @test size(internal_default[1], 1) == 41
+
+        _, internal_21, _ = integrate(prob, vise_method(record_grid_points = 21))
+        @test size(internal_21[1], 1) == 21
+        @test all(isfinite, internal_21[1])
+        # The recording grid spans [0, 1], so both runs sample the same first and last point.
+        @test internal_21[1][1, 1] ≈ internal_default[1][1, 1]
+        @test internal_21[1][end, 1] ≈ internal_default[1][end, 1]
+    end
+
+    # Regression guard for the restart indexing bug: `integrate!` sized its two output vectors
+    # `n₂-n₁+1` but indexed them by `n`, so any `n₁ > 1` left the first `n₁-1` slots `#undef`
+    # and ran off the end. The network integrators had this fixed; the VISE copy had not.
+    @testset "restart from n₁ > 1" begin
+        prob = HarmonicOscillator.lodeproblem([0.5], [0.0];
+            timespan = (0.0, 0.3), timestep = 0.1, parameters = params)
+        int = GeometricIntegrator(prob, vise_method())
+        sol = GeometricIntegratorsBase.GeometricSolution(prob)
+
+        # Step 1 first, so that `sol[1]` holds a real state for the restart to continue from —
+        # starting at n₁ = 2 against an unwritten `sol[1]` gives a degenerate Newton system.
+        GeometricIntegratorsBase.integrate!(sol, int, 1, 1)
+        _, internal_values, x_list = GeometricIntegratorsBase.integrate!(sol, int, 2, 3)
+
+        # Sized n₂-n₁+1 = 2. Indexing these by `n` rather than `n-n₁+1`, as the code used to,
+        # writes past the end on the second iteration.
+        @test length(internal_values) == 2
+        @test all(i -> isassigned(internal_values, i), eachindex(internal_values))
+        @test all(i -> isassigned(x_list, i), eachindex(x_list))
+    end
+
+    # These four used to be defined *unqualified*, which created a shadowing
+    # `NonlinearIntegrators.isexplicit` instead of extending the framework generic — so the
+    # framework answered `missing` for all of them, including where the intent was a definite
+    # `false`/`true`. Asserted through `GeometricIntegratorsBase` precisely so that a bare
+    # definition cannot pass.
+    @testset "traits reach the framework" begin
+        m = vise_method()
+        @test GeometricIntegratorsBase.isexplicit(m) === false
+        @test GeometricIntegratorsBase.isimplicit(m) === true
+        @test GeometricIntegratorsBase.issymmetric(m) === missing
+        @test GeometricIntegratorsBase.issymplectic(m) === missing
+    end
 end

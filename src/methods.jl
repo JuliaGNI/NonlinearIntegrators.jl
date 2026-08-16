@@ -56,7 +56,7 @@ abstract type InitialParametersMethod end
     TrainingMethod <: InitialParametersMethod
 
 Initialise network parameters by gradient descent (`GeometricOptimizers.Adam` with a
-`DecayingStatic` line search) against an MSE target built from the extrapolated
+`DecayingStatic` line search) against a mean-absolute-error target built from the extrapolated
 trajectory. Applies to both
 `ShallowNet` and `DenseNet`; controlled by the
 `training_epochs` constructor kwarg.

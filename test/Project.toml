@@ -1,0 +1,36 @@
+# Test-only dependencies.
+#
+# These used to live in the package's own `[extras]`/`[targets]` block. Aqua and JET are
+# analysis tools with their own dependency trees, and putting them there would make them part
+# of the resolution problem for anyone installing NonlinearIntegrators. A `test/Project.toml`
+# keeps them out of the package's dependency graph entirely.
+#
+# NonlinearIntegrators itself is deliberately *not* listed: `Pkg.test` puts the package under
+# test into this environment automatically. Adding it by hand (e.g. with `Pkg.develop`) also
+# writes a `[sources]` entry and a `test/Manifest.toml`, which pins the whole dependency tree
+# and defeats the point of the CI version matrix.
+
+[deps]
+AbstractNeuralNetworks = "60874f82-5ada-4c70-bd1c-fa6be7711c8a"
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+CompactBasisFunctions = "a09551c4-f815-4143-809e-dd1986753ba7"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+GeometricBase = "9a0b12b7-583b-4f04-aa1f-d8551b6addc9"
+GeometricIntegratorsBase = "71212ab4-08a2-48eb-a02b-4cbad0e9c44a"
+GeometricProblems = "18cb22b4-ad41-5c80-9c5f-710df63fbdc9"
+GeometricSolutions = "7843afe4-64f4-4df4-9231-049495c56661"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+QuadratureRules = "a08977f5-a20d-4b99-b11f-f5ea535e0575"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SimpleSolvers = "36b790f5-6434-4fbe-b711-1f64a1e2f6a2"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+Aqua = "0.8"
+GeometricProblems = "0.8"
+JET = "0.9, 0.10"
+Logging = "1"
+Test = "1"

@@ -19,7 +19,11 @@ using CompactBasisFunctions
 # CompactBasisFunctions and QuadratureRules; `nbasis` belongs to CompactBasisFunctions.
 import GeometricBase: basis, nnodes
 import CompactBasisFunctions: nbasis
-using Zygote
+# No `using Zygote`: the one call site (the velocity of the hand-written ansatz in
+# `ShallowNetAutodiff`/`ShallowNetAutodiffReversible`) was reverse-mode differentiating a
+# scalar ℝ→ℝ function and has been switched to the `ForwardDiff.derivative` that was already
+# defined alongside it. Zygote is still reachable transitively through the optimizer stack;
+# it is just no longer a direct dependency of this package.
 using Random
 using Statistics
 using StaticArrays

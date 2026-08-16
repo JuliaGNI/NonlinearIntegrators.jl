@@ -136,9 +136,12 @@ straight line between the endpoints is subtracted first, and the `t(1-t)` factor
 of 10 sub-steps is where the `M = 11` quadrature nodes assumed throughout [Algorithms](@ref) come
 from, and Simpson's rule is why the value must be even.
 
-Per-step diagnostics are printed by default: `show_status = true` on the method makes each seed
+Per-step diagnostics are off by default: `show_status = true` on the method makes each seed
 report, per component, how many neurons it placed, the weighted residual it reached, and how many
-atoms were rejected for adding no new direction. Set `show_status = false` to silence it.
+atoms were rejected for adding no new direction. The default was `true` in 0.2.0 — it also
+gated a per-Newton-iteration `println` of the residual vector in the two reversible integrators,
+which is why it flipped; everything except this OGA report is `@debug` now, reachable with
+`JULIA_DEBUG=NonlinearIntegrators`.
 
 ## Reading the result
 

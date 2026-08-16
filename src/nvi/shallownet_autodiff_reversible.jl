@@ -25,7 +25,7 @@ struct ShallowNetAutodiffReversible{T, NNODES, basisType <: Basis{T},
     function ShallowNetAutodiffReversible(basis::Basis{T}, quadrature::QuadratureRule{T};
         extrapolation_substep      :: Int  = 10,
         training_epochs           :: Int  = 50000,
-        show_status               :: Bool = true,
+        show_status               :: Bool = false,
         initial_trajectory_method :: ET   = IntegratorExtrapolation(),
         initial_guess_method      :: IPMT = OGA1d(),
         record_grid_points        :: Int  = 41,
@@ -52,100 +52,20 @@ end
 
 GeometricIntegratorsBase.issymmetric(::Union{ShallowNetAutodiffReversible, Type{<:ShallowNetAutodiffReversible}}) = true
 
-default_iparams(::ShallowNetAutodiffReversible) = OGA1d()
-
-struct ShallowNetAutodiffReversibleCache{ST,S,R,N} <: NetworkIntegratorCache{ST}
-    x::Vector{ST}
-
-    q̄::Vector{ST}
-    p̄::Vector{ST}
-
-    q̃::Vector{ST}
-    p̃::Vector{ST}
-    ṽ::Vector{ST}
-    f̃::Vector{ST}
-    s̃::Vector{ST}
-
-    X::Vector{Vector{ST}}
-    Q::Vector{Vector{ST}}
-    P::Vector{Vector{ST}}
-    V::Vector{Vector{ST}}
-    F::Vector{Vector{ST}}
-
-    ps::Vector{@NamedTuple{L1::@NamedTuple{W::Matrix{ST}, b::Vector{ST}},L2::@NamedTuple{W::Matrix{ST}}}}
-
-    dqdW2c::Array{ST,3}
-    dvdW2c::Array{ST,3}
-    dqdW1c::Array{ST,3}
-    dvdW1c::Array{ST,3}
-    dqdbc::Array{ST,3}
-    dvdbc::Array{ST,3}
-
-    dqdW2r₁::Matrix{ST}
-    dqdW2r₀::Matrix{ST}
-    dqdW1r₁::Matrix{ST}
-    dqdW1r₀::Matrix{ST}
-    dqdbr₁::Matrix{ST}
-    dqdbr₀::Matrix{ST}
-
-    stage_values::Matrix{ST}
-    network_labels::Matrix{ST}
-
-    function ShallowNetAutodiffReversibleCache{ST,S,R,N}(ics; record_grid_points::Int = 41) where {ST,S,R,N}
-        D = length(vec(ics.q))
-        x = zeros(ST, D * (1 + 2 * S)) # Last layer Weight S (no bias for now) + q + hidden layer W S/2 + hidden layer bias S/2
-
-        q̄ = zeros(ST, D)
-        p̄ = zeros(ST, D)
-
-        # create temporary vectors
-        q̃ = zeros(ST, D)
-        p̃ = zeros(ST, D)
-        ṽ = zeros(ST, D)
-        f̃ = zeros(ST, D)
-        s̃ = zeros(ST, D)
-
-        # create internal stage vectors
-        X = create_internal_stage_vector(ST, D, S)
-        Q = create_internal_stage_vector(ST, D, R)
-        P = create_internal_stage_vector(ST, D, R)
-        V = create_internal_stage_vector(ST, D, R)
-        F = create_internal_stage_vector(ST, D, R)
-
-        # create parameter vectors
-        ps = [(L1=(W=zeros(ST, S, 1), b=zeros(ST, S)), L2=(W=zeros(ST, 1, S),)) for k in 1:D]
-
-        dqdW2c = zeros(ST, R, S, D)
-        dvdW2c = zeros(ST, R, S, D)
-        dqdW1c = zeros(ST, R, S, D)
-        dvdW1c = zeros(ST, R, S, D)
-        dqdbc = zeros(ST, R, S, D)
-        dvdbc = zeros(ST, R, S, D)
-
-        dqdW2r₁ = zeros(ST, S, D)
-        dqdW2r₀ = zeros(ST, S, D)
-        dqdW1r₁ = zeros(ST, S, D)
-        dqdW1r₀ = zeros(ST, S, D)
-        dqdbr₁ = zeros(ST, S, D)
-        dqdbr₀ = zeros(ST, S, D)
-
-        stage_values = zeros(ST, record_grid_points, D)
-        network_labels = zeros(ST, N + 1, D)
-
-        new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps,
-            dqdW2c, dvdW2c, dqdW1c, dvdW1c, dqdbc, dvdbc,
-            dqdW2r₁, dqdW2r₀, dqdW1r₁, dqdW1r₀, dqdbr₁, dqdbr₀,
-            stage_values, network_labels)
-    end
-end
+# The cache lives in `network_integrator_core.jl` and is shared with this integrator's
+# sibling; the only thing that differs is the number of unknowns per dimension, passed
+# below. `CacheType` returns `AutodiffShallowNetCache{ST}` — a *concrete* type, which it was
+# not while the basis size and sub-step count were (runtime-computed) type parameters.
 
 function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::ShallowNetAutodiffReversible; kwargs...) where {ST}
-    ShallowNetAutodiffReversibleCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}(initial_conditions(problem);
+    local S = nbasis(method)
+    AutodiffShallowNetCache{ST}(initial_conditions(problem), 2 * S + 1, S, nnodes(method),
+        extrapolation_substep(method);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
 @inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::ShallowNetAutodiffReversible) =
-    ShallowNetAutodiffReversibleCache{ST, nbasis(method), nnodes(method), extrapolation_substep(method)}
+    AutodiffShallowNetCache{ST}
 
 # The extrapolated trajectory has to land in `network_labels`, because that is what the OGA
 # seed reads (`initial_params!` in `src/oga/adapters.jl`). This used to write the extrapolated
@@ -215,33 +135,11 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:Sh
         x[D*S+k] = cache(int).q̃[k]
     end
 end
-# function apply_NN(t, ps, S, activation)
-#     W2 = ps[1:S]
-#     W1 = ps[S+1:2S]
-#     b1 = ps[2S+1:3S]
-
-#     z1 = W1 .* t .+ b1
-#     a1 = activation.(z1)
-#     z2 = sum(W2 .* a1)
-#     return z2
-# end
-
-# function NN_ansatz(ps, S::Int, activation, t, q̄, q)
-#     # q_h(t) = (1-t)q_n + t*q_{n+1} + t(1-t)NN(t)
-#     return (1.0 - t) * q̄ + t * q + t * (1.0 - t) * apply_NN(t, ps, S, activation)
-# end
-
-# VNN_ansatz_zygote(ps, S, activation, t, q̄, q) = Zygote.gradient(tt -> NN_ansatz(ps, S, activation, tt, q̄, q),t)[1]
-
-# VNN_ansatz(ps, S, activation, t, q̄, q) = ForwardDiff.derivative(tt -> NN_ansatz(ps, S, activation, tt, q̄, q), t)
-# ∂NN_ansatz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> NN_ansatz(p, S, activation, t, q̄, q), ps)
-# ∂VNN_ansatz_∂params(ps, S, activation, t, q̄, q) = ForwardDiff.gradient(p -> VNN_ansatz(p, S, activation, t, q̄, q), ps)
-
-# ∂NN_ansatz_∂q̄(ps,S,activation,t,q̄,q) = 1.0 .- t
-# ∂NN_ansatz_∂q(ps,S,activation,t,q̄,q) = t
-
-# ∂VNN_ansatz_∂q̄(ps,S,activation,t,q̄,q)= -1.0
-# ∂VNN_ansatz_∂q(ps,S,activation,t,q̄,q) = 1.0
+# The ansatz (`apply_NN`, `NN_ansatz`, `VNN_ansatz`, `∂NN_ansatz_∂params`,
+# `∂VNN_ansatz_∂params`) is shared with `ShallowNetAutodiff` and defined once, in
+# shallownet_autodiff.jl. A commented-out second copy used to sit here, which made it look as
+# though this file were self-contained when in fact it depends on that file being `include`d
+# first (see the include order in src/NonlinearIntegrators.jl).
 
 function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:ShallowNetAutodiffReversible}) where {ST}
     local D = length(cache(int).q̃)
@@ -252,15 +150,15 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     local q̄ = sol.q
 
     local q = cache(int, ST).q̃
-    local p = cache(int, ST).p̃
     local Q = cache(int, ST).Q
     local V = cache(int, ST).V
     local P = cache(int, ST).P
     local F = cache(int, ST).F
-    local X = cache(int, ST).X
 
-    local NN = method(int).basis.NN
     local ps = cache(int, ST).ps
+    local ps_vec = cache(int, ST).ps_vec
+    local g_buf  = cache(int, ST).g_buf
+    local gv_buf = cache(int, ST).gv_buf
 
     local dqdW2c = cache(int, ST).dqdW2c
     local dvdW2c = cache(int, ST).dvdW2c
@@ -269,12 +167,6 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     local dqdbc = cache(int, ST).dqdbc
     local dvdbc = cache(int, ST).dvdbc
 
-    local dqdW2r₁ = cache(int, ST).dqdW2r₁
-    local dqdW2r₀ = cache(int, ST).dqdW2r₀
-    local dqdW1r₁ = cache(int, ST).dqdW1r₁
-    local dqdW1r₀ = cache(int, ST).dqdW1r₀
-    local dqdbr₁ = cache(int, ST).dqdbr₁
-    local dqdbr₀ = cache(int, ST).dqdbr₀
 
     local activation = method(int).basis.activation
 
@@ -287,68 +179,53 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
         for i in 1:S
             ps[k][2].W[i] = x[D*(i-1)+k]
         end
-        for i in 1:Int(S/2)
-            ps[k][1].W[Int(2i-1)] = x[Int(D*(S+1)+D*(i-1)+k)]
-            ps[k][1].b[Int(2i-1)] = x[Int(D*(S+1+S/2)+D*(i-1)+k)]
-            ps[k][1].W[Int(2i)] = -1 * ps[k][1].W[Int(2i-1)]
-            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)]
+        for i in 1:(S ÷ 2)
+            ps[k][1].W[2i-1] = x[D*(S+1)+D*(i-1)+k]
+            ps[k][1].b[2i-1] = x[D*(S+1+S÷2)+D*(i-1)+k]
+            ps[k][1].W[2i] = -ps[k][1].W[2i-1]
+            ps[k][1].b[2i] = ps[k][1].W[2i-1] + ps[k][1].b[2i-1]
         end
     end
 
-    ps_vec = zeros(ST, 3S)
-    # compute the derivatives of the coefficients on the quadrature nodes and at the boundaries
+    # One pass over `d`, one `ps_vec` fill per dimension. See the equivalent block in
+    # shallownet_autodiff.jl: this used to be three separate `d`-loops each re-deriving the
+    # same flat parameter vector, two of them re-allocating it inside the loop, and the
+    # velocity was taken with `Zygote.gradient` where the ForwardDiff `VNN_ansatz` computes
+    # the same number. The `g[1:S]`-style reads are views now; each used to allocate.
+    #
+    # There are no boundary-point gradients here either: they fed six cache arrays that
+    # nothing ever read, because this ansatz interpolates the endpoints exactly.
     for d in 1:D
-        ps_vec[1:S] = ps[d][2].W[:]
-        ps_vec[S+1:2S] = ps[d][1].W[:]
-        ps_vec[2S+1:3S] = ps[d][1].b[:]
+        copyto!(view(ps_vec, 1:S),      ps[d][2].W)
+        copyto!(view(ps_vec, S+1:2S),   ps[d][1].W)
+        copyto!(view(ps_vec, 2S+1:3S),  ps[d][1].b)
+
+        # `q̃plain`, not `q[d]`, in the two *gradient* calls below. `q[d]` is the `ST` cache, so
+        # during the Newton solve it is a `ForwardDiff.Dual`; `∂NN_ansatz_∂params` nests a
+        # second `ForwardDiff.gradient` inside that, and mixing an outer untagged `Dual` with
+        # the inner tagged one raises "Cannot determine ordering of Dual tags". Reading the
+        # *problem-datatype* cache keeps this argument a plain number.
+        #
+        # That is sound rather than merely expedient: `q` enters the ansatz only through the
+        # linear term `t·q`, so ∂/∂(W2, W1, b1) is identically independent of it, and the same
+        # holds after the `d/dt` in `∂VNN_ansatz_∂params`. The *value* computations below do
+        # need the live endpoint estimate, and use `q[d]`.
+        q̃plain = cache(int).q̃[d]
 
         for j in eachindex(quad_nodes)
-            # @infiltrate
-            g = ∂NN_ansatz_∂params(ps_vec,S,activation,quad_nodes[j],q̄[d],cache(int).q̃[d])
-            dqdW2c[j, :, d] = g[1:S]
-            dqdW1c[j, :, d] = g[S+1:2S]
-            dqdbc[j, :, d] = g[2S+1:3S]
+            g = ∂NN_ansatz_∂params!(g_buf, ps_vec, S, activation, quad_nodes[j], q̄[d], q̃plain)
+            copyto!(view(dqdW2c, j, :, d), view(g, 1:S))
+            copyto!(view(dqdW1c, j, :, d), view(g, S+1:2S))
+            copyto!(view(dqdbc,  j, :, d), view(g, 2S+1:3S))
 
-            gv = ∂VNN_ansatz_∂params(ps_vec,S,activation,quad_nodes[j],q̄[d],cache(int).q̃[d])
-            dvdW1c[j, :, d] = gv[S+1:2S]
-            dvdbc[j, :, d] = gv[2S+1:3S]
-            dvdW2c[j, :, d] = gv[1:S]
-        end
+            gv = ∂VNN_ansatz_∂params!(gv_buf, ps_vec, S, activation, quad_nodes[j], q̄[d], q̃plain)
+            copyto!(view(dvdW2c, j, :, d), view(gv, 1:S))
+            copyto!(view(dvdW1c, j, :, d), view(gv, S+1:2S))
+            copyto!(view(dvdbc,  j, :, d), view(gv, 2S+1:3S))
 
-        # Boundary points t=0 and t=1 must share the (plain) element type of the
-        # quadrature nodes, NOT the solver type ST: during the Newton solve ST is a
-        # ForwardDiff.Dual, and ∂NN_ansatz_∂params itself nests a ForwardDiff.gradient,
-        # so passing a Dual `t` triggers a Dual-tag ordering error.
-        g0 = ∂NN_ansatz_∂params(ps_vec,S,activation,zero(eltype(quad_nodes)),q̄[d],cache(int).q̃[d])
-        dqdW1r₀[:, d] = g0[S+1:2S]
-        dqdbr₀[:, d] = g0[2S+1:3S]
-        dqdW2r₀[:, d] = g0[1:S]
-
-        g1 = ∂NN_ansatz_∂params(ps_vec,S,activation,one(eltype(quad_nodes)),q̄[d],cache(int).q̃[d])
-        dqdW1r₁[:, d] = g1[S+1:2S]
-        dqdbr₁[:, d] = g1[2S+1:3S]
-        dqdW2r₁[:, d] = g1[1:S]
-    end
-
-    # compute Q : q at quaadurature points
-    for d in 1:D
-        ps_vec = zeros(ST, 3S)
-        ps_vec[1:S] = ps[d][2].W[:]
-        ps_vec[S+1:2S] = ps[d][1].W[:]
-        ps_vec[2S+1:3S] = ps[d][1].b[:]
-        for i in eachindex(quad_nodes)
-            Q[i][d] = NN_ansatz(ps_vec, S, activation, quad_nodes[i], q̄[d], q[d])
-        end
-    end
-
-    # compute V volicity at quadrature points
-    for d in 1:D
-        ps_vec = zeros(ST, 3S)
-        ps_vec[1:S] = ps[d][2].W[:]
-        ps_vec[S+1:2S] = ps[d][1].W[:]
-        ps_vec[2S+1:3S] = ps[d][1].b[:]
-        for i in eachindex(quad_nodes)
-            V[i][d] = VNN_ansatz_zygote(ps_vec,S,activation,quad_nodes[i],q̄[d],q[d]) / timestep(int)
+            # Position and velocity at the same node, from the same `ps_vec`.
+            Q[j][d] = NN_ansatz(ps_vec, S, activation, quad_nodes[j], q̄[d], q[d])
+            V[j][d] = VNN_ansatz(ps_vec, S, activation, quad_nodes[j], q̄[d], q[d]) / timestep(int)
         end
     end
 
@@ -369,7 +246,6 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
     local p̃ = cache(int, ST).p̃
     local P = cache(int, ST).P
     local F = cache(int, ST).F
-    local X = cache(int, ST).X
 
 
     local dqdW2c = cache(int, ST).dqdW2c
@@ -380,7 +256,6 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
     local dvdbc = cache(int, ST).dvdbc
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
 
-    local show_status = method(int).show_status
 
     # compute b = - [(P-AF)], the residual in actual action, vatiation with respect to Q_{n,i}
     for i in 1:S
@@ -403,35 +278,36 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
         b[D*S+k] = p̄[k] + z
     end
 
-    for i in 1:1:Int(S/2)
+    for i in 1:(S ÷ 2)
         for k in 1:D
             z = zero(ST)
             for j in eachindex(P, F)
-                z += timestep(int) * method(int).b[j] * F[j][k] * dqdW1c[j, Int(2*i-1), k]
-                z += method(int).b[j] * P[j][k] * dvdW1c[j, Int(2*i-1), k]
+                z += timestep(int) * method(int).b[j] * F[j][k] * dqdW1c[j, 2i-1, k]
+                z += method(int).b[j] * P[j][k] * dvdW1c[j, 2i-1, k]
             end
-            b[Int(D*(S+1)+D*(i-1)+k)] =  z
+            b[D*(S+1)+D*(i-1)+k] =  z
         end
     end
 
-    for i in 1:1:Int(S/2)
+    for i in 1:(S ÷ 2)
         for k in 1:D
             z = zero(ST)
             for j in eachindex(P, F)
-                z += timestep(int) * method(int).b[j] * F[j][k] * dqdbc[j, Int(2*i-1), k]
-                z += method(int).b[j] * P[j][k] * dvdbc[j, Int(2*i-1), k]
+                z += timestep(int) * method(int).b[j] * F[j][k] * dqdbc[j, 2i-1, k]
+                z += method(int).b[j] * P[j][k] * dvdbc[j, 2i-1, k]
             end
-            b[Int(D*(S+1+S/2)+D*(i-1)+k)] = z
+            b[D*(S+1+S÷2)+D*(i-1)+k] = z
         end
     end
 
-    show_status ? println(" Residual vector b: \n", b) : nothing
-    show_status ? println(" Norm of Residual vector b: ", norm(b)) : nothing
+    # See the note in shallownet_reversible.jl: `residual!` is called per Newton iteration and
+    # per Jacobian column, so this has to be `@debug`, not a `show_status`-gated `println`.
+    @debug "residual" b norm_b = norm(b)
 end
 
 
 
-function GeometricIntegratorsBase.update!(sol, params, int::GeometricIntegrator{<:ShallowNetAutodiffReversible}, DT)
+function update_solution!(sol, params, int::GeometricIntegrator{<:ShallowNetAutodiffReversible}, ::Type{DT}) where {DT}
     local D = length(cache(int).q̃)
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
     local P = cache(int).P
@@ -459,9 +335,7 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNetAutodi
     # local network_inputs = method(int).network_inputs
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
-    local NN = method(int).basis.NN
     local ps = cache(int).ps
-    local show_status = method(int).show_status
     local q̄ = sol.q  # start point q_n
     local q = cache(int).q̃ # endpoint estimate q_{n+1}
     local activation = method(int).basis.activation
@@ -470,20 +344,16 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNetAutodi
     local T = eltype(x)
     network_inputs = reshape(collect(range(zero(T), one(T), N_plot)), 1, N_plot)
 
-    if show_status
-        print("\n solution x after solving by Newton \n")
-        print(x)
-    end
-    # @infiltrate
+    @debug "solution x after solving by Newton" x
     for k in 1:D
         for i in 1:S
             ps[k][2].W[i] = x[D*(i-1)+k]
         end
-        for i in 1:Int(S/2)
-            ps[k][1].W[Int(2i-1)] = x[Int(D*(S+1)+D*(i-1)+k)]
-            ps[k][1].b[Int(2i-1)] = x[Int(D*(S+1+S/2)+D*(i-1)+k)]
-            ps[k][1].W[Int(2i)] = -1 * ps[k][1].W[Int(2i-1)]
-            ps[k][1].b[Int(2i)] = ps[k][1].W[Int(2i-1)] + ps[k][1].b[Int(2i-1)]
+        for i in 1:(S ÷ 2)
+            ps[k][1].W[2i-1] = x[D*(S+1)+D*(i-1)+k]
+            ps[k][1].b[2i-1] = x[D*(S+1+S÷2)+D*(i-1)+k]
+            ps[k][1].W[2i] = -ps[k][1].W[2i-1]
+            ps[k][1].b[2i] = ps[k][1].W[2i-1] + ps[k][1].b[2i-1]
         end
 
         ps_vec = zeros(eltype(x), 3S)
@@ -495,21 +365,10 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNetAutodi
             stage_values[i, k] = NN_ansatz(ps_vec, S, activation, network_inputs[i], q̄[k], q[k])
         end
 
-        if show_status
-            @show ps[k][2].W[:]
-            @show ps[k][1].W[:]
-            @show ps[k][1].b[:]
-        end
+        @debug "parameters after solving" dim = k W2 = ps[k][2].W W1 = ps[k][1].W b1 = ps[k][1].b
     end
 
-    if show_status
-        print("\n stages prediction after solving \n")
-        print(stage_values)
-        print("\n sol from this step \n")
-        print("q:", sol.q, "\n")
-        print("p:", sol.p, "\n")
-
-    end
+    @debug "stages prediction after solving" stage_values q = sol.q p = sol.p
 
 end
 

@@ -221,7 +221,13 @@ function oga_fit(oga::OGA, σ, nodes::AbstractVector{T}, w::AbstractVector{T},
         # atoms' fit columns and the off-grid refinement's candidates — is scaled the same
         # way as `Ψ`. `ŷ` keeps the *unscaled* weights, which is what makes the unscaling of
         # the coefficients a single multiplication at the end.
-        sw = sw .* scale
+        #
+        # Scaled in place, not re-bound. `sw` is captured by the `_candidate_score` closure
+        # passed to `oga_refine` below, and a captured variable that is *re-assigned* in the
+        # enclosing scope is put in a `Core.Box` — the one boxed capture in this function, and
+        # on the hot path. `sw` is freshly allocated by `sqrt.(w)` above and aliases nothing,
+        # so mutating it is safe and drops an allocation too.
+        sw .*= scale
     end
 
     nfloor = oga.norm_guard ? oga_norm_floor(T, finite_max) : zero(T)

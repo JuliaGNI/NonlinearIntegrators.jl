@@ -20,13 +20,6 @@ oga_fits() = (WeightedQR(), IncrementalQR(), PivotedQR(), TruncatedSVD(),
               NormalEquationsFit(), NormalEquationsFit(ridge = false))
 oga_selections() = (RawProjection(), NormalizedProjection(), OrthogonalProjection())
 
-# A smooth target on the unit interval and the Simpson weights the integrators use.
-function oga_testcase(::Type{T}; n = 10) where {T}
-    nodes = T.((0:n) ./ n)
-    weights = NI.simpson_quadrature(n, T)
-    y = T.(cos.(3 .* Float64.(nodes)))
-    return (nodes, weights, y)
-end
 
 @testset "grids" begin
     @testset "bias_grid ($T)" for T in OGA_TYPES
