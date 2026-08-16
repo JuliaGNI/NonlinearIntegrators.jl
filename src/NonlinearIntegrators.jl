@@ -115,8 +115,7 @@ include("vise/vise_basis.jl")
 export VISE, VISEBasis
 
 # The linear reference integrator this package used to carry, `CGVINodal` — continuous
-# Galerkin on a nodal basis — moves to GeometricIntegrators alongside `CGVI`, which is where a
-# linear variational integrator belongs: JuliaGNI/GeometricIntegrators.jl#219. Once that has
-# landed and shipped, it is reachable as `GeometricIntegrators.CGVINodal`; until then, only
-# from this package's history.
+# Galerkin on a nodal basis — now lives in GeometricIntegrators alongside `CGVI`, which is where
+# a linear variational integrator belongs (JuliaGNI/GeometricIntegrators.jl#219). Reach it as
+# `GeometricIntegrators.CGVINodal`, from v0.18.3 on.
 end
