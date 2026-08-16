@@ -17,7 +17,7 @@ All of it lives in `src/oga/`, behind a single composable type.
 | Page | Contents |
 |---|---|
 | [Theory](@ref) | what is being approximated, why the classical dictionary has `±1` weights, the greedy selection criterion and where it comes from, the conditioning analysis |
-| [Algorithms](@ref) | every dictionary, selection rule and fit in turn — mechanism, implementation, cost, when to use |
+| [Algorithms](@ref) | the components compared at a glance, then every dictionary, selection rule and fit in turn — mechanism, implementation, cost, when to use |
 | [Usage](@ref) | presets, composing your own, per-integrator behaviour, reading the result, extending |
 | [Precision](@ref) | the no-implicit-conversion invariant, how it is enforced, and the `Float16` traps |
 | [Studies](@ref) | the two-tier measurement setup and what it found |
@@ -43,8 +43,8 @@ type rather than enumerated as a type per combination:
 - **selection** ([`OGASelection`](@ref)) — how candidates are ranked against the residual;
 - **fit** ([`OGAFit`](@ref)) — how the output weights are refit.
 
-Named presets recover the useful corners: [`OGA1d`](@ref) (the default, and the
-default), [`OGA1dNormalized`](@ref), [`OGA1dStable`](@ref),
+Named presets recover the useful corners: [`OGA1d`](@ref) (the default),
+[`OGA1dNormalized`](@ref), [`OGA1dStable`](@ref),
 [`OGA2d`](@ref), [`OGASphere`](@ref). The original-paper reference implementation is kept
 separately as [`OGA1dNormalEquations`](@ref).
 
