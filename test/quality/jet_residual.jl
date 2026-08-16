@@ -1,6 +1,7 @@
 # JET optimisation analysis of the Newton hot path, run as a *standalone script*.
 #
-# Driven as a subprocess by `aqua_jet.jl` rather than analysed in-process. Both matter:
+# Not part of the suite: `aqua_jet.jl` skips JET and points here. Analysing this in-process,
+# or through `JET.test_package`, does not give a usable answer:
 #
 #   * In-process, this runs after ~1800 other tests have instantiated a large number of
 #     specialisations of the same functions, and Julia's inference widens under that load —
@@ -14,6 +15,16 @@
 # A fresh process analysing `residual!` at the concrete argument types is what actually answers
 # the question "does the hot path dispatch dynamically". Exits 0 if clean, 1 otherwise, printing
 # the reports.
+#
+# Run it from the repository root. Not with `--project=test`: `test/Project.toml` deliberately
+# omits NonlinearIntegrators itself (see the note at the top of that file), so `using
+# NonlinearIntegrators` below would fail there. A temporary environment gets the package plus
+# JET without writing a `test/Manifest.toml`:
+#
+#     julia -e 'using Pkg; Pkg.activate(temp = true); Pkg.develop(path = "."); \
+#               Pkg.add(["JET", "GeometricProblems", "QuadratureRules", \
+#                        "GeometricIntegratorsBase", "GeometricSolutions"]); \
+#               include("test/quality/jet_residual.jl")'
 
 using NonlinearIntegrators
 using QuadratureRules

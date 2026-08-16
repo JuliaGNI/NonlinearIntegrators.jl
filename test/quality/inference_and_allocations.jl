@@ -73,9 +73,13 @@ end
             end
 
             @testset "inference" begin
-                # `residual!` returns nothing useful; what matters is that inference gets
-                # through the call without falling back to `Any`. `@inferred` still fails on a
-                # `Nothing`-returning call if the call itself cannot be inferred.
+                # A weak gate, deliberately kept as a tripwire rather than relied on:
+                # `@inferred` compares the *return* type against `typeof(result)`, and
+                # `residual!` returns `nothing`, so it passes as long as inference reaches
+                # `Nothing` — which it can do with runtime dispatch throughout the body. What
+                # it does catch is the call becoming uninferable altogether, e.g. a cache
+                # lookup that stops folding. The allocation budget above is the assertion that
+                # actually bites; `jet_residual.jl` is the one that checks dispatch directly.
                 @test (@inferred residual!(p.b, p.x, p.s, p.params, p.int)) isa Any
             end
         end

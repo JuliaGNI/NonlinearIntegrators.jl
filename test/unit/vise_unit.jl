@@ -12,8 +12,8 @@
 # finiteness — which is what it used to do, on a single time step, making it the weakest guard
 # in the suite and no basis at all for the type-stability work on `VISECache`/`VISEBasis`.
 
-vise_method() = VISE(build_vise_basis(Float64), gauss(Float64, 4),
-                     [Float64[0.5, sqrt(0.5), 0.0]])
+vise_method(; kwargs...) = VISE(build_vise_basis(Float64), gauss(Float64, 4),
+                                [Float64[0.5, sqrt(0.5), 0.0]]; kwargs...)
 
 @testset "VISE (Float64)" begin
     params = HarmonicOscillator.default_parameters(Float64)
@@ -40,6 +40,25 @@ vise_method() = VISE(build_vise_basis(Float64), gauss(Float64, 4),
         # Concrete element types, not `Vector{Matrix}` / `Vector{Vector}`.
         @test isconcretetype(eltype(internal_values))
         @test isconcretetype(eltype(x_list))
+    end
+
+    # `record_grid_points` used to be a `VISECache` keyword that nothing could reach: `VISE`
+    # had no such field, `Cache{ST}` passed no value, and `record_finer_solution!` filled a
+    # hard-coded 41-point grid. A non-default value is what distinguishes "wired through" from
+    # "defaults happen to agree" — with the old code this row is a `BoundsError`.
+    @testset "record_grid_points is honoured" begin
+        prob = HarmonicOscillator.lodeproblem([0.5], [0.0];
+            timespan = (0.0, 0.2), timestep = 0.1, parameters = params)
+
+        _, internal_default, _ = integrate(prob, vise_method())
+        @test size(internal_default[1], 1) == 41
+
+        _, internal_21, _ = integrate(prob, vise_method(record_grid_points = 21))
+        @test size(internal_21[1], 1) == 21
+        @test all(isfinite, internal_21[1])
+        # The recording grid spans [0, 1], so both runs sample the same first and last point.
+        @test internal_21[1][1, 1] ≈ internal_default[1][1, 1]
+        @test internal_21[1][end, 1] ≈ internal_default[1][end, 1]
     end
 
     # Regression guard for the restart indexing bug: `integrate!` sized its two output vectors

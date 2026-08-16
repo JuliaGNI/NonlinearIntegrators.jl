@@ -1,7 +1,42 @@
-# `quadrature` is typed. It was the one untyped field of this struct, and
-# `int.method.quadrature.nodes` is read at the top of `components!` — so `quad_nodes` came back
-# `Any` and poisoned every expression it appeared in, including the arguments of the compiled
-# basis functions.
+"""
+    VISE(basis::VISEBasis{T}, quadrature, init_w; extrapolation_substep = 10,
+         record_grid_points = 41)
+
+Variational integrator on a **symbolic** ansatz: one closed-form expression per degree of
+freedom, whose free weights are solved for at every step.
+
+Where the network integrators fit a shallow or dense network, `VISE` takes an ansatz the
+caller writes down — `W₁·cos(W₂·t + W₃)`, say — and lets [`VISEBasis`](@ref) differentiate it
+symbolically with respect to `t` and to each weight. The discrete Euler–Lagrange equations are
+then solved for the weights directly. An ansatz that spans the exact solution therefore
+reproduces it to Newton's residual floor rather than to a discretisation order.
+
+# Arguments
+
+  - `basis`: a [`VISEBasis`](@ref) carrying the compiled ansatz and its derivatives.
+  - `quadrature`: the quadrature rule for the action integral.
+  - `init_w`: one initial weight vector per degree of freedom. Also the fallback restart point:
+    `initial_guess!` reuses the previous step's weights unless they have drifted from `init_w`
+    by more than 1 in norm.
+
+# Keywords
+
+  - `extrapolation_substep = 10`: sub-steps of the warm-start extrapolation.
+  - `record_grid_points = 41`: rows of the per-step `stage_values` record — the continuous
+    solution *between* two discrete steps, returned as the second element of `integrate`'s
+    tuple. Same keyword as on the network integrators.
+
+# Note
+
+Unlike the network integrators, `integrate` returns a **three**-element tuple here:
+`(sol, internal_values, each_step_solution)`, the last being the converged weight vector of
+every step.
+
+`quadrature` is a type parameter rather than an untyped field: it was the one untyped field of
+this struct, and `method.quadrature.nodes` is read at the top of `components!`, so `quad_nodes`
+came back `Any` and poisoned every expression it appeared in — including the arguments of the
+compiled basis functions.
+"""
 struct VISE{T,NNODES,basisType<:Basis{T},quadType} <: LODEMethod
     basis::basisType
     quadrature::quadType
@@ -11,13 +46,18 @@ struct VISE{T,NNODES,basisType<:Basis{T},quadType} <: LODEMethod
 
     init_w::Vector{Vector{T}}
     extrapolation_substep::Int
+    # Rows of the `stage_values` recording grid, as on the five network integrators. It was a
+    # hard-coded 41 in two places that had to agree — the buffer in `VISECache` and the loop in
+    # `record_finer_solution!` — with no way to change either.
+    record_grid_points::Int
 
     function VISE(basis::Basis{T}, quadrature, init_w::Vector{Vector{T}};
-        extrapolation_substep::Int=10) where {T}
+        extrapolation_substep::Int=10, record_grid_points::Int=41) where {T}
         quad_weights = quadrature.weights
         quad_nodes = quadrature.nodes
         NNODES = nnodes(quadrature)
-        new{T,NNODES,typeof(basis),typeof(quadrature)}(basis, quadrature, quad_weights, quad_nodes, init_w, extrapolation_substep)
+        new{T,NNODES,typeof(basis),typeof(quadrature)}(basis, quadrature, quad_weights, quad_nodes,
+            init_w, extrapolation_substep, record_grid_points)
     end
 end
 
@@ -126,7 +166,8 @@ GeometricIntegratorsBase.nlsolution(cache::VISECache) = cache.x
 
 
 function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::VISE; kwargs...) where {ST}
-    VISECache{ST,nnodes(method)}(method.basis.W_sizes, initial_conditions(problem); kwargs...)
+    VISECache{ST,nnodes(method)}(method.basis.W_sizes, initial_conditions(problem);
+        record_grid_points = method.record_grid_points, kwargs...)
 end
 
 @inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::VISE) = VISECache{ST,nnodes(method)}
@@ -230,7 +271,7 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
                 dvdWc[d][j, p] = DVDW[d][p](tem_W[d], sol.t - timestep(int) + quad_nodes[j] * timestep(int))
             end
         end
-        # `tem_W[d]`, not `tem_W[d]`: the compiled function only reads its argument, so
+        # `tem_W[d]`, not `tem_W[d][:]`: the compiled function only reads its argument, so
         # the `[:]` copy of the whole weight vector was pure waste — and it was made once per
         # quadrature node per dimension per residual evaluation everywhere it appeared below.
         # A loop replaces `map`, which allocated a fresh vector to immediately copy out of.
@@ -365,19 +406,21 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:VISE})
     local tem_W = cache(int).tem_W
     local W_sizes = method(int).basis.W_sizes
 
-    network_inputs = reshape(collect(0:1/40:1), 1, 41)
+    # `record_grid_points` rows, built at the working element type — the same two lines the
+    # network integrators use. This was `reshape(collect(0:1/40:1), 1, 41)`: a fixed 41 that had
+    # to agree by hand with the `stage_values` buffer, and `Float64` whatever `ST` was.
+    local N_plot = method(int).record_grid_points
+    local T = eltype(x)
+    network_inputs = reshape(collect(range(zero(T), one(T), N_plot)), 1, N_plot)
 
+    # `copyto!`, not `tem_W[d] = …`: assigning the slice would rebind the cache slot to a fresh
+    # vector rather than fill the buffer that is already there.
     start_idx = 1
     for (d, W_size) in enumerate(W_sizes)
-        tem_W[d] = x[start_idx:start_idx+W_size-1]
+        copyto!(tem_W[d], view(x, start_idx:start_idx+W_size-1))
         start_idx += W_size
     end
 
-    # for i in 1:S
-    #     for k in 1:D
-    #         tem_W[k,i] = x[D*(i-1)+k]
-    #     end
-    # end
     for d in 1:D
         for i in eachindex(network_inputs)
             stage_values[i, d] = q_expr[d](tem_W[d], sol.t - timestep(int) + network_inputs[i] * timestep(int))

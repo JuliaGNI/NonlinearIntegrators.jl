@@ -55,9 +55,9 @@ end
 # The only integrator that does not take the shared `IntegratorExtrapolation` default.
 default_iguess(::DenseNet) = MidpointExtrapolation()
 
-# `{ST}` only — see the note on `ShallowNetCache`. `S₁`, `S`, `NP`, `R` and `N` were phantom
-# type parameters computed from runtime fields, which made `CacheType` non-concrete and every
-# read out of `cache(int, ST)` an `Any`.
+# `{ST}` only — see the note on `SymbolicShallowNetCache` in `network_integrator_core.jl`.
+# `S₁`, `S`, `NP`, `R` and `N` were phantom type parameters computed from runtime fields, which
+# made `CacheType` non-concrete and every read out of `cache(int, ST)` an `Any`.
 struct DenseNetCache{ST} <: NetworkIntegratorCache{ST}
     x::Vector{ST}
 

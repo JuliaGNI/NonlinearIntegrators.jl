@@ -36,6 +36,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was never updated. Both containers also had abstract element types (`Vector{Matrix}`,
   `Vector{Vector}`), now concrete.
 
+- **The Documenter build failed on two unresolvable cross-references.** The new `VISEBasis`
+  docstring links `[`VISE`](@ref)` and the new `VNN_ansatz` one links `[`NN_ansatz`](@ref)`,
+  and neither target had a docstring for `@autodocs` to pick up — so `makedocs` terminated with
+  `encountered an error [:cross_references]` before rendering. Both now have one: `VISE` gains
+  the constructor documentation it never had (including the three-element `integrate` return,
+  which no page stated), and `NN_ansatz` states the ansatz and why it needs no boundary-point
+  parameter gradients.
+
+- **`VISE.record_finer_solution!` replaced its cache buffer instead of filling it.**
+  `tem_W[d] = x[start_idx:start_idx+W_size-1]` rebinds the slot to a freshly allocated copy of
+  the slice, so the cache ended each step holding different arrays than the ones it was
+  constructed with, at one allocation per degree of freedom per step. `copyto!` into the
+  existing buffer, as everywhere else.
+
 - **`box_init_plain` reseeded Julia's global RNG as a side effect of a default argument.** The
   keyword defaulted to the *expression* `Random.seed!(1)`, which is evaluated on every call that
   omits it: `DenseNet`'s LSGD seed calls it three times in a row, so it reseeded the global RNG
@@ -154,11 +168,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are not reachable.
 
 - **VISE is typed.** `VISE.quadrature` and eight `VISECache` fields were `::Any`, and their
-  contents `Vector{Any}` because the builders started from `mat = []`. The `41`-row
-  `stage_values` buffer now honours `record_grid_points` like the network integrators.
+  contents `Vector{Any}` because the builders started from `mat = []`.
+
+- **`VISE` gains `record_grid_points`,** matching the five network integrators. The recording
+  grid was a hard-coded 41 in two places that had to agree by hand — the `stage_values` buffer
+  in `VISECache` and the loop in `record_finer_solution!` — and the latter built its nodes with
+  `collect(0:1/40:1)`, i.e. in `Float64` whatever precision the run was started at. The grid is
+  built at the working element type now, the way the network integrators build theirs.
 
 - **Dead code removed:** `default_iparams` (three definitions, no call sites),
-  `GaussQuadrature64`/`GaussQuadrature128`, four unused ansatz partial derivatives, a duplicate
+  `GaussQuadrature64`/`GaussQuadrature128`, four unused ansatz partial derivatives, the `X`
+  field of the autodiff shallow-net cache (allocated per cache, indexed nowhere — `s̃`'s
+  counterpart, and only the *symbolic* pair reads its `X`), a duplicate
   `update!` override in `ShallowNetReversible`, and a commented-out second copy of the ansatz in
   `shallownet_autodiff_reversible.jl` that made the file look self-contained when it in fact
   depends on its sibling being included first. `Int(S/2)`-style float arithmetic in index

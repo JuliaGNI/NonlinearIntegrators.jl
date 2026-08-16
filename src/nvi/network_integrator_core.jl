@@ -239,7 +239,10 @@ struct AutodiffShallowNetCache{ST} <: NetworkIntegratorCache{ST}
     ṽ::Vector{ST}
     f̃::Vector{ST}
 
-    X::Vector{Vector{ST}}
+    # No `X` here, unlike `SymbolicShallowNetCache`. The symbolic pair writes the last-layer
+    # weights into `X` and reads them back in `residual!` against `m`/`a`/`r₀`/`r₁`; the
+    # autodiff pair goes through `ps_vec` instead and never touches it, so the field was `D`
+    # vectors of length `S` allocated per cache and read nowhere — the same thing `s̃` was.
     Q::Vector{Vector{ST}}
     P::Vector{Vector{ST}}
     V::Vector{Vector{ST}}
@@ -279,7 +282,6 @@ struct AutodiffShallowNetCache{ST} <: NetworkIntegratorCache{ST}
         ṽ = zeros(ST, D)
         f̃ = zeros(ST, D)
 
-        X = create_internal_stage_vector(ST, D, S)
         Q = create_internal_stage_vector(ST, D, R)
         P = create_internal_stage_vector(ST, D, R)
         V = create_internal_stage_vector(ST, D, R)
@@ -301,7 +303,7 @@ struct AutodiffShallowNetCache{ST} <: NetworkIntegratorCache{ST}
         stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N + 1, D)
 
-        new(x, q̄, p̄, q̃, p̃, ṽ, f̃, X, Q, P, V, F, ps, ps_vec, g_buf, gv_buf,
+        new(x, q̄, p̄, q̃, p̃, ṽ, f̃, Q, P, V, F, ps, ps_vec, g_buf, gv_buf,
             dqdW2c, dvdW2c, dqdW1c, dvdW1c, dqdbc, dvdbc,
             stage_values, network_labels)
     end
@@ -417,8 +419,10 @@ end
 # local convention — `GeometricIntegratorsBase` has no such second form — and defining it as a
 # fourth `update!` method meant a signature of the shape `(Any, Any, GeometricIntegrator, Any)`,
 # which is ambiguous against the framework's own `(Any, Any, Any, GeometricIntegrator)`
-# (`explicit_euler.jl`). Four of the eight ambiguities Aqua reported were exactly that pair, for
-# no benefit: nothing dispatches on this generically. Giving it its own name removes them.
+# (`explicit_euler.jl`). Five of the eight ambiguities Aqua reported were exactly that pair —
+# one per DT-form definition: this default plus the four overrides in `ShallowNetAutodiff`,
+# `ShallowNetAutodiffReversible`, `CGVINodal` and `VISE` — for no benefit, since nothing
+# dispatches on this generically. Giving it its own name removes all five.
 #
 # The trailing argument is also `::Type{DT}` now rather than an untyped `DT`. It always was a
 # type — the x-form below passes the element type of `x` — so this documents it and lets it be

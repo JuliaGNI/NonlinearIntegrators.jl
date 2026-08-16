@@ -40,6 +40,18 @@ vise_sol = integrate(HHlode, vise_method)
 ```
 
 One good thing about continuous Galerkin variational integrators is that you could record the coordinates values between two discrete steps for free!
+
+The second element of the returned tuple holds one such record per time step, sampled on a
+uniform grid over the step. `record_grid_points` sets its size — 41 points by default, which is
+the `h_step/40` spacing the plot below assumes, and the same keyword the network integrators
+take:
+
+```
+vise_method = VISE(vise_basis, QGau8, init_w; record_grid_points = 81)
+```
+
+(`init_w` being the initial-parameter vector spelled out in full above.)
+
 ```
 
 HHlode_ref = GeometricProblems.HenonHeilesPotential.lodeproblem([0.1,0.1],[0.1,0.1],timespan = (0,TT),timestep = h_step/50)

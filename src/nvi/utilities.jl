@@ -30,20 +30,16 @@ function simpson_quadrature(N::Int, ::Type{T}=Float64) where {T}
 end
 
 """
-    flatten_params!(dest, params) -> dest
+    _param_arrays(params) -> Tuple
 
-Copy every layer parameter array of `params`, in layer-then-field order, into the flat vector
-`dest`.
-
-Replaces an allocating `flatten_params` that built a `flat_list = []` — a `Vector{Any}` — and
-returned `vcat(flat_list...)`. That form is type-unstable twice over: `values(params)` iterates
-a heterogeneous `NamedTuple`, so `fieldnames(typeof(layer))` inside the loop cannot be folded,
-and a splatted `vcat` over a `Vector{Any}` infers as `Any`. `DenseNet`'s `components!` calls it
-`2 + 2R` times per dimension per residual evaluation, i.e. per Newton iteration and per
-Jacobian column.
+Every layer parameter array of `params`, `vec`'d, in layer-then-field order. The backing tuple
+for [`flatten_params!`](@ref) and [`flatten_params`](@ref); it aliases `params` rather than
+copying.
 
 `@generated` for the same reason as [`optimizer_params`](@ref): the layer/field structure is in
-the *type*, so the copy sequence can be emitted once at compile time.
+the *type*, so the sequence can be emitted once at compile time. Walking it at run time is what
+made the old `flatten_params` type-unstable — `values(params)` iterates a heterogeneous
+`NamedTuple`, so `fieldnames(typeof(layer))` inside the loop cannot be folded.
 """
 @generated function _param_arrays(params::NamedTuple{LN,LT}) where {LN,LT}
     entries = Expr[]
@@ -58,6 +54,17 @@ end
 _param_arrays(params::NeuralNetworkParameters) =
     _param_arrays(AbstractNeuralNetworks.params(params))
 
+"""
+    flatten_params!(dest, params) -> dest
+
+Copy every layer parameter array of `params`, in layer-then-field order, into the flat vector
+`dest`.
+
+Replaces an allocating `flatten_params` that built a `flat_list = []` — a `Vector{Any}` — and
+returned `vcat(flat_list...)`, which infers as `Any` when splatted. `DenseNet`'s `components!`
+calls this `2 + 2R` times per dimension per residual evaluation, i.e. per Newton iteration and
+per Jacobian column, so it is worth having a form that writes into a caller-supplied buffer.
+"""
 function flatten_params!(dest::AbstractVector, params)
     off = 0
     # A homogeneous tuple (`vec` of a `Matrix` and of a `Vector` are both `Vector{T}`), so this

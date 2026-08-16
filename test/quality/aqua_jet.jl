@@ -65,7 +65,7 @@ end
     # is the *behaviour* that the type stability buys — the `@allocated` budgets and `@inferred`
     # in `inference_and_allocations.jl`, both of which do run in the suite.
     #
-    # Run the analysis by hand with:
-    #     julia --project=test test/quality/jet_residual.jl
+    # Run the analysis by hand; the exact command is in that file's header (it needs a temp
+    # environment, because `test/Project.toml` does not carry the package itself).
     @test_skip "JET: run test/quality/jet_residual.jl by hand; see the note above"
 end

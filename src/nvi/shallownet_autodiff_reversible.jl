@@ -150,14 +150,11 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     local q̄ = sol.q
 
     local q = cache(int, ST).q̃
-    local p = cache(int, ST).p̃
     local Q = cache(int, ST).Q
     local V = cache(int, ST).V
     local P = cache(int, ST).P
     local F = cache(int, ST).F
-    local X = cache(int, ST).X
 
-    local NN = method(int).basis.NN
     local ps = cache(int, ST).ps
     local ps_vec = cache(int, ST).ps_vec
     local g_buf  = cache(int, ST).g_buf
@@ -249,7 +246,6 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
     local p̃ = cache(int, ST).p̃
     local P = cache(int, ST).P
     local F = cache(int, ST).F
-    local X = cache(int, ST).X
 
 
     local dqdW2c = cache(int, ST).dqdW2c
@@ -339,7 +335,6 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNetAutodi
     # local network_inputs = method(int).network_inputs
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
-    local NN = method(int).basis.NN
     local ps = cache(int).ps
     local q̄ = sol.q  # start point q_n
     local q = cache(int).q̃ # endpoint estimate q_{n+1}

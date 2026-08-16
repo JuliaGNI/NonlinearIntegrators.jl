@@ -164,6 +164,67 @@ const EXTRAPOLATIONS = [
     (HermiteExtrapolation(),     "HermiteExtrapolation"),
 ]
 
+# ---- the integrator table ---------------------------------------------------
+#
+# The five network integrators and what genuinely differs between them. Lives here, not in
+# `unit/network_integrators_unit.jl`, because `quality/inference_and_allocations.jl` drives the
+# same rows: keeping it in a unit file made `quality/` silently depend on `unit/` having been
+# included first.
+#
+#   name   — used in testset names and to look up the allocation budget
+#   make   — the constructor, taking `T` and forwarding keywords
+#   seeds  — the `initial_guess_method`s to drive. `ShallowNet` supports all four OGA
+#            variants; the reversible and autodiff ones are only meaningful with a single
+#            seed; `DenseNet` takes the two gradient-descent seeds instead.
+#   tol    — endpoint tolerance for the accuracy guard, `nothing` to skip it. The symbolic
+#            pair reaches 1e-8; the autodiff pair is limited to 1e-4 by the Newton floor of
+#            the hand-written ansatz. `DenseNet` has no guard at all: its Training/LSGD seeds
+#            are not stable enough for one, so its rows assert dispatch and finiteness only
+#            (this is deliberate — see the note in runtests.jl).
+
+shallow_kw(::Type{T}) where {T} = (; show_status = false, bias_interval = [-T(pi), T(pi)],
+                                     dict_amount = 400)
+
+const NETWORK_INTEGRATORS = [
+    (name  = "ShallowNet",
+     make  = (T; kw...) -> ShallowNet(cached_shallownet_basis(T; S = 4), gauss(T, 8);
+                                      shallow_kw(T)..., kw...),
+     seeds = [(OGA1d(),                "OGA1d"),
+              (OGA1dNormalized(),      "OGA1dNormalized"),
+              (OGA1dStable(),          "OGA1dStable"),
+              (OGA1dNormalEquations(), "OGA1dNormalEquations")],
+     tol   = (Float64 = 1e-8, Float32 = 1e-3)),
+
+    (name  = "ShallowNetReversible",
+     make  = (T; kw...) -> ShallowNetReversible(cached_shallownet_basis(T; S = 4), gauss(T, 8);
+                                                shallow_kw(T)..., kw...),
+     seeds = [(OGA1d(), "OGA1d")],
+     tol   = (Float64 = 1e-8, Float32 = 1e-3)),
+
+    # `symbolic = false`: the autodiff integrators differentiate their own ansatz with
+    # ForwardDiff and never read the compiled derivative slots, so building them is wasted
+    # work. This also keeps the cached basis distinct from the symbolic one above.
+    (name  = "ShallowNetAutodiff",
+     make  = (T; kw...) -> ShallowNetAutodiff(
+                 cached_shallownet_basis(T; S = 4, symbolic = false), gauss(T, 8);
+                 shallow_kw(T)..., kw...),
+     seeds = [(OGA1dNormalized(), "OGA1dNormalized")],
+     tol   = (Float64 = 1e-4, Float32 = 1e-3)),
+
+    (name  = "ShallowNetAutodiffReversible",
+     make  = (T; kw...) -> ShallowNetAutodiffReversible(
+                 cached_shallownet_basis(T; S = 4, symbolic = false), gauss(T, 8);
+                 shallow_kw(T)..., kw...),
+     seeds = [(OGA1d(), "OGA1d")],
+     tol   = (Float64 = 1e-4, Float32 = 1e-3)),
+
+    (name  = "DenseNet",
+     make  = (T; kw...) -> DenseNet(cached_densenet_basis(T; S₁ = 3, S = 3), gauss(T, 8);
+                                    show_status = false, training_epochs = 3, kw...),
+     seeds = [(TrainingMethod(), "TrainingMethod"), (LSGD(), "LSGD")],
+     tol   = nothing),
+]
+
 # The endpoint of a run must be finite *and* still at the working element type. Spelled out
 # in seven places before.
 function assert_finite_endpoint(sol, ::Type{T}) where {T}

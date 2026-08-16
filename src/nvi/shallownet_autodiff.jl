@@ -140,6 +140,21 @@ function apply_NN(t, ps, S, activation)
     return sum(ps[i] * activation(ps[S+i] * t + ps[2S+i]) for i in 1:S)
 end
 
+"""
+    NN_ansatz(ps, S, activation, t, q̄, q)
+
+The trajectory ansatz of [`ShallowNetAutodiff`](@ref) and
+[`ShallowNetAutodiffReversible`](@ref), on the unit interval `t ∈ [0, 1]`:
+
+    q_h(t) = (1-t)·q̄ + t·q + t(1-t)·N(t),    N(t) = Σᵢ W2ᵢ·σ(W1ᵢ·t + b1ᵢ)
+
+`ps` is the flat `[W2 | W1 | b1]` parameter vector of `3S` entries; `q̄` and `q` are the two
+endpoints. The `t(1-t)` factor makes the network vanish at both ends, so the ansatz
+interpolates the endpoints exactly — `q_h(0) = q̄` and `q_h(1) = q` by construction, whatever
+the parameters. That is why `components!` needs no boundary-point parameter gradients.
+
+Its time derivative is [`VNN_ansatz`](@ref).
+"""
 function NN_ansatz(ps, S::Int, activation, t, q̄, q)
     # q_h(t) = (1-t)q_n + t*q_{n+1} + t(1-t)NN(t)
     return (one(t) - t) * q̄ + t * q + t * (one(t) - t) * apply_NN(t, ps, S, activation)
@@ -205,14 +220,11 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     local q̄ = sol.q
 
     local q = cache(int, ST).q̃
-    local p = cache(int, ST).p̃
     local Q = cache(int, ST).Q
     local V = cache(int, ST).V
     local P = cache(int, ST).P
     local F = cache(int, ST).F
-    local X = cache(int, ST).X
 
-    local NN = method(int).basis.NN
     local ps = cache(int, ST).ps
     local ps_vec = cache(int, ST).ps_vec
     local g_buf  = cache(int, ST).g_buf
@@ -307,7 +319,6 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
     local p̃ = cache(int, ST).p̃
     local P = cache(int, ST).P
     local F = cache(int, ST).F
-    local X = cache(int, ST).X
 
 
     local dqdW2c = cache(int, ST).dqdW2c
@@ -394,7 +405,6 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNetAutodi
     # local network_inputs = method(int).network_inputs
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
-    local NN = method(int).basis.NN
     local ps = cache(int).ps
     local q̄ = sol.q  # start point q_n
     local q = cache(int).q̃ # endpoint estimate q_{n+1}

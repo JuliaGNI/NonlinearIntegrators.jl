@@ -101,9 +101,10 @@ function Base.show(io::IO, method::CGVINodal)
 end
 
 
-# `{ST}` only — see the note on `ShallowNetCache`. Unlike the network methods, `CGVINodal`
-# already carried `NBASIS`/`NNODES` as type parameters, so `CacheType` did fold here; dropping
-# the phantom parameters keeps the seven caches uniform and removes the dependency on that.
+# `{ST}` only — see the note on `SymbolicShallowNetCache` in `nvi/network_integrator_core.jl`.
+# Unlike the network methods, `CGVINodal` already carried `NBASIS`/`NNODES` as type parameters,
+# so `CacheType` did fold here; dropping the phantom parameters keeps the seven caches uniform
+# and removes the dependency on that.
 struct CGVINodalCache{ST} <: IODEIntegratorCache{ST}
     x::Vector{ST}
 
