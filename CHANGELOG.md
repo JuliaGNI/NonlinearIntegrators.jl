@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-17
+
 ### Breaking
 
 - **`CGVINodal` is removed. It now lives in GeometricIntegrators**, next to `CGVI`, which is
@@ -221,7 +223,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **New gates:** per-integrator `@allocated` budgets on `residual!` and `@inferred`; Aqua's full
   suite; and a `D = 2` layout guard for the network integrators — every layout mistake between
   `components!`, `residual!` and `update!` collapses to the identity at `D = 1`, which is why
-  `cgvi_unit.jl` already carried the equivalent guard. VISE's test went from one Float64 step
+  the linear reference integrator's unit file already carried the equivalent guard before both
+  moved upstream with `CGVINodal` (see *Breaking*). VISE's test went from one Float64 step
   asserting only finiteness to a five-step accuracy assertion (its ansatz is exact for the
   harmonic oscillator), a restart guard, and trait checks.
 
