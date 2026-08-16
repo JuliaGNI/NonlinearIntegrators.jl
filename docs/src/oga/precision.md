@@ -114,7 +114,7 @@ than degrading it.
 The integrator default is
 ``f_{\text{abstol}} = \max(8, \texttt{solversize})\,\varepsilon(\texttt{datatype(problem)})``
 — scaled to the working precision, and merged with any options the caller passes. Both
-properties are required of the dependency (`[compat]` pins GeometricIntegratorsBase 0.5),
+properties are required of the dependency (`[compat]` pins GeometricIntegratorsBase 0.6.3),
 because an absolute tolerance that does not scale with `eps(T)` is simply unreachable in
 reduced precision: at `Float32` (``\varepsilon \approx 1.2\times10^{-7}``) or `Float16`
 (``\approx 9.8\times10^{-4}``) the run then sits at its residual floor and burns the entire

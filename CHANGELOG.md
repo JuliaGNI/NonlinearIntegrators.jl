@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The OGA section gains an at-a-glance comparison and documents the adapter layer.** Three
+  tables at the top of *Algorithms* compare the dictionaries, the selection rules and the fits
+  on what they add, what they cost and how they behave on a dependent atom — the design-level
+  view, next to the measured ranking in *Studies* and the prescriptive list in *Usage*. Two
+  implementation decisions that previously reached the manual only through docstrings are now
+  on the page: the `rtol` default of `PivotedQR`/`TruncatedSVD` (`eps(T)·max(4, k)`, and why
+  not `sqrt(eps(T))` — that is the scale of the rank-gain floor, so truncating there would
+  discard the directions selection just admitted), and the power-of-two dictionary rescaling
+  that opens the greedy loop.
+
+  *Usage* gains the glue between `oga_fit` and the integrators, which `src/oga/adapters.jl`
+  had but no page stated: the seed runs **one independent greedy fit per degree of freedom**,
+  its target is the `initial_trajectory_method` estimate rather than the solution, and the node
+  count and Simpson weights both come from `extrapolation_substep` — which is where the `M = 11`
+  assumed throughout *Algorithms* comes from. Also that `TrainingMethod` is an alternative seed
+  for `ShallowNet`, and that `show_status` (on by default) is what prints the per-component
+  neuron count, residual and rejection count.
+
 ### Fixed
+
+- The OGA *Precision* page said `[compat]` pins GeometricIntegratorsBase 0.5; it has required
+  0.6.3 since the SimpleSolvers 0.12 upgrade. The argument for the bound — an `f_abstol` that
+  scales with `datatype(problem)`, and defaults that merge with the caller's options rather than
+  being substituted away — is unchanged.
 
 - **The documentation deploys again on a tag.** `deploydocs` was called with `devurl = "stable"`,
   publishing `main` at `/stable/`. Its default `versions` is `["stable" => "v^", "v#.#", devurl =>
