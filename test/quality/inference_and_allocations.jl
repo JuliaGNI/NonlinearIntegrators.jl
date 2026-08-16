@@ -86,17 +86,37 @@ end
     end
 end
 
+# Repeated `@allocated` samples of one `oga_fit` call, measured inside a function for the same
+# reason `residual_bytes` is: a `@testset` body is a closure, and an inline `@allocated` would
+# fold the boxed access to every captured variable into the number.
+function oga_fit_bytes(args, kw, n = 3)
+    oga_fit(args...; kw...)                                   # compile / first touch
+    return [(@allocated oga_fit(args...; kw...)) for _ in 1:n]
+end
+
 @testset "oga_fit is allocation-stable across dimensions" begin
     # The OGA seed builds a dictionary-sized `Ψ` per call. This does not assert a small number
-    # — the matrix is genuinely large — only that a second call with identical arguments costs
-    # the same as the first, i.e. that nothing has started growing per invocation.
+    # — the matrix is genuinely large — only that repeated calls with identical arguments cost
+    # the same, i.e. that nothing has started growing per invocation.
+    #
+    # Three samples and a tolerance, not `a1 == a2`. Exact byte equality between two
+    # `@allocated` calls is not a property of this code: the same assertion read 222 374 vs
+    # 222 438 on Windows / 1.13.0-rc3 and 155 894 vs 155 846 on Windows / nightly — tens of
+    # bytes, and in *opposite* directions, which is measurement noise rather than growth.
+    # (The two totals differ by 30% between those builds, so the absolute figure is not a
+    # stable quantity either, which is why nothing is pinned here.)
+    #
+    # Growth is what the test is for, and growth compounds: over `n` samples it widens the
+    # spread by `n` times the per-call leak, where the noise floor stays put. So the assertion
+    # is on the spread, at ~4 kB against a ~200 kB measurement — two orders of magnitude above
+    # the noise seen, and far below the per-call `Ψ` that a regression here would add.
     nodes, weights, y = oga_testcase(Float64)
     σ = relu_k(3)
     args = (OGA1d(), σ, nodes, weights, y, 4)
     kw = (; bias_interval = [-Float64(pi), Float64(pi)], dict_amount = 200)
-    oga_fit(args...; kw...)
-    a1 = @allocated oga_fit(args...; kw...)
-    a2 = @allocated oga_fit(args...; kw...)
-    @debug "oga_fit bytes" a1 a2
-    @test a1 == a2
+
+    bytes = oga_fit_bytes(args, kw)
+    spread = maximum(bytes) - minimum(bytes)
+    @debug "oga_fit bytes" bytes spread
+    @test spread ≤ max(4096, minimum(bytes) ÷ 100)
 end
