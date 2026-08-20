@@ -44,6 +44,10 @@ using SimpleSolvers: Newton, solve_with_status!
 import GeometricOptimizers
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks
+# `AbstractNeuralNetworks` 0.7 no longer exports `NeuralNetworkParameters`: the parameter container
+# moved out to the package of that name, where the type is called `NetworkParameters`, and the alias
+# left behind is deliberately unexported so that every user of it says where it came from.
+import AbstractNeuralNetworks: NeuralNetworkParameters
 using LinearAlgebra
 using ForwardDiff
 
