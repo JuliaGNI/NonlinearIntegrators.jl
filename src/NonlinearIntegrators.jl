@@ -44,6 +44,10 @@ using SimpleSolvers: Newton, solve_with_status!
 import GeometricOptimizers
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks
+# The parameter container lives in `NeuralNetworkParameters` as of `AbstractNeuralNetworks` 0.7,
+# under the name `NetworkParameters`. The import is selective: `NeuralNetworkParameters` also exports
+# `flatten`/`unflatten`, and the flat-vector conversions in `nvi/utilities.jl` are this package's own.
+import NeuralNetworkParameters: NetworkParameters
 using LinearAlgebra
 using ForwardDiff
 
