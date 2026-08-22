@@ -6,7 +6,7 @@
 # puts it back. The property the training loops actually depend on is that neither copies:
 # the optimizer updates `ps_flat` in place and the network has to see the result.
 
-using AbstractNeuralNetworks: NeuralNetworkParameters
+using NeuralNetworkParameters: NetworkParameters
 
 nested_params() = (L1 = (W = [1.0 2.0; 3.0 4.0], b = [5.0, 6.0]),
                    L2 = (W = [7.0 8.0],))
@@ -54,16 +54,16 @@ nested_params() = (L1 = (W = [1.0 2.0; 3.0 4.0], b = [5.0, 6.0]),
         @test NI.network_params(flat, subset).L1.W === ps.L1.W
     end
 
-    # `PNN.params` is a `NeuralNetworkParameters`, not a bare `NamedTuple`, and the loss has
+    # `PNN.params` is a `NetworkParameters`, not a bare `NamedTuple`, and the loss has
     # to hand the network back the same wrapper it expects.
-    @testset "NeuralNetworkParameters" begin
-        nnp = NeuralNetworkParameters(nested_params())
+    @testset "NetworkParameters" begin
+        nnp = NetworkParameters(nested_params())
         flat = NI.optimizer_params(nnp)
         @test keys(flat) == (:L1_W, :L1_b, :L2_W)
         @test flat.L1_W === nnp.L1.W
 
         back = NI.network_params(flat, nnp)
-        @test back isa NeuralNetworkParameters
+        @test back isa NetworkParameters
         @test back.L1.W === nnp.L1.W
         @test back.L2.W === nnp.L2.W
     end
