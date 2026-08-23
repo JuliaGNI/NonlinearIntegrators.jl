@@ -52,7 +52,7 @@ made the old `flatten_params` type-unstable — `values(params)` iterates a hete
 end
 
 _param_arrays(params::NetworkParameters) =
-    _param_arrays(AbstractNeuralNetworks.params(params))
+    _param_arrays(NeuralNetworkParameters.params(params))
 
 """
     flatten_params!(dest, params) -> dest
@@ -110,7 +110,7 @@ at run time, inference cannot fold it, and the return type degrades to `NamedTup
 training loops then hand `Optimizer` an argument of unknown type, and inferring the
 constructor plus `solver_step!` from there costs minutes per specialization on Julia 1.12.
 """
-optimizer_params(ps::NetworkParameters) = optimizer_params(AbstractNeuralNetworks.params(ps))
+optimizer_params(ps::NetworkParameters) = optimizer_params(NeuralNetworkParameters.params(ps))
 
 @generated function optimizer_params(ps::NamedTuple{LN,LT}) where {LN,LT}
     names = Symbol[]
@@ -138,7 +138,7 @@ nested, so it needs this on the way in. The result is a `NetworkParameters` exac
 runs inside the differentiated loss, on every function and gradient evaluation.
 """
 function network_params(flat, template::NetworkParameters)
-    NetworkParameters(network_params(flat, AbstractNeuralNetworks.params(template)))
+    NetworkParameters(network_params(flat, NeuralNetworkParameters.params(template)))
 end
 
 @generated function network_params(flat::NamedTuple, template::NamedTuple{LN,LT}) where {LN,LT}

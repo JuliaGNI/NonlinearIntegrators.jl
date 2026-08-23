@@ -44,7 +44,7 @@
 
 include(joinpath(@__DIR__, "shallownet_benchmark_common.jl"))
 
-using AbstractNeuralNetworks: NeuralNetworkParameters
+using NeuralNetworkParameters: NetworkParameters
 using GeometricProblems.HarmonicOscillator
 using GeometricProblems.Pendulum
 using GeometricProblems.DoublePendulum
@@ -355,14 +355,14 @@ function bench_call(f; calls::Int)
     return (min = minimum(ts), median = median(ts), bytes = Float64(bytes))
 end
 
-# Parameters in the two layouts the two backends want: the nested `NeuralNetworkParameters`
+# Parameters in the two layouts the two backends want: the nested `NetworkParameters`
 # the generated kernels take (the shape `cache(int).ps` holds), and the flat `[W2; W1; b1]`
 # vector `apply_NN` indexes.
 function kernel_params(::Type{T}, S::Int) where {T}
     rng = Random.MersenneTwister(42)
     ps = (L1 = (W = rand(rng, T, S, 1), b = rand(rng, T, S)), L2 = (W = rand(rng, T, 1, S),))
     ps_vec = vcat(vec(ps.L2.W), vec(ps.L1.W), ps.L1.b)
-    return NeuralNetworkParameters(ps), ps_vec
+    return NetworkParameters(ps), ps_vec
 end
 
 # `cse` and `inplace` change the emitted code, not the mathematics, so the two settings have

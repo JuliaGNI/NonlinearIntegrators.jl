@@ -47,7 +47,10 @@ using AbstractNeuralNetworks
 # The parameter container lives in `NeuralNetworkParameters` as of `AbstractNeuralNetworks` 0.7,
 # under the name `NetworkParameters`. The import is selective: `NeuralNetworkParameters` also exports
 # `flatten`/`unflatten`, and the flat-vector conversions in `nvi/utilities.jl` are this package's own.
-import NeuralNetworkParameters: NetworkParameters
+# The module itself is listed alongside the type because the accessor is taken qualified,
+# `NeuralNetworkParameters.params`, for the same reason `solve!` is above: `params` is too generic a
+# name to read bare. `using M: x` alone does not bind `M`.
+using NeuralNetworkParameters: NeuralNetworkParameters, NetworkParameters
 using LinearAlgebra
 using ForwardDiff
 

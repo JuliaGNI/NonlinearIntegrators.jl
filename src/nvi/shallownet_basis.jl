@@ -29,7 +29,7 @@ reject such a basis in their constructor; see [`has_symbolic_derivatives`](@ref)
 
 `cse` (common-subexpression elimination during code generation) and `inplace` (evaluate a
 batch through a kernel writing into one preallocated array) both default to `true`, which is
-also what `SymbolicNeuralNetworks` 0.5 uses. They are pinned here rather than left to the
+also what `SymbolicNeuralNetworks` 0.6 uses. They are pinned here rather than left to the
 upstream default so that a change there cannot silently change this package's code
 generation. They are exposed to be turned *off*: `cse = false, inplace = false` emits the
 whole shared forward pass once per gradient block and evaluates a batch out of place, one
