@@ -84,7 +84,7 @@ end
     @test has_symbolic_derivatives(plain)
 
     input = [T(0.3)]
-    ps = AbstractNeuralNetworks.NeuralNetworkParameters((
+    ps = NeuralNetworkParameters.NetworkParameters((
         L1 = (W = reshape(T[0.7, -0.4, 0.2, 0.9], 4, 1), b = T[0.1, -0.2, 0.3, -0.4]),
         L2 = (W = reshape(T[0.5, -0.6, 0.7, -0.8], 1, 4),)))
 
@@ -123,7 +123,7 @@ function rebuild_params(v, template)
         end
         layers = (layers..., NamedTuple{keys(layer)}(fields))
     end
-    AbstractNeuralNetworks.NeuralNetworkParameters(NamedTuple{keys(template)}(layers))
+    NeuralNetworkParameters.NetworkParameters(NamedTuple{keys(template)}(layers))
 end
 
 # The compiled kernels against an *independent* reference. The testset above compares

@@ -132,10 +132,10 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     # Coefficients and their parameter derivatives, at the quadrature nodes and the two
     # interval boundaries. See the equivalent block in shallownet.jl: merging the two passes
     # over `d` lets `DVDθ` be evaluated once per node instead of twice, builds
-    # `NeuralNetworkParameters(ps[d])` once per dimension instead of four times per node, and
+    # `NetworkParameters(ps[d])` once per dimension instead of four times per node, and
     # replaces the `[:]`-copy-then-slice-assign with `copyto!` into a view.
     for d in 1:D
-        psd = NeuralNetworkParameters(ps[d])
+        psd = NetworkParameters(ps[d])
 
         tbuf[1] = zero(ST)
         copyto!(view(r₀, :, d), (NN.layers[1])(tbuf, ps[d][1]))

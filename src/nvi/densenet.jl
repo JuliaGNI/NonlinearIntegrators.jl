@@ -334,7 +334,7 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::LS
         # and the loss reads the *current* L3 through the closure.
         tem_flat = optimizer_params(tem_ps)
         loss(p) = lsgd_loss(network_inputs, labels, NN,
-            NeuralNetworkParameters(merge(network_params(p, tem_ps), (L3 = PNN.params.L3,))))
+            NetworkParameters(merge(network_params(p, tem_ps), (L3 = PNN.params.L3,))))
         algorithm = GeometricOptimizers.GradientMethod()
         # The `Static` line search is not a style choice: `GradientMethod` with any *searching*
         # line search throws `MethodError: no method matching gradient(::GradientCache)` on
@@ -427,17 +427,17 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
         # r₀[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([0.0],intermidiate_ps)
         # r₁[:,d] = AbstractNeuralNetworks.Chain(NN.layers[1:end-1]...)([1.0],intermidiate_ps)
         # for i in 1:S
-        g0 = DQDθ([zero(ST)], NeuralNetworkParameters(ps[d]))
+        g0 = DQDθ([zero(ST)], NetworkParameters(ps[d]))
         flatten_params!(view(g0_params, :, d), g0)
 
-        g1 = DQDθ([one(ST)], NeuralNetworkParameters(ps[d]))
+        g1 = DQDθ([one(ST)], NetworkParameters(ps[d]))
         flatten_params!(view(g1_params, :, d), g1)
 
         for j in eachindex(quad_nodes)
-            g = DQDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
+            g = DQDθ([quad_nodes[j]], NetworkParameters(ps[d]))
             flatten_params!(view(dqdθc, j, :, d), g)
 
-            gv = DVDθ([quad_nodes[j]], NeuralNetworkParameters(ps[d]))
+            gv = DVDθ([quad_nodes[j]], NetworkParameters(ps[d]))
             flatten_params!(view(dvdθc, j, :, d), gv)
         end
     end
@@ -445,23 +445,23 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     # compute Q q at quaadurature points
     for i in eachindex(Q)
         for d in eachindex(Q[i])
-            Q[i][d] = NN([quad_nodes[i]], NeuralNetworkParameters(ps[d]))[1]
+            Q[i][d] = NN([quad_nodes[i]], NetworkParameters(ps[d]))[1]
         end
     end
 
     # compute q[t_{n+1}]
     for d in eachindex(q)
-        q[d] = NN([one(ST)], NeuralNetworkParameters(ps[d]))[1]
+        q[d] = NN([one(ST)], NetworkParameters(ps[d]))[1]
     end
 
     for d in eachindex(q)
-        q0[d] = NN([zero(ST)], NeuralNetworkParameters(ps[d]))[1]
+        q0[d] = NN([zero(ST)], NetworkParameters(ps[d]))[1]
     end
 
     # compute V volicity at quadrature points
     for i in eachindex(V)
         for d in eachindex(V[i])
-            V[i][d] = V_func([quad_nodes[i]],NeuralNetworkParameters(ps[d]))[1] / timestep(int)
+            V[i][d] = V_func([quad_nodes[i]],NetworkParameters(ps[d]))[1] / timestep(int)
         end
     end
 

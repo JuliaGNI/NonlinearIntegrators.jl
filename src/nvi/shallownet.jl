@@ -200,12 +200,12 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     #     (taking `.L2.W`) and the second called it again at the same node for `dvdWc`/`dvdbc`
     #     (taking `.L1.W`/`.L1.b`) — one call returns all three. This is the most expensive
     #     kernel in the integrator, so it is a straight 2× on the dominant cost.
-    #   * `NeuralNetworkParameters(ps[d])` is loop-invariant in `j` and is now built once per
+    #   * `NetworkParameters(ps[d])` is loop-invariant in `j` and is now built once per
     #     dimension rather than four times per node.
     #   * `copyto!` into a `view` replaces `dst[j, :, d] = src.L1.W[:]`, whose `[:]` allocated
     #     a copy of the source only to read it once.
     for d in 1:D
-        psd = NeuralNetworkParameters(ps[d])
+        psd = NetworkParameters(ps[d])
 
         tbuf[1] = zero(ST)
         copyto!(view(r₀, :, d), (NN.layers[1])(tbuf, ps[d][1]))

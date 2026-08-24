@@ -48,6 +48,35 @@ const RESIDUAL_ALLOC_BUDGET = Dict(
     "ShallowNetAutodiffReversible" => 78_000,
 )
 
+# Julia 1.10 pays more than 1.12+ for the same call, and `SymbolicNeuralNetworks` 0.6 widened the
+# gap. The symbolic bases go through generated kernels (`DQDθ`, `DVDθ`, `V_func`), and 0.6 laid
+# their equation sets out over `NeuralNetworkParameters.ParameterLayout` instead of a local
+# `FlatSlice`; something in that path stops folding on 1.10 and does not on 1.12 or later.
+# Measured per `residual!` call, Float64, S = 4, R = 8, D = 1:
+#
+#                                 1.10 / ANN 0.6.4   1.10 / ANN 0.7   1.11 - 1.13 / ANN 0.7
+#   ShallowNet                              15 168           28 096                  11 424
+#   ShallowNetReversible                    15 168           28 096                  11 424
+#   ShallowNetAutodiff                      51 584           51 584        52 096 - 54 656
+#   ShallowNetAutodiffReversible            51 584           51 584        52 096 - 54 656
+#
+# Only the two symbolic rows move, and only on 1.10: the autodiff rows go through `ForwardDiff`
+# rather than a generated kernel and are unchanged. 1.11 was measured (11 424, same as 1.13) so
+# that the cutoff below is a measurement and not a guess — CI's matrix skips 1.11. The container
+# constructor itself allocates 0 bytes under both stacks on every version tried, so this is not
+# the `NetworkParameters` rename. 28 096 is byte-identical on macOS aarch64, macOS x86_64 and
+# Linux x86_64, so it is deterministic rather than noise and a fixed ceiling is safe.
+#
+# The 1.10 ceiling keeps the same ~1.5x margin over what 1.10 actually costs, so a *further*
+# regression there still trips. The tight ceiling stays in force on 1.11 and later, which is
+# where the number this package can control is visible. Recorded under *Open Issues* →
+# *Upstream* in the CHANGELOG and reported as SymbolicNeuralNetworks#55; remove this override when
+# that closes.
+if VERSION < v"1.11"
+    RESIDUAL_ALLOC_BUDGET["ShallowNet"]           = 42_000
+    RESIDUAL_ALLOC_BUDGET["ShallowNetReversible"] = 42_000
+end
+
 # The measurement has to happen inside a function taking `p` as an argument, not inline in a
 # `@testset` body. `@testset` wraps its body in a closure, so an inline `@allocated` also
 # measures the boxed access to every captured variable — which inflated ShallowNet from 11 424

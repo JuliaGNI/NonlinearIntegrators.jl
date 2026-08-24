@@ -51,8 +51,8 @@ made the old `flatten_params` type-unstable — `values(params)` iterates a hete
     Expr(:tuple, entries...)
 end
 
-_param_arrays(params::NeuralNetworkParameters) =
-    _param_arrays(AbstractNeuralNetworks.params(params))
+_param_arrays(params::NetworkParameters) =
+    _param_arrays(NeuralNetworkParameters.params(params))
 
 """
     flatten_params!(dest, params) -> dest
@@ -94,7 +94,7 @@ one key: `L1.W` becomes `L1_W`.
 
 This is the shape GeometricOptimizers' `Optimizer` requires — its `OptimizerSolution` is an
 `AbstractVector`, a `Manifold`, or a *flat* `NamedTuple` of arrays, whereas network parameters are
-one level deeper, `(L1 = (W = …, b = …), L2 = (W = …,))`. Both `NeuralNetworkParameters` and a
+one level deeper, `(L1 = (W = …, b = …), L2 = (W = …,))`. Both `NetworkParameters` and a
 plain `NamedTuple` of layers are accepted, the latter for optimising a subset of the layers.
 
 Does **not** copy: the result aliases the same arrays, so the optimizer's in-place updates are
@@ -110,7 +110,7 @@ at run time, inference cannot fold it, and the return type degrades to `NamedTup
 training loops then hand `Optimizer` an argument of unknown type, and inferring the
 constructor plus `solver_step!` from there costs minutes per specialization on Julia 1.12.
 """
-optimizer_params(ps::NeuralNetworkParameters) = optimizer_params(AbstractNeuralNetworks.params(ps))
+optimizer_params(ps::NetworkParameters) = optimizer_params(NeuralNetworkParameters.params(ps))
 
 @generated function optimizer_params(ps::NamedTuple{LN,LT}) where {LN,LT}
     names = Symbol[]
@@ -131,14 +131,14 @@ Rebuild the layer nesting that [`optimizer_params`](@ref) removed, taking the ke
 `template` and the arrays from the flat `NamedTuple` `flat`.
 
 The loss handed to `Optimizer` is called on the flat parameters while the network wants them
-nested, so it needs this on the way in. The result is a `NeuralNetworkParameters` exactly when
+nested, so it needs this on the way in. The result is a `NetworkParameters` exactly when
 `template` is one.
 
 `@generated` for the same reason as [`optimizer_params`](@ref), and more pressingly: this one
 runs inside the differentiated loss, on every function and gradient evaluation.
 """
-function network_params(flat, template::NeuralNetworkParameters)
-    NeuralNetworkParameters(network_params(flat, AbstractNeuralNetworks.params(template)))
+function network_params(flat, template::NetworkParameters)
+    NetworkParameters(network_params(flat, NeuralNetworkParameters.params(template)))
 end
 
 @generated function network_params(flat::NamedTuple, template::NamedTuple{LN,LT}) where {LN,LT}

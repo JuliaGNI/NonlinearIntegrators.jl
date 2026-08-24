@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-24
+
+The parameter container moved out from under this package. `AbstractNeuralNetworks` 0.7 gave the
+type its own package, and `SymbolicNeuralNetworks` 0.6 followed; this release follows both. Nothing
+in this package's own exported surface changes — no integrator, method, basis or constructor is
+renamed, and the numerics are untouched.
+
+### Breaking
+
+- **`NeuralNetworkParameters` is `NeuralNetworkParameters.NetworkParameters`.**
+  [`AbstractNeuralNetworks` 0.7](https://github.com/JuliaGNI/AbstractNeuralNetworks.jl/pull/33)
+  moved the parameter container — the struct, the leaf protocol, the tree walks, the flat form, the
+  HDF5 path and the Zygote rule — out to
+  [`NeuralNetworkParameters`](https://github.com/JuliaGNI/NeuralNetworkParameters.jl), where the
+  type is called `NetworkParameters`, and removed the old name outright rather than leaving an
+  alias, so that one type has one name across the ecosystem. It is the same type object, so code
+  that only *uses* a parameter set is unaffected; code that *names* the type has to be edited:
+
+  ```julia
+  using AbstractNeuralNetworks: NeuralNetworkParameters   # before
+  using NeuralNetworkParameters: NetworkParameters        # after
+  ```
+
+  Every call site here names it where it now lives — three method signatures and the wrapper
+  construction in `src/nvi/utilities.jl`, the per-dimension parameter set in `shallownet.jl`,
+  `shallownet_reversible.jl` and `densenet.jl`, and the `L3` merge in `DenseNet`'s LSGD loss. The
+  import is selective rather than a bare `using`, because `NeuralNetworkParameters` also exports
+  `flatten`/`unflatten` and the flat-vector conversions in `nvi/utilities.jl` —
+  `optimizer_params` and `network_params` — are this package's own, over a layout one level
+  shallower than a network's. The `params` accessor is taken from the same module, qualified;
+  `AbstractNeuralNetworks` re-exports it, so both spellings resolve to one binding, but the type
+  and its accessor now read as coming from the same place.
+
+  `NeuralNetworkParameters` enters the tree as a dependency of both `AbstractNeuralNetworks` 0.7
+  and `SymbolicNeuralNetworks` 0.6. It is listed here directly, with a `[compat]` entry, because
+  this package names the type itself rather than only passing parameter sets through. The test
+  environment lists it too, since the unit tests construct parameter sets by hand.
+
+- **`SymbolicNeuralNetworks` moves to 0.6** (was 0.5) and **`AbstractNeuralNetworks` to 0.7** (was
+  0.6.4). These are one constraint, not two: SNN 0.6 is the release that tracks ANN 0.7, and SNN
+  0.5 pins ANN `0.6.4 - 0.6`, so the pair has to move together or the environment does not resolve.
+  Nothing else SNN 0.6 changes reaches here — it renames nothing in its exported surface, and the
+  one name it drops, `QPTOAT`, was never used in this package. Its rewrite of `SymbolicPullback`
+  into a per-layer composition (an `O(width^depth)` expression becomes a sum over layers) is a
+  path this package does not take, since both bases go through `symbolic_parameter_gradient`.
+
+  Unlike the 0.6.4 floor this replaces — recorded under *Open Issues* → *Reviewing the 0.5 update*
+  as a bound stating something other than this package's own requirement — `0.7` is this package's
+  requirement: `NetworkParameters` is named directly in `src/`.
+
+- **`benchmark/` takes `NeuralNetworkParameters` in place of `AbstractNeuralNetworks`.**
+  `compare_derivative_backends.jl` was the only file under `benchmark/` that used
+  `AbstractNeuralNetworks` at all, and only for the parameter container, so the dependency is
+  replaced rather than added to. The docs CI job instantiates this environment.
+
+### Known issues
+
+- **On Julia 1.10, `residual!` allocates 1.85x what it did** for `ShallowNet` and
+  `ShallowNetReversible` — 28 096 bytes per call against 15 168 before. Julia 1.11 and later are
+  unaffected, at an unchanged 11 424. The cause is upstream of this package; it is recorded in full
+  under *Open Issues* → *Upstream*, and the allocation gate carries a 1.10-only ceiling so that a
+  further regression there is still caught.
+
 ## [0.3.0] - 2026-08-17
 
 ### Breaking
@@ -982,6 +1045,26 @@ so that this section is the complete index.
 
 ### Upstream
 
+- **`SymbolicNeuralNetworks` 0.6 costs 1.85x the allocations in the symbolic `residual!` path, on
+  Julia 1.10 only.** Per `residual!` call at Float64, `S = 4`, `R = 8`, `D = 1`, `ShallowNet` and
+  `ShallowNetReversible` go from 15 168 bytes under `AbstractNeuralNetworks` 0.6.4 / SNN 0.5 to
+  28 096 under 0.7 / 0.6. On 1.11, 1.12 and 1.13 the same call is 11 424 either way, so nothing
+  regressed there.
+
+  It is not the `NetworkParameters` rename: the container constructor allocates 0 bytes under both
+  stacks on every version tried. The two `*Autodiff` rows, which reach their derivatives through
+  `ForwardDiff` rather than a generated kernel, are unchanged at 51 584. What is left is the
+  generated kernels the symbolic bases call — `DQDθ`, `DVDθ`, `V_func` — and SNN 0.6 laid their
+  equation sets out over `NeuralNetworkParameters.ParameterLayout` in place of a local `FlatSlice`.
+  Something on that path stops folding on 1.10 and does not on 1.11 or later. 28 096 is
+  byte-identical on macOS aarch64, macOS x86_64 and Linux x86_64, so it is deterministic.
+
+  `test/quality/inference_and_allocations.jl` carries a 1.10-only ceiling of 42 000 for those two
+  rows, the same ~1.5x margin over the measured figure that the other budgets have, so a further
+  regression on 1.10 still trips it; 1.11 and later keep the tight 17 000. Reported as
+  [SymbolicNeuralNetworks#55](https://github.com/JuliaGNI/SymbolicNeuralNetworks.jl/issues/55); the
+  exact kernel of the three is not yet isolated, which is the next step there.
+
 - **`GeometricOptimizers.GradientMethod` cannot be used with a searching line search** on
   Euclidean parameters: `_trial_slope` calls `gradient(cache)` while the first-order caches
   expose `gradient_array`, so it throws `MethodError: no method matching
@@ -1240,9 +1323,9 @@ exactly `NP`), which is the check now in `test/unit/dispatch_variants_unit.jl`.
   few nodes, or reusing the quadrature nodes the integrators actually evaluate at, would cost
   almost nothing.
 
-- **`Project.toml`'s `AbstractNeuralNetworks = "0.6.4"` is a floor this package does not need.**
-  Neither `input_dimension` nor `output_dimension` is called anywhere here; the constraint that
-  forces 0.6.4 is `SymbolicNeuralNetworks` 0.5's own, and the resolver applies it whether or not
-  this entry exists. Kept because it documents the coupling the *0.4 → 0.5* entry explains, but
-  it is a compat bound stating something other than this package's requirement, and it will need
-  a reason to move when it next changes.
+- ~~**`Project.toml`'s `AbstractNeuralNetworks = "0.6.4"` is a floor this package does not need.**~~
+  Neither `input_dimension` nor `output_dimension` was called anywhere here; the constraint that
+  forced 0.6.4 was `SymbolicNeuralNetworks` 0.5's own, and the resolver applied it whether or not
+  the entry existed. **Closed** by [0.4.0]: the bound is now `0.7`, and it is this package's own —
+  `NetworkParameters` is named directly in `src/`, so the entry states a requirement rather than
+  documenting a coupling.
