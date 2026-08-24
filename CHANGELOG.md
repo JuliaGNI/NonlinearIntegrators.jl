@@ -62,6 +62,14 @@ renamed, and the numerics are untouched.
   `AbstractNeuralNetworks` at all, and only for the parameter container, so the dependency is
   replaced rather than added to. The docs CI job instantiates this environment.
 
+### Known issues
+
+- **On Julia 1.10, `residual!` allocates 1.85x what it did** for `ShallowNet` and
+  `ShallowNetReversible` — 28 096 bytes per call against 15 168 before. Julia 1.11 and later are
+  unaffected, at an unchanged 11 424. The cause is upstream of this package; it is recorded in full
+  under *Open Issues* → *Upstream*, and the allocation gate carries a 1.10-only ceiling so that a
+  further regression there is still caught.
+
 ## [0.3.0] - 2026-08-17
 
 ### Breaking
@@ -1036,6 +1044,26 @@ so that this section is the complete index.
   these changes and a `main` baseline can be taken again.
 
 ### Upstream
+
+- **`SymbolicNeuralNetworks` 0.6 costs 1.85x the allocations in the symbolic `residual!` path, on
+  Julia 1.10 only.** Per `residual!` call at Float64, `S = 4`, `R = 8`, `D = 1`, `ShallowNet` and
+  `ShallowNetReversible` go from 15 168 bytes under `AbstractNeuralNetworks` 0.6.4 / SNN 0.5 to
+  28 096 under 0.7 / 0.6. On 1.11, 1.12 and 1.13 the same call is 11 424 either way, so nothing
+  regressed there.
+
+  It is not the `NetworkParameters` rename: the container constructor allocates 0 bytes under both
+  stacks on every version tried. The two `*Autodiff` rows, which reach their derivatives through
+  `ForwardDiff` rather than a generated kernel, are unchanged at 51 584. What is left is the
+  generated kernels the symbolic bases call — `DQDθ`, `DVDθ`, `V_func` — and SNN 0.6 laid their
+  equation sets out over `NeuralNetworkParameters.ParameterLayout` in place of a local `FlatSlice`.
+  Something on that path stops folding on 1.10 and does not on 1.11 or later. 28 096 is
+  byte-identical on macOS aarch64, macOS x86_64 and Linux x86_64, so it is deterministic.
+
+  `test/quality/inference_and_allocations.jl` carries a 1.10-only ceiling of 42 000 for those two
+  rows, the same ~1.5x margin over the measured figure that the other budgets have, so a further
+  regression on 1.10 still trips it; 1.11 and later keep the tight 17 000. Reported as
+  [SymbolicNeuralNetworks#55](https://github.com/JuliaGNI/SymbolicNeuralNetworks.jl/issues/55); the
+  exact kernel of the three is not yet isolated, which is the next step there.
 
 - **`GeometricOptimizers.GradientMethod` cannot be used with a searching line search** on
   Euclidean parameters: `_trial_slope` calls `gradient(cache)` while the first-order caches
