@@ -15,7 +15,7 @@ using NonlinearIntegrators
 # summary section.
 function generate_benchmark_figures()
     benchdir = normpath(joinpath(@__DIR__, "..", "benchmark"))
-    figdir   = joinpath(@__DIR__, "src", "benchmarks", "figures")
+    figdir   = joinpath(@__DIR__, "src", "Benchmarks", "figures")
     resdir   = joinpath(benchdir, "results")
     mkpath(figdir)
     julia = Base.julia_cmd()
@@ -97,7 +97,7 @@ makedocs(
         ],
         "Variational Integrator with Symbolic Expression" =>
             "vise/vise.md",
-        "Benchmarks" => "benchmarks/benchmarks.md",
+        "Benchmarks" => "Benchmarks/benchmarks.md",
     ],
 )
 
