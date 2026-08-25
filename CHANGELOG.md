@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-25
+
+Three compat bounds move together, and the two things the releases behind them bring make code
+here shorter. Nothing in this package's exported surface changes.
+
+### Changed
+
+- **`GeometricOptimizers` 0.4 → 0.5, `NeuralNetworkParameters` 0.1 → 0.2.1,
+  `SymbolicNeuralNetworks` 0.6 → 0.7.** One constraint, not three. `GeometricOptimizers` 0.5.0
+  drops the `ParameterHandling` shim and lets `NeuralNetworkParameters` do the flattening, which
+  makes the 0.2 container a requirement rather than a choice — 0.4 and earlier want the 0.1
+  container — and `SymbolicNeuralNetworks` 0.7.0 is the first release that permits 0.2, where
+  0.6.0 allows only 0.1. Any one of the three alone is unsatisfiable.
+
+  Nothing here called what `GeometricOptimizers` 0.5.0 *removed*: `apply_toNT`, the pirated
+  `ParameterHandling` methods on Base types, or `NeuralNetworkParametersExt`, whose contents are
+  `src/parameter_protocol.jl` there now.
+
+- **`AbstractNeuralNetworks` is bounded at `0.7.1`, not `0.7`.** 0.7.0 pins
+  `NeuralNetworkParameters = "0.1"`, so it can never coexist with the 0.2 container this package
+  now requires: the wider bound admitted a version that is not satisfiable here, which the
+  resolver works out on its own but which makes the bound a false statement about what this
+  package supports. `SymbolicNeuralNetworks` 0.7 names 0.7.1 for the same reason.
+
+- **`NeuralNetworkParameters` is bounded at `0.2.1`, not `0.2`.** Not a bound about what loads —
+  every name used here is in 0.2.0 — but about what `test/quality/inference_and_allocations.jl`
+  measures; see the entry below.
+
+- **The training loops hand `GeometricOptimizers` a flat `Vector`, and
+  `optimizer_params`/`network_params` are gone.** Both were `@generated` helpers that flattened
+  the layer nesting into `L1_W`-style keys and back, because `Optimizer` takes a *flat*
+  `NamedTuple` where network parameters are one level deeper. That shape was never what the
+  optimizer works in: handed a `NamedTuple`, `GeometricOptimizers` flattens it itself inside the
+  `Gradient` it builds, so the flat `NamedTuple` bought a second, nested unflattening on every
+  function and gradient evaluation of every epoch.
+
+  `NeuralNetworkParameters` 0.2's `flatten`/`unflatten`/`unflatten!` replace both. What makes
+  that possible now and not before is that a `ParameterLayout` is a *value*: the
+  `ParameterHandling.flatten` this package could have called instead returned a chain of nested
+  closures, one per level of the tree, which is not type stable — and that instability is exactly
+  why the two helpers were `@generated` in the first place. `unflatten` keeps the element type of
+  the vector it is given, which is what lets the same closure be called on `ForwardDiff.Dual`s.
+
+  The three call sites — `ShallowNet`'s `TrainingMethod` seed and `DenseNet`'s `TrainingMethod`
+  and `LSGD` seeds — lose the aliasing the old flat view gave them, so each gained an explicit
+  `unflatten!` where the network's arrays are read back: once after `solve!` for `ShallowNet`, and
+  once per epoch for the two hand-rolled `DenseNet` loops, which read the loss off `PNN.params`
+  inside the loop. `test/unit/optimizer_params_unit.jl` becomes
+  `test/unit/parameter_flattening_unit.jl` and pins the contract this package depends on —
+  including that `unflatten` preserves a `Dual` element type, without which every gradient in
+  those loops would come out zero.
+
+  `flatten_params!` and `_param_arrays` stay. `NeuralNetworkParameters.flatten!` does the same
+  walk, but is allocation-free only when handed a stored `ParameterLayout`, and the four call
+  sites in `DenseNet`'s `components!` flatten a freshly built gradient set with nowhere on the
+  cache to keep a layout for it. A `@generated` walk needs none.
+
+  Not available yet, and checked: handing a `NetworkParameters` straight to `Optimizer`.
+  `GeometricOptimizers` 0.5 makes `NetworkParameters{T}` a member of `OptimizerSolution{T}`, but
+  its changelog's *Known issues* records that the swap itself is not in the release — every
+  elementwise primitive in its `named_tuple_wrapper.jl` still dispatches on `ArrayNamedTuple`,
+  and `default_gradient` has no container method — so a container "gets further in before failing
+  rather than being turned away at the door".
+
+- **`benchmark/Project.toml`'s `[sources]` entry takes a relative path.** It carried an absolute
+  one, `/Users/mkraus/Datashare/Julia/NonlinearIntegrators`, since [0.2.0], so the benchmark
+  environment resolved on exactly one machine. `docs/Project.toml` has always used `".."`.
+
+### Fixed
+
+- **The allocation gate has one ceiling per row again, on every Julia version.** The 1.10-only
+  ceiling of 42 000 that [0.4.0] shipped for `ShallowNet` and `ShallowNetReversible` is removed:
+  `SymbolicNeuralNetworks` 0.7.0 and `NeuralNetworkParameters` 0.2.1 close
+  [SymbolicNeuralNetworks#55](https://github.com/JuliaGNI/SymbolicNeuralNetworks.jl/issues/55),
+  which this repository reported from
+  [#86](https://github.com/JuliaGNI/NonlinearIntegrators.jl/pull/86), and the two symbolic rows
+  are back under the tight 17 000 on 1.10 — 15 168 bytes per `residual!` call, measured on
+  1.10.11 against 28 096 for the same probe under SNN 0.6.0 / NNP 0.1.1, with nothing but those
+  two versions changed. The cause was a `map` over a closure that 1.10 does not always elide, on
+  the walk that splits a generated function's flat result back into the nesting of the
+  parameters; the fix has two independent halves, and both bounds above are what make them
+  reachable. See *Open Issues* → *Upstream*, where the entry is now closed.
+
 ## [0.4.0] - 2026-08-24
 
 The parameter container moved out from under this package. `AbstractNeuralNetworks` 0.7 gave the
@@ -1045,25 +1128,23 @@ so that this section is the complete index.
 
 ### Upstream
 
-- **`SymbolicNeuralNetworks` 0.6 costs 1.85x the allocations in the symbolic `residual!` path, on
-  Julia 1.10 only.** Per `residual!` call at Float64, `S = 4`, `R = 8`, `D = 1`, `ShallowNet` and
-  `ShallowNetReversible` go from 15 168 bytes under `AbstractNeuralNetworks` 0.6.4 / SNN 0.5 to
-  28 096 under 0.7 / 0.6. On 1.11, 1.12 and 1.13 the same call is 11 424 either way, so nothing
-  regressed there.
+- ~~**`SymbolicNeuralNetworks` 0.6 costs 1.85x the allocations in the symbolic `residual!` path,
+  on Julia 1.10 only.**~~ **Closed** in [0.4.1] by
+  [SymbolicNeuralNetworks#55](https://github.com/JuliaGNI/SymbolicNeuralNetworks.jl/issues/55).
+  Per `residual!` call at Float64, `S = 4`, `R = 8`, `D = 1`, `ShallowNet` and
+  `ShallowNetReversible` went from 15 168 bytes under `AbstractNeuralNetworks` 0.6.4 / SNN 0.5 to
+  28 096 under 0.7 / 0.6, while 1.11, 1.12 and 1.13 stayed at 11 424 either way.
 
-  It is not the `NetworkParameters` rename: the container constructor allocates 0 bytes under both
-  stacks on every version tried. The two `*Autodiff` rows, which reach their derivatives through
-  `ForwardDiff` rather than a generated kernel, are unchanged at 51 584. What is left is the
-  generated kernels the symbolic bases call — `DQDθ`, `DVDθ`, `V_func` — and SNN 0.6 laid their
-  equation sets out over `NeuralNetworkParameters.ParameterLayout` in place of a local `FlatSlice`.
-  Something on that path stops folding on 1.10 and does not on 1.11 or later. 28 096 is
-  byte-identical on macOS aarch64, macOS x86_64 and Linux x86_64, so it is deterministic.
-
-  `test/quality/inference_and_allocations.jl` carries a 1.10-only ceiling of 42 000 for those two
-  rows, the same ~1.5x margin over the measured figure that the other budgets have, so a further
-  regression on 1.10 still trips it; 1.11 and later keep the tight 17 000. Reported as
-  [SymbolicNeuralNetworks#55](https://github.com/JuliaGNI/SymbolicNeuralNetworks.jl/issues/55); the
-  exact kernel of the three is not yet isolated, which is the next step there.
+  This report was right about where it was not — not the `NetworkParameters` rename, not the two
+  `*Autodiff` rows, and on the path SNN 0.6 laid out over `NeuralNetworkParameters.ParameterLayout`
+  in place of a local `FlatSlice` — and did not isolate the cause. It was a `map` over a closure
+  that Julia 1.10 does not always elide, on the walk that splits a generated function's flat result
+  back into the nesting of the parameters, and it is fixed in two independent halves:
+  `SymbolicNeuralNetworks` 0.7.0 for the batched walk and `NeuralNetworkParameters` 0.2.1 for the
+  un-batched one. This package's symbolic `residual!` calls `DQDθ` on a length-one `Vector`, so it
+  takes the un-batched path and it is the 0.2.1 half that returns it to 15 168 — confirmed here on
+  1.10.11, 15 168 against 28 096 for the same probe under the old pair. Both are named in
+  `Project.toml`; the 1.10-only ceiling of 42 000 is gone and 17 000 holds on every version.
 
 - **`GeometricOptimizers.GradientMethod` cannot be used with a searching line search** on
   Euclidean parameters: `_trial_slope` calls `gradient(cache)` while the first-order caches

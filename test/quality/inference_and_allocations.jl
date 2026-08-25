@@ -41,41 +41,36 @@ end
 #   ShallowNetReversible           26 176 → 11 424   (2.3×)
 #   ShallowNetAutodiff            211 968 → 51 584   (4.1×)
 #   ShallowNetAutodiffReversible  216 800 → 51 584   (4.2×)
+#
+# One ceiling per row, on every Julia version. That was not true between
+# `SymbolicNeuralNetworks` 0.6.0 and 0.7.0: the two symbolic rows cost 28 096 bytes on Julia 1.10
+# there — 1.85× the 15 168 they cost under SNN 0.5, while 1.11 and later stayed at 11 424 either
+# way — and this file carried a 1.10-only ceiling of 42 000 for them. The cause was a `map` over
+# a closure that 1.10 does not always elide, on the walk that splits a generated function's flat
+# result back into the nesting of the parameters. It is fixed in two independent halves, and
+# `Project.toml` requires both: `SymbolicNeuralNetworks` 0.7.0 for the batched walk and
+# `NeuralNetworkParameters` 0.2.1 for the un-batched one. The symbolic `residual!` here calls
+# `DQDθ` on a length-one `Vector`, so it takes the un-batched path, which is the half that
+# `NeuralNetworkParameters` 0.2.1 carries.
+#
+# Measured on Julia 1.10.11, macOS aarch64, holding everything but those two versions fixed —
+# the same probe against both stacks:
+#
+#                                 SNN 0.6.0 / NNP 0.1.1   SNN 0.7.0 / NNP 0.2.1
+#   ShallowNet                                   28 096                  15 168
+#   ShallowNetReversible                         28 096                  15 168
+#   ShallowNetAutodiff                           51 584                  51 584
+#   ShallowNetAutodiffReversible                 51 584                  51 584
+#
+# Only the two symbolic rows move, as they did going the other way: the autodiff rows reach their
+# derivatives through `ForwardDiff` rather than a generated kernel. See SymbolicNeuralNetworks#55,
+# reported from this repository's #86.
 const RESIDUAL_ALLOC_BUDGET = Dict(
     "ShallowNet"                   => 17_000,
     "ShallowNetReversible"         => 17_000,
     "ShallowNetAutodiff"           => 78_000,
     "ShallowNetAutodiffReversible" => 78_000,
 )
-
-# Julia 1.10 pays more than 1.12+ for the same call, and `SymbolicNeuralNetworks` 0.6 widened the
-# gap. The symbolic bases go through generated kernels (`DQDθ`, `DVDθ`, `V_func`), and 0.6 laid
-# their equation sets out over `NeuralNetworkParameters.ParameterLayout` instead of a local
-# `FlatSlice`; something in that path stops folding on 1.10 and does not on 1.12 or later.
-# Measured per `residual!` call, Float64, S = 4, R = 8, D = 1:
-#
-#                                 1.10 / ANN 0.6.4   1.10 / ANN 0.7   1.11 - 1.13 / ANN 0.7
-#   ShallowNet                              15 168           28 096                  11 424
-#   ShallowNetReversible                    15 168           28 096                  11 424
-#   ShallowNetAutodiff                      51 584           51 584        52 096 - 54 656
-#   ShallowNetAutodiffReversible            51 584           51 584        52 096 - 54 656
-#
-# Only the two symbolic rows move, and only on 1.10: the autodiff rows go through `ForwardDiff`
-# rather than a generated kernel and are unchanged. 1.11 was measured (11 424, same as 1.13) so
-# that the cutoff below is a measurement and not a guess — CI's matrix skips 1.11. The container
-# constructor itself allocates 0 bytes under both stacks on every version tried, so this is not
-# the `NetworkParameters` rename. 28 096 is byte-identical on macOS aarch64, macOS x86_64 and
-# Linux x86_64, so it is deterministic rather than noise and a fixed ceiling is safe.
-#
-# The 1.10 ceiling keeps the same ~1.5x margin over what 1.10 actually costs, so a *further*
-# regression there still trips. The tight ceiling stays in force on 1.11 and later, which is
-# where the number this package can control is visible. Recorded under *Open Issues* →
-# *Upstream* in the CHANGELOG and reported as SymbolicNeuralNetworks#55; remove this override when
-# that closes.
-if VERSION < v"1.11"
-    RESIDUAL_ALLOC_BUDGET["ShallowNet"]           = 42_000
-    RESIDUAL_ALLOC_BUDGET["ShallowNetReversible"] = 42_000
-end
 
 # The measurement has to happen inside a function taking `p` as an argument, not inline in a
 # `@testset` body. `@testset` wraps its body in a closure, so an inline `@allocated` also

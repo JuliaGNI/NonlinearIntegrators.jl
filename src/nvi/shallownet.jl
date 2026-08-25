@@ -99,12 +99,20 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::
         PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
         # `Adam` and the line search are built at the parameter element type: `Optimizer` does not
         # convert `Adam`, so an `Adam{Float64}` handed `Float32` parameters would not dispatch.
-        # `ps_flat` aliases the network's arrays (see `optimizer_params`), so the in-place updates
-        # in the loop below are visible through `PNN.params`. `Adam` supplies only a direction, so
-        # the learning rate is the line search, decaying from 1e-3 to 5e-5 over the epoch budget.
+        # `Adam` supplies only a direction, so the learning rate is the line search, decaying from
+        # 1e-3 to 5e-5 over the epoch budget.
+        #
+        # The optimizer is given the *flat vector*, which is what it works in anyway: handed a
+        # `NamedTuple`, `GeometricOptimizers` flattens it itself inside the `Gradient` it builds
+        # (`GradientAutodiff(F, ::NamedTuple)`), so the `L1_W`-style flat `NamedTuple` this used to
+        # pass cost a second, nested unflattening on every function and gradient evaluation. The
+        # `ParameterLayout` that `flatten` returns is a value and is captured by the loss closure
+        # once; `unflatten` keeps the element type of the vector it is given, which is what makes
+        # the same closure work on `ForwardDiff.Dual`s. Nothing aliases any more, so the trained
+        # weights have to be written back explicitly after the solve.
         local PT = eltype(PNN.params[1].W)
-        ps_flat = optimizer_params(PNN.params)
-        loss(p) = mae_loss(network_inputs, labels, NN, network_params(p, PNN.params))
+        ps_flat, layout = NeuralNetworkParameters.flatten(PNN.params)
+        loss(p) = mae_loss(network_inputs, labels, NN, NeuralNetworkParameters.unflatten(layout, p))
         algorithm = GeometricOptimizers.Adam(PT)
         # `max_iterations` is the epoch budget: `solve!` runs its own loop and stops on
         # `meets_stopping_criteria`, so the budget has to be an option rather than a `for` range.
@@ -122,6 +130,9 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::
         # epoch — so they stay hand-rolled; see the CHANGELOG.
         result = GeometricOptimizers.solve!(ps_flat, state, opt)
         optstatus = GeometricOptimizers.status(result)
+        # What the aliasing used to do implicitly. Everything below this line — the loss in the
+        # `@debug`, and the three reads that fill `x` — goes through `PNN.params`.
+        NeuralNetworkParameters.unflatten!(PNN.params, layout, ps_flat)
         # The training is a *seed* for the Newton solve that follows, so a budget spent without
         # converging is the expected case and not an error: it is reported at debug level, like the
         # loss beside it, rather than warned about. The epoch count comes from the state because
