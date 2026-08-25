@@ -1,0 +1,45 @@
+using JLD2
+using CairoMakie
+using Statistics
+using Printf
+
+# Loads parameter lists, figure style constants, and shared helper functions:
+# load_relu_tensor, load_tanh_tensor, save_relu_error_trend, save_tanh_error_trend,
+# save_hams_ts, print_relu_table, print_tanh_table.
+include(joinpath(@__DIR__, "result_summary_config.jl"))
+
+resultsdir = joinpath(@__DIR__, "results", "shallownet_reversible")
+figdir     = joinpath(@__DIR__, "..", "docs", "src", "nvi", "figures")
+mkpath(figdir)
+
+# ── Harmonic Oscillator ───────────────────────────────────────────────────────
+HO_relu_tensor, HO_relu_best_err = load_relu_tensor(resultsdir, "NVI_TR", "HO", "HO")
+HO_tanh_tensor, HO_tanh_best_err = load_tanh_tensor(resultsdir, "NVI_TR", "HO", "HO")
+
+save_relu_error_trend(figdir, "shallownet_reversible_HO_relu_error_trend",
+    HO_relu_tensor, "ShallowNetReversible — Harmonic Oscillator (ReLU)")
+save_tanh_error_trend(figdir, "shallownet_reversible_HO_tanh_error_trend",
+    HO_tanh_tensor, "ShallowNetReversible — Harmonic Oscillator (tanh)")
+save_hams_ts(figdir, "shallownet_reversible_HO_relu_hamiltonian_error_ts",
+    HO_relu_best_err, "ShallowNetReversible — HO Best ReLU Run Hamiltonian Error")
+save_hams_ts(figdir, "shallownet_reversible_HO_tanh_hamiltonian_error_ts",
+    HO_tanh_best_err, "ShallowNetReversible — HO Best tanh Run Hamiltonian Error")
+
+print_relu_table(HO_relu_tensor, "ShallowNetReversible HO")
+print_tanh_table(HO_tanh_tensor, "ShallowNetReversible HO")
+
+# ── Double Pendulum ───────────────────────────────────────────────────────────
+DP_relu_tensor, DP_relu_best_err = load_relu_tensor(resultsdir, "NVI_TR", "DP", "DP")
+DP_tanh_tensor, DP_tanh_best_err = load_tanh_tensor(resultsdir, "NVI_TR", "DP", "DP")
+
+save_relu_error_trend(figdir, "shallownet_reversible_DP_relu_error_trend",
+    DP_relu_tensor, "ShallowNetReversible — Double Pendulum (ReLU)")
+save_tanh_error_trend(figdir, "shallownet_reversible_DP_tanh_error_trend",
+    DP_tanh_tensor, "ShallowNetReversible — Double Pendulum (tanh)")
+save_hams_ts(figdir, "shallownet_reversible_DP_relu_hamiltonian_error_ts",
+    DP_relu_best_err, "ShallowNetReversible — DP Best ReLU Run Hamiltonian Error")
+save_hams_ts(figdir, "shallownet_reversible_DP_tanh_hamiltonian_error_ts",
+    DP_tanh_best_err, "ShallowNetReversible — DP Best tanh Run Hamiltonian Error")
+
+print_relu_table(DP_relu_tensor, "ShallowNetReversible DP")
+print_tanh_table(DP_tanh_tensor, "ShallowNetReversible DP")

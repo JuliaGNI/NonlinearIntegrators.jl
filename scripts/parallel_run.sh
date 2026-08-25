@@ -1,50 +1,85 @@
 #!/bin/bash
+# Parameter scan launcher for all neural variational integrators.
+#
+# Set INTEGRATOR to one of:
+#   shallownet | shallownet_reversible | shallownet_autodiff |
+#   shallownet_autodiff_reversible | densenet | vise
+#
 
-# export JULIA_NUM_THREADS=20
-# for i in {1..10}
-# do
-#     julia IntegratorNN/test_sh.jl "$i"|| true
-# done
+# ── Configuration ─────────────────────────────────────────────────────────────
+INTEGRATOR="shallownet"   # change to target integrator
 
-# seq 12 | xargs -I{} -P 6 bash -c 'julia IntegratorNN/test_sh2.jl {}|| true'
+DP_FLAG=""                # set to "--double-pendulum" to include DP problems
 
+# Neural integrator parameter grid
+H_LIST="0.05 0.1" # 0.2 0.5 1.0
+REG_LIST="1e-3 1e-7" # 0.0  1e-5
+FABS_LIST="0.0" # 2.0 8.0
+XSUC_LIST="2.0" # 0.0 2.0 8.0
+SOLVER_LIST="backtracking" #dogleg
+DTYPE_LIST="Float64" #Float16 Float32
+INT_TIMESPAN="10.0"
+R_LIST="4 8 16"   # quadrature points
+S_LIST="4 6 8"    # hidden neurons
+K_LIST="2 3 4"    # ReLU exponent
 
-# Function to run the Julia script with the specified activation function
-run_configuration() {
-    local h=$1
-    local reg_factor=$2
-    # Print the activation for debugging
-    echo "Running Julia script with Step Size: $h, Regularization Factor: $reg_factor"
+# VISE parameter grid
+VISE_R_LIST="4 8 16"
+VISE_INT_TIMESPAN="1000.0"
 
-    # Run the Julia script in the background
-    julia --project=scripts scripts/test_shallownet_reversible.jl $h $reg_factor &
-    
-    # julia --project=scripts scripts/test_shallownet_autodiff.jl $h $f_abs $x_suc &
-}
-
-# Loop through the activations
-for h in {0.05,0.1,0.2,0.5,1.0}; do # ,  
-    for reg_factor in {0.0,1e-3,1e-5,1e-7}; do #
-        run_configuration $h $reg_factor 
+# ── Dispatch ──────────────────────────────────────────────────────────────────
+case $INTEGRATOR in
+  shallownet | shallownet_reversible | shallownet_autodiff | \
+  shallownet_autodiff_reversible | densenet)
+    SCRIPT="scripts/run_${INTEGRATOR}.jl"
+    for h in $H_LIST; do
+      for reg in $REG_LIST; do
+        for fabs in $FABS_LIST; do
+          for xsuc in $XSUC_LIST; do
+            for solver in $SOLVER_LIST; do
+              for dtype in $DTYPE_LIST; do
+                for R in $R_LIST; do
+                  for S in $S_LIST; do
+                    for k in $K_LIST; do
+                      echo "Launching ${INTEGRATOR} h=${h} reg=${reg} fabs=${fabs} xsuc=${xsuc} solver=${solver} dtype=${dtype} R=${R} S=${S} k=${k}"
+                      julia --project=scripts $SCRIPT $dtype $h $reg $fabs $xsuc $INT_TIMESPAN $solver $R $S $k $DP_FLAG &
+                    done
+                  done
+                done
+              done
+            done
+          done
+        done
+      done
     done
-done
+    ;;
+  # vise)
+    # SCRIPT="scripts/run_vise.jl"
+    # for h in $H_LIST; do
+    #   for R in $VISE_R_LIST; do
+    #     for dtype in $DTYPE_LIST; do
+    #       echo "Launching vise h=${h} R=${R} intspan=${VISE_INT_TIMESPAN} dtype=${dtype}"
+    #       julia --project=scripts $SCRIPT $h $R $VISE_INT_TIMESPAN $dtype &
+    #     done
+    #   done
+    # done
+    # ;;
+  all)
+    for INTEGRATOR in shallownet shallownet_reversible shallownet_autodiff \
+                      shallownet_autodiff_reversible densenet vise; do
+      echo "=== Starting ${INTEGRATOR} ==="
+      INTEGRATOR=$INTEGRATOR bash "$0"
+      echo "=== Finished ${INTEGRATOR} ==="
+    done
+    exit 0
+    ;;
+  *)
+    echo "Unknown integrator: $INTEGRATOR"
+    echo "Choose from: shallownet, shallownet_reversible, shallownet_autodiff,"
+    echo "             shallownet_autodiff_reversible, densenet, vise, all"
+    exit 1
+    ;;
+esac
 
-# MAX_JOBS=24
-
-# run_with_limit() {
-#     while (( $(jobs -rp | wc -l) >= MAX_JOBS )); do
-#         wait -n
-#     done
-#     "$@" &
-# }
-
-# for h in {0.1,0.2,0.5,1.0}; do # ,  
-#     for f_abs in {2.0,8.0}; do #
-#         for x_suc in {2.0,8.0}; do #
-#             run_with_limit julia --project=scripts scripts/run_shallownet.jl $h $f_abs $x_suc  &
-#         # run_with_limit julia --project=scripts scripts/test_shallownet_autodiff.jl $h $f_abs $x_suc
-#         done
-#     done
-# done
-
-# wait
+wait
+echo "All jobs for ${INTEGRATOR} completed."

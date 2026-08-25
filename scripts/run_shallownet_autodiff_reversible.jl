@@ -14,24 +14,24 @@ using Logging
 # and helper functions plot_1d!, plot_2d!, save_1d_jld2, save_2d_jld2.
 include(joinpath(@__DIR__, "run_config.jl"))
 
-dtype_str    = length(ARGS) >= 1 ? ARGS[1] : "Float64"        # "Float16", "Float32", or "Float64"
+dtype_str    = length(ARGS) >= 1  ? ARGS[1]                   : "Float64"        # "Float16", "Float32", or "Float64"
 T            = eval(Meta.parse(dtype_str))
-int_step     = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : T(0.1)
-reg_factor   = length(ARGS) >= 3 ? eval(Meta.parse(ARGS[3])) : T(1e-7)
-f_abstol     = length(ARGS) >= 4 ? eval(Meta.parse(ARGS[4])) : SimpleSolvers.absolute_tolerance(T) # multiplier of eps(T)
-x_suctol     = length(ARGS) >= 5 ? eval(Meta.parse(ARGS[5])) : SimpleSolvers.default_tolerance(T) # multiplier of eps(T)
-int_timespan = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : T(10.0)
-solver_name  = length(ARGS) >= 7 ? ARGS[7] : "backtracking"  # "backtracking" or "dogleg"
+int_step     = length(ARGS) >= 2  ? parse(Float64, ARGS[2])   : T(0.1)
+reg_factor   = length(ARGS) >= 3  ? eval(Meta.parse(ARGS[3])) : T(1e-7)
+f_abstol     = length(ARGS) >= 4  ? eval(Meta.parse(ARGS[4])) : SimpleSolvers.absolute_tolerance(T) # multiplier of eps(T)
+x_suctol     = length(ARGS) >= 5  ? eval(Meta.parse(ARGS[5])) : SimpleSolvers.default_tolerance(T)  # multiplier of eps(T)
+int_timespan = length(ARGS) >= 6  ? parse(Float64, ARGS[6])   : T(10.0)
+solver_name  = length(ARGS) >= 7  ? ARGS[7]                   : "backtracking"   # "backtracking" or "dogleg"
 R      = length(ARGS) >= 8  ? parse(Int, ARGS[8])  : 4
 S      = length(ARGS) >= 9  ? parse(Int, ARGS[9])  : 4
 k_relu = length(ARGS) >= 10 ? parse(Int, ARGS[10]) : 3
-run_dp       = "--double-pendulum" in ARGS
+run_dp = "--double-pendulum" in ARGS
 
-outdir = joinpath(@__DIR__, "results", "shallownet")
+outdir = joinpath(@__DIR__, "results", "shallownet_autodiff_reversible")
 mkpath(outdir)
 
 if solver_name == "dogleg"
-    GeometricIntegratorsBase.default_options(method::ShallowNet) = (
+    GeometricIntegratorsBase.default_options(method::ShallowNetAutodiffReversible) = (
         max_iterations        = max_iterations,
         regularization_factor = reg_factor,
         f_abstol              = f_abstol * eps(T),
@@ -39,7 +39,7 @@ if solver_name == "dogleg"
         solver                = SimpleSolvers.DogLeg(),
     )
 else
-    GeometricIntegratorsBase.default_options(method::ShallowNet) = (
+    GeometricIntegratorsBase.default_options(method::ShallowNetAutodiffReversible) = (
         max_iterations        = max_iterations,
         regularization_factor = reg_factor,
         f_abstol              = f_abstol * eps(T),
@@ -49,6 +49,7 @@ else
 end
 
 # ── Harmonic Oscillator setup ────────────────────────────────────────────────
+# Uses LobattoLegendre quadrature (matching original test_shallownet_autodiff_reversible.jl).
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step, timespan=(0, int_timespan))
 HO_initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(
     0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
@@ -57,11 +58,11 @@ HO_ref = GeometricProblems.HarmonicOscillator.exact_solution(
 ts_HO = collect(0:int_step:int_timespan)
 
 # ── Block 1: HO + ReLU ───────────────────────────────────────────────────────
-QGau = QuadratureRules.GaussLegendreQuadrature(R)
+QLob = QuadratureRules.LobattoLegendreQuadrature(R)
 try
     relu = x -> max(zero(T), x)^k_relu
     net = ShallowNetBasis{T}(relu, S)
-    nlmethod = ShallowNet(net, QGau, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
+    nlmethod = ShallowNetAutodiffReversible(net, QLob, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
     HO_sol, HO_internal = integrate(HO_lode, nlmethod)
     qend = HO_sol.q[end]
@@ -75,9 +76,9 @@ try
                 for (q, p) in zip(collect(HO_sol.q[:]), collect(HO_sol.p[:]))]
         hams_err = abs.((hams .- HO_initial_hamiltonian) / HO_initial_hamiltonian)
 
-        fname = "NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
+        fname = "NVI_ADTR_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
         plot_1d!(outdir, fname, ts_HO, collect(HO_sol.q[:, 1]), collect(HO_sol.p[:, 1]), hams_err,
-                 "HO ReLU k=$(k_relu) S$(S)R$(R) h=$(int_step) $(dtype_str)")
+                 "HO ReLU k=$(k_relu) S$(S)R$(R) AD+TR h=$(int_step) $(dtype_str)")
         save_1d_jld2(outdir, fname, collect(HO_sol.q[:, 1]), collect(HO_sol.p[:, 1]),
                      HO_internal, HO_qerror, hams_err; prefix="HO")
     end
@@ -88,7 +89,7 @@ end
 # ── Block 2: HO + tanh ───────────────────────────────────────────────────────
 try
     net = ShallowNetBasis{T}(tanh, S)
-    nlmethod = ShallowNet(net, QGau, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
+    nlmethod = ShallowNetAutodiffReversible(net, QLob, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
     HO_sol, HO_internal = integrate(HO_lode, nlmethod)
     qend = HO_sol.q[end]
@@ -102,9 +103,9 @@ try
                 for (q, p) in zip(collect(HO_sol.q[:]), collect(HO_sol.p[:]))]
         hams_err = abs.((hams .- HO_initial_hamiltonian) / HO_initial_hamiltonian)
 
-        fname = "NVI_HO_h$(int_step)S$(S)R$(R)tanh_reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
+        fname = "NVI_ADTR_HO_h$(int_step)S$(S)R$(R)tanh_reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
         plot_1d!(outdir, fname, ts_HO, collect(HO_sol.q[:, 1]), collect(HO_sol.p[:, 1]), hams_err,
-                 "HO tanh S$(S)R$(R) h=$(int_step) $(dtype_str)")
+                 "HO tanh S$(S)R$(R) AD+TR h=$(int_step) $(dtype_str)")
         save_1d_jld2(outdir, fname, collect(HO_sol.q[:, 1]), collect(HO_sol.p[:, 1]),
                      HO_internal, HO_qerror, hams_err; prefix="HO")
     end
@@ -126,11 +127,10 @@ if run_dp
     ts_DP = collect(0:int_step:int_timespan)
 
     # Block 3: DP + ReLU
-    QLob = QuadratureRules.LobattoLegendreQuadrature(R)
     try
         relu = x -> max(zero(T), x)^k_relu
         net = ShallowNetBasis{T}(relu, S)
-        nlmethod = ShallowNet(net, QLob, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
+        nlmethod = ShallowNetAutodiffReversible(net, QLob, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
         DP_sol, DP_internal = integrate(DP_lode, nlmethod)
         qend = DP_sol.q[end]
@@ -144,11 +144,11 @@ if run_dp
                        for (q, p) in zip(collect(DP_sol.q[:]), collect(DP_sol.p[:]))]
             DP_hams_err = abs.((DP_hams .- DP_initial_hamiltonian) / DP_initial_hamiltonian)
 
-            fname = "NVI_DP_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
+            fname = "NVI_ADTR_DP_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
             plot_2d!(outdir, fname, ts_DP,
                      collect(DP_sol.q[:, 1]), collect(DP_sol.q[:, 2]),
                      collect(DP_sol.p[:, 1]), collect(DP_sol.p[:, 2]),
-                     DP_hams_err, "DP ReLU k=$(k_relu) S$(S)R$(R) h=$(int_step) $(dtype_str)")
+                     DP_hams_err, "DP ReLU k=$(k_relu) S$(S)R$(R) AD+TR h=$(int_step) $(dtype_str)")
             save_2d_jld2(outdir, fname,
                          collect(DP_sol.q[:, 1]), collect(DP_sol.q[:, 2]),
                          collect(DP_sol.p[:, 1]), collect(DP_sol.p[:, 2]),
@@ -161,7 +161,7 @@ if run_dp
     # Block 4: DP + tanh
     try
         net = ShallowNetBasis{T}(tanh, S)
-        nlmethod = ShallowNet(net, QLob, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
+        nlmethod = ShallowNetAutodiffReversible(net, QLob, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
         DP_sol, DP_internal = integrate(DP_lode, nlmethod)
         qend = DP_sol.q[end]
@@ -175,11 +175,11 @@ if run_dp
                        for (q, p) in zip(collect(DP_sol.q[:]), collect(DP_sol.p[:]))]
             DP_hams_err = abs.((DP_hams .- DP_initial_hamiltonian) / DP_initial_hamiltonian)
 
-            fname = "NVI_DP_h$(int_step)S$(S)R$(R)tanh_reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
+            fname = "NVI_ADTR_DP_h$(int_step)S$(S)R$(R)tanh_reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
             plot_2d!(outdir, fname, ts_DP,
                      collect(DP_sol.q[:, 1]), collect(DP_sol.q[:, 2]),
                      collect(DP_sol.p[:, 1]), collect(DP_sol.p[:, 2]),
-                     DP_hams_err, "DP tanh S$(S)R$(R) h=$(int_step) $(dtype_str)")
+                     DP_hams_err, "DP tanh S$(S)R$(R) AD+TR h=$(int_step) $(dtype_str)")
             save_2d_jld2(outdir, fname,
                          collect(DP_sol.q[:, 1]), collect(DP_sol.q[:, 2]),
                          collect(DP_sol.p[:, 1]), collect(DP_sol.p[:, 2]),
