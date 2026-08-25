@@ -264,13 +264,15 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::Tr
         labels = reshape(network_labels[:,k],1,extrapolation_substep+1)
 
         PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
-        # `optimizer_params` gives the optimizer the flat parameter view it requires, aliasing the
-        # network's arrays so its in-place updates show up in `PNN.params`. `Adam` and the line
-        # search are built at the parameter element type, and supply direction and learning rate
-        # respectively — the rate decaying from 1e-3 to 5e-5 over the epoch budget.
+        # The optimizer works in the flat vector; see the same construction in `ShallowNet`'s
+        # `initial_params!` for why it is given one directly rather than a flat `NamedTuple`.
+        # `Adam` and the line search are built at the parameter element type, and supply direction
+        # and learning rate respectively — the rate decaying from 1e-3 to 5e-5 over the epoch
+        # budget. Nothing aliases, so `PNN.params` is refreshed from `ps_flat` inside the loop.
         local PT = eltype(PNN.params[1].W)
-        ps_flat = optimizer_params(PNN.params)
-        loss(p) = mae_loss(network_inputs, labels, PNN, network_params(p, PNN.params))
+        ps_flat, layout = NeuralNetworkParameters.flatten(PNN.params)
+        loss(p) = mae_loss(network_inputs, labels, PNN,
+                           NeuralNetworkParameters.unflatten(layout, p))
         algorithm = GeometricOptimizers.Adam(PT)
         opt = GeometricOptimizers.Optimizer(ps_flat, loss; algorithm = algorithm,
             linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
@@ -280,6 +282,7 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::Tr
             GeometricOptimizers.increase_iteration_number!(state)
             GeometricOptimizers.solver_step!(ps_flat, state, opt)
             GeometricOptimizers.update!(state, opt, ps_flat)
+            NeuralNetworkParameters.unflatten!(PNN.params, layout, ps_flat)
             err = mae_loss(network_inputs,labels,PNN,PNN.params)
 
             if err < 5e-8
@@ -329,12 +332,15 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::LS
         PNN.params.L2.W[:], PNN.params.L2.b[:] = box_init_plain(S₁, S, PT)
         PNN.params.L3.W[:], _ = box_init_plain(S, 1, PT)
         tem_ps = (L1 = PNN.params.L1, L2 = PNN.params.L2)
-        # Only L1 and L2 are optimised; L3 is re-solved by least squares inside the loop
-        # below. The flat view aliases L1/L2, so the optimizer writes through to `PNN.params`,
-        # and the loss reads the *current* L3 through the closure.
-        tem_flat = optimizer_params(tem_ps)
+        # Only L1 and L2 are optimised; L3 is re-solved by least squares inside the loop below,
+        # and the loss reads the *current* L3 through the closure. `tem_ps` is a bare `NamedTuple`
+        # of two layers rather than the whole `NetworkParameters`, which `flatten` handles the
+        # same way — the layout it returns simply spans those two. Its arrays are `PNN.params`',
+        # so the `unflatten!` in the loop writes the optimizer's step through to the network.
+        tem_flat, layout = NeuralNetworkParameters.flatten(tem_ps)
         loss(p) = lsgd_loss(network_inputs, labels, NN,
-            NetworkParameters(merge(network_params(p, tem_ps), (L3 = PNN.params.L3,))))
+            NetworkParameters(merge(NeuralNetworkParameters.unflatten(layout, p),
+                                    (L3 = PNN.params.L3,))))
         algorithm = GeometricOptimizers.GradientMethod()
         # The `Static` line search is not a style choice: `GradientMethod` with any *searching*
         # line search throws `MethodError: no method matching gradient(::GradientCache)` on
@@ -355,6 +361,8 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::LS
             GeometricOptimizers.increase_iteration_number!(state)
             GeometricOptimizers.solver_step!(tem_flat, state, opt)
             GeometricOptimizers.update!(state, opt, tem_flat)
+            # Before `err` reads `PNN.params` and before the next epoch's `Φ` reads `tem_ps`.
+            NeuralNetworkParameters.unflatten!(tem_ps, layout, tem_flat)
             err = lsgd_loss(network_inputs,labels,NN,PNN.params)
               if err < 5e-5
                 @debug "dimension $k,final loss: $err by $ep epochs"

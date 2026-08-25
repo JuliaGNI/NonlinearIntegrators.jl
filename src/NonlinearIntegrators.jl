@@ -45,11 +45,13 @@ import GeometricOptimizers
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks
 # The parameter container lives in `NeuralNetworkParameters` as of `AbstractNeuralNetworks` 0.7,
-# under the name `NetworkParameters`. The import is selective: `NeuralNetworkParameters` also exports
-# `flatten`/`unflatten`, and the flat-vector conversions in `nvi/utilities.jl` are this package's own.
-# The module itself is listed alongside the type because the accessor is taken qualified,
-# `NeuralNetworkParameters.params`, for the same reason `solve!` is above: `params` is too generic a
-# name to read bare. `using M: x` alone does not bind `M`.
+# under the name `NetworkParameters`. `NetworkParameters` is the only name taken unqualified,
+# because it appears in type annotations where a module prefix would only add noise. Everything
+# else this package uses from there — `params`, and the `flatten`/`unflatten`/`unflatten!` trio
+# the training loops flatten a network with — is called qualified, for the same reason `solve!`
+# is above: they are names generic enough that the reader has to be told whose they are. The
+# module itself is therefore listed alongside the type, since `using M: x` alone does not bind
+# `M`.
 using NeuralNetworkParameters: NeuralNetworkParameters, NetworkParameters
 using LinearAlgebra
 using ForwardDiff
