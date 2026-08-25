@@ -10,6 +10,7 @@
 INTEGRATOR="shallownet"   # change to target integrator
 
 DP_FLAG=""                # set to "--double-pendulum" to include DP problems
+MAX_JOBS=${MAX_JOBS:-12}   # maximum number of Julia processes running simultaneously
 
 # Neural integrator parameter grid
 H_LIST="0.05 0.1" # 0.2 0.5 1.0
@@ -27,6 +28,15 @@ K_LIST="2 3 4"    # ReLU exponent
 VISE_R_LIST="4 8 16"
 VISE_INT_TIMESPAN="1000.0"
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+# Launch a background job, blocking until a slot is free.
+launch() {
+    while [ "$(jobs -r -p | wc -l)" -ge "$MAX_JOBS" ]; do
+        sleep 0.5
+    done
+    "$@" &
+}
+
 # ── Dispatch ──────────────────────────────────────────────────────────────────
 case $INTEGRATOR in
   shallownet | shallownet_reversible | shallownet_autodiff | \
@@ -42,7 +52,7 @@ case $INTEGRATOR in
                   for S in $S_LIST; do
                     for k in $K_LIST; do
                       echo "Launching ${INTEGRATOR} h=${h} reg=${reg} fabs=${fabs} xsuc=${xsuc} solver=${solver} dtype=${dtype} R=${R} S=${S} k=${k}"
-                      julia --project=scripts $SCRIPT $dtype $h $reg $fabs $xsuc $INT_TIMESPAN $solver $R $S $k $DP_FLAG &
+                      launch julia --project=scripts $SCRIPT $dtype $h $reg $fabs $xsuc $INT_TIMESPAN $solver $R $S $k $DP_FLAG
                     done
                   done
                 done
