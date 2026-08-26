@@ -30,20 +30,6 @@ run_dp       = "--double-pendulum" in ARGS
 outdir = joinpath(@__DIR__, "results", "shallownet")
 mkpath(outdir)
 
-if solver_name == "dogleg"
-    GeometricIntegratorsBase.default_options(method::ShallowNet) = (
-        max_iterations        = max_iterations,
-        regularization_factor = reg_factor,
-        solver                = SimpleSolvers.DogLeg(),
-    )
-else
-    GeometricIntegratorsBase.default_options(method::ShallowNet) = (
-        max_iterations        = max_iterations,
-        regularization_factor = reg_factor,
-        linesearch            = SimpleSolvers.Backtracking(),
-    )
-end
-
 # ── Harmonic Oscillator setup ────────────────────────────────────────────────
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step, timespan=(0, int_timespan))
 HO_initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(
@@ -59,7 +45,7 @@ try
     net = ShallowNetBasis{T}(relu, S)
     nlmethod = ShallowNet(net, QGau, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
-    HO_sol, HO_internal = integrate(HO_lode, nlmethod)
+    HO_sol, HO_internal = integrate(HO_lode, nlmethod,regularization_factor = reg_factor, max_iterations = max_iterations,f_abstol = f_abstol,x_suctol = x_suctol,solver = SimpleSolvers.DogLeg())
     qend = HO_sol.q[end]
     if !(eltype(qend) === T)
         @warn "upcast from $(T) for HO ReLU h=$(int_step) S=$(S) R=$(R) k=$(k_relu)"
@@ -71,7 +57,7 @@ try
                 for (q, p) in zip(collect(HO_sol.q[:]), collect(HO_sol.p[:]))]
         hams_err = abs.((hams .- HO_initial_hamiltonian) / HO_initial_hamiltonian)
 
-        fname = "NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
+        fname = "NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg=$(reg_factor)fabs=$(f_abstol)_xsuc=$(x_suctol)_solver=default_$(dtype_str)"
         plot_1d!(outdir, fname, ts_HO, collect(HO_sol.q[:, 1]), collect(HO_sol.p[:, 1]), hams_err,
                  "HO ReLU k=$(k_relu) S$(S)R$(R) h=$(int_step) $(dtype_str)")
         save_1d_jld2(outdir, fname, collect(HO_sol.q[:, 1]), collect(HO_sol.p[:, 1]),

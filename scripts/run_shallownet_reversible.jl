@@ -30,24 +30,6 @@ run_dp = "--double-pendulum" in ARGS
 outdir = joinpath(@__DIR__, "results", "shallownet_reversible")
 mkpath(outdir)
 
-if solver_name == "dogleg"
-    GeometricIntegratorsBase.default_options(method::ShallowNetReversible) = (
-        max_iterations        = max_iterations,
-        regularization_factor = reg_factor,
-        f_abstol              = f_abstol * eps(T),
-        x_suctol              = x_suctol * eps(T),
-        solver                = SimpleSolvers.DogLeg(),
-    )
-else
-    GeometricIntegratorsBase.default_options(method::ShallowNetReversible) = (
-        max_iterations        = max_iterations,
-        regularization_factor = reg_factor,
-        f_abstol              = f_abstol * eps(T),
-        x_suctol              = x_suctol * eps(T),
-        linesearch            = SimpleSolvers.Backtracking(),
-    )
-end
-
 # ── Harmonic Oscillator setup ────────────────────────────────────────────────
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step, timespan=(0, int_timespan))
 HO_initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(
@@ -63,7 +45,7 @@ try
     net = ShallowNetBasis{T}(relu, S)
     nlmethod = ShallowNetReversible(net, QGau, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
-    HO_sol, HO_internal = integrate(HO_lode, nlmethod)
+    HO_sol, HO_internal = integrate(HO_lode, nlmethod, regularization_factor = reg_factor, max_iterations = max_iterations)
     qend = HO_sol.q[end]
     if !(eltype(qend) === T)
         @warn "upcast from $(T) for HO ReLU h=$(int_step) S=$(S) R=$(R) k=$(k_relu)"

@@ -30,24 +30,6 @@ run_dp = "--double-pendulum" in ARGS
 outdir = joinpath(@__DIR__, "results", "densenet")
 mkpath(outdir)
 
-if solver_name == "dogleg"
-    GeometricIntegratorsBase.default_options(method::DenseNet) = (
-        max_iterations        = max_iterations,
-        regularization_factor = reg_factor,
-        f_abstol              = f_abstol * eps(T),
-        x_suctol              = x_suctol * eps(T),
-        solver                = SimpleSolvers.DogLeg(),
-    )
-else
-    GeometricIntegratorsBase.default_options(method::DenseNet) = (
-        max_iterations        = max_iterations,
-        regularization_factor = reg_factor,
-        f_abstol              = f_abstol * eps(T),
-        x_suctol              = x_suctol * eps(T),
-        linesearch            = SimpleSolvers.Backtracking(),
-    )
-end
-
 # ── Harmonic Oscillator setup ────────────────────────────────────────────────
 HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step, timespan=(0, int_timespan))
 HO_initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(
@@ -64,7 +46,7 @@ try
     net = DenseNetBasis{T}(relu, S, S)
     nlmethod = DenseNet(net, QGau, training_epochs=50000, initial_guess_method=TrainingMethod())
 
-    HO_sol, HO_internal = integrate(HO_lode, nlmethod)
+    HO_sol, HO_internal = integrate(HO_lode, nlmethod, regularization_factor = reg_factor, max_iterations = max_iterations)
     qend = HO_sol.q[end]
     if !(eltype(qend) === T)
         @warn "upcast from $(T) for HO ReLU h=$(int_step) S=$(S) R=$(R) k=$(k_relu)"

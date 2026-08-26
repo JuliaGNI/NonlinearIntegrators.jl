@@ -12,11 +12,14 @@ using Logging
 # Note: R_list / S_list / k_list / dict_amount are not used for VISE.
 include(joinpath(@__DIR__, "run_config.jl"))
 
+dtype_str    = length(ARGS) >= 4 ? ARGS[4] : "Float64"  # "Float16", "Float32", or "Float64"
+T            = eval(Meta.parse(dtype_str))
 int_step     = parse(Float64, ARGS[1])
 R            = parse(Int,     ARGS[2])
 int_timespan = parse(Float64, ARGS[3])
-dtype_str    = length(ARGS) >= 4 ? ARGS[4] : "Float64"  # "Float16", "Float32", or "Float64"
-T            = eval(Meta.parse(dtype_str))
+reg_factor   = length(ARGS) >= 3  ? eval(Meta.parse(ARGS[4])) : T(1e-7)
+
+
 
 outdir = joinpath(@__DIR__, "results", "vise")
 mkpath(outdir)
@@ -40,7 +43,7 @@ begin
     ts_HO = collect(0:int_step:int_timespan)
 
     try
-        HO_sol, HO_internal, HO_x_list = integrate(HO_lode, vise_method)
+        HO_sol, HO_internal, HO_x_list = integrate(HO_lode, vise_method, regularization_factor = reg_factor, max_iterations = max_iterations)
         qend = HO_sol.q[end]
         if !(eltype(qend) === T)
             @warn "upcast from $(T) for HO VISE h=$(int_step) R=$(R)"
