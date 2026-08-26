@@ -34,37 +34,33 @@ function residual_probe(make, ::Type{T}) where {T}
     return (; int, s, params, x, b)
 end
 
-# Measured on Float64, S = 4, R = 8, D = 1 (bytes per `residual!` call), before → after the
-# audit:
+# Measured on Float64, S = 4, R = 8, D = 1 (bytes per `residual!` call), before the audit → after →
+# **re-measured on Julia 1.11.9 against the current stack**, which is what the ceilings below are set
+# from:
 #
-#   ShallowNet                     21 344 → 11 424   (1.9×)
-#   ShallowNetReversible           26 176 → 11 424   (2.3×)
-#   ShallowNetAutodiff            211 968 → 51 584   (4.1×)
-#   ShallowNetAutodiffReversible  216 800 → 51 584   (4.2×)
+#   ShallowNet                     21 344 → 11 424 → 11 424
+#   ShallowNetReversible           26 176 → 11 424 → 11 424
+#   ShallowNetAutodiff            211 968 → 51 584 → 54 656
+#   ShallowNetAutodiffReversible  216 800 → 51 584 → 54 656
 #
-# One ceiling per row, on every Julia version. That was not true between
-# `SymbolicNeuralNetworks` 0.6.0 and 0.7.0: the two symbolic rows cost 28 096 bytes on Julia 1.10
-# there — 1.85× the 15 168 they cost under SNN 0.5, while 1.11 and later stayed at 11 424 either
-# way — and this file carried a 1.10-only ceiling of 42 000 for them. The cause was a `map` over
-# a closure that 1.10 does not always elide, on the walk that splits a generated function's flat
-# result back into the nesting of the parameters. It is fixed in two independent halves, and
-# `Project.toml` requires both: `SymbolicNeuralNetworks` 0.7.0 for the batched walk and
-# `NeuralNetworkParameters` 0.2.1 for the un-batched one. The symbolic `residual!` here calls
-# `DQDθ` on a length-one `Vector`, so it takes the un-batched path, which is the half that
-# `NeuralNetworkParameters` 0.2.1 carries.
+# The two autodiff rows are 3072 bytes dearer than recorded and the two symbolic rows have not moved
+# at all. Both are worth stating rather than quietly re-recording, because the *prediction* was the
+# other way round: `NeuralNetworkParameters` 0.2.2 took `SymbolicNeuralNetworks`' single-sample split
+# from 768 bytes to 560, and the symbolic `residual!` here calls `DQDθ` on a length-one `Vector`, so
+# that is the path it takes — and it moves this figure by nothing. Measured, not assumed.
 #
-# Measured on Julia 1.10.11, macOS aarch64, holding everything but those two versions fixed —
-# the same probe against both stacks:
+# One ceiling per row, on every Julia version. That was not true between `SymbolicNeuralNetworks`
+# 0.6.0 and 0.7.0: the two symbolic rows cost 28 096 bytes on Julia 1.10 there — 1.85× the 15 168 they
+# cost under SNN 0.5, while 1.11 and later stayed at 11 424 either way — and this file carried a
+# 1.10-only ceiling of 42 000 for them. The cause was a `map` over a closure that 1.10 does not always
+# elide, on the walk that splits a generated function's flat result back into the nesting of the
+# parameters. It is fixed in two independent halves and `Project.toml` requires both:
+# `SymbolicNeuralNetworks` 0.7.0 for the batched walk and `NeuralNetworkParameters` 0.2.1 for the
+# un-batched one.
 #
-#                                 SNN 0.6.0 / NNP 0.1.1   SNN 0.7.0 / NNP 0.2.1
-#   ShallowNet                                   28 096                  15 168
-#   ShallowNetReversible                         28 096                  15 168
-#   ShallowNetAutodiff                           51 584                  51 584
-#   ShallowNetAutodiffReversible                 51 584                  51 584
-#
-# Only the two symbolic rows move, as they did going the other way: the autodiff rows reach their
-# derivatives through `ForwardDiff` rather than a generated kernel. See SymbolicNeuralNetworks#55,
-# reported from this repository's #86.
+# **That whole comparison is now history rather than a live concern**, since 1.10 is no longer a
+# supported version here. It is kept because the shape of it recurs: a defect that shows on one Julia
+# version and not another, in a walk two packages away, found from a budget in this file.
 const RESIDUAL_ALLOC_BUDGET = Dict(
     "ShallowNet"                   => 17_000,
     "ShallowNetReversible"         => 17_000,
