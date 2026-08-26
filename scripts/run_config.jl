@@ -6,7 +6,7 @@
 
 # ── Solver / integrator options ───────────────────────────────────────────────
 max_iterations = 10000
-dict_amount    = 400000   # OGA dictionary size
+dict_amount    = 40000   # OGA dictionary size
 
 # ── Figure style ─────────────────────────────────────────────────────────────
 fig_label_size = 22   # axis label font size

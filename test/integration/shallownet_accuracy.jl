@@ -7,11 +7,11 @@
 # through integrate(...).
 @testset "ShallowNet OGA accuracy (Float64)" begin
     @debug "ShallowNet accuracy: Float64, S=4, R=8, dict_amount=4000"
-    HO_lode = lodeproblem()
+    HO_lode = lodeproblem(timespan = (0.0,100.0))
     HO_ref  = exact_solution(podeproblem())
 
     net = build_shallownet_basis(Float64; S = 4)
-    method = ShallowNet(net, gauss(Float64, 8); show_status = false, bias_interval = [-pi, pi], dict_amount = 4000)
+    method = ShallowNet(net, gauss(Float64, 4); show_status = false, bias_interval = [-pi, pi], dict_amount = 40000)
 
     sol, _ = integrate(HO_lode, method; regularization_factor = 1e-5, max_iterations = 10000)
 

@@ -17,10 +17,10 @@ include(joinpath(@__DIR__, "run_config.jl"))
 dtype_str    = length(ARGS) >= 1 ? ARGS[1] : "Float64"        # "Float16", "Float32", or "Float64"
 T            = eval(Meta.parse(dtype_str))
 int_step     = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : T(0.1)
-reg_factor   = length(ARGS) >= 3 ? eval(Meta.parse(ARGS[3])) : T(1e-7)
-f_abstol     = length(ARGS) >= 4 ? eval(Meta.parse(ARGS[4])) : SimpleSolvers.absolute_tolerance(T) # multiplier of eps(T)
-x_suctol     = length(ARGS) >= 5 ? eval(Meta.parse(ARGS[5])) : SimpleSolvers.default_tolerance(T) # multiplier of eps(T)
-int_timespan = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : T(10.0)
+reg_factor   = length(ARGS) >= 3 ? eval(Meta.parse(ARGS[3])) : T(1e-5)
+f_abstol     = length(ARGS) >= 4 ? eval(Meta.parse(ARGS[4])) : SimpleSolvers.absolute_tolerance(T) 
+x_suctol     = length(ARGS) >= 5 ? eval(Meta.parse(ARGS[5])) : SimpleSolvers.default_tolerance(T)
+int_timespan = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : T(100.0)
 solver_name  = length(ARGS) >= 7 ? ARGS[7] : "backtracking"  # "backtracking" or "dogleg"
 R      = length(ARGS) >= 8  ? parse(Int, ARGS[8])  : 4
 S      = length(ARGS) >= 9  ? parse(Int, ARGS[9])  : 4
@@ -34,16 +34,12 @@ if solver_name == "dogleg"
     GeometricIntegratorsBase.default_options(method::ShallowNet) = (
         max_iterations        = max_iterations,
         regularization_factor = reg_factor,
-        f_abstol              = f_abstol * eps(T),
-        x_suctol              = x_suctol * eps(T),
         solver                = SimpleSolvers.DogLeg(),
     )
 else
     GeometricIntegratorsBase.default_options(method::ShallowNet) = (
         max_iterations        = max_iterations,
         regularization_factor = reg_factor,
-        f_abstol              = f_abstol * eps(T),
-        x_suctol              = x_suctol * eps(T),
         linesearch            = SimpleSolvers.Backtracking(),
     )
 end
