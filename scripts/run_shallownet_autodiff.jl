@@ -18,10 +18,14 @@ dtype_str    = length(ARGS) >= 1  ? ARGS[1]                   : "Float64"       
 T            = eval(Meta.parse(dtype_str))
 int_step     = length(ARGS) >= 2  ? parse(Float64, ARGS[2])   : T(0.1)
 reg_factor   = length(ARGS) >= 3  ? eval(Meta.parse(ARGS[3])) : T(1e-7)
-f_abstol     = length(ARGS) >= 4  ? eval(Meta.parse(ARGS[4])) : SimpleSolvers.absolute_tolerance(T) # multiplier of eps(T)
-x_suctol     = length(ARGS) >= 5  ? eval(Meta.parse(ARGS[5])) : SimpleSolvers.default_tolerance(T)  # multiplier of eps(T)
+f_abstol     = length(ARGS) >= 4 ? eval(Meta.parse(ARGS[4])) : T(0.0)
+x_suctol     = length(ARGS) >= 5 ? eval(Meta.parse(ARGS[5])) : T(2.0)
+
+f_abstol = f_abstol * eps(T)
+x_suctol = x_suctol * eps(T)
+
 int_timespan = length(ARGS) >= 6  ? parse(Float64, ARGS[6])   : T(10.0)
-solver_name  = length(ARGS) >= 7  ? ARGS[7]                   : "backtracking"   # "backtracking" or "dogleg"
+solver_name  = length(ARGS) >= 7  ? ARGS[7]                   : "backtracking"   # "backtracking", "static", "strongwolfe", or "dogleg"
 R      = length(ARGS) >= 8  ? parse(Int, ARGS[8])  : 4
 S      = length(ARGS) >= 9  ? parse(Int, ARGS[9])  : 4
 k_relu = length(ARGS) >= 10 ? parse(Int, ARGS[10]) : 3
@@ -29,6 +33,22 @@ run_dp = "--double-pendulum" in ARGS
 
 outdir = joinpath(@__DIR__, "results", "shallownet_autodiff")
 mkpath(outdir)
+
+# Build solver/linesearch kwargs from solver_name.
+# Strategies mirror the benchmark suite in benchmark/shallownet_benchmark_common.jl:
+#   "backtracking" → Newton + Backtracking
+#   "static"       → Newton + Static
+#   "strongwolfe"  → Newton + StrongWolfe
+#   "dogleg"       → DogLeg (no linesearch)
+if solver_name == "dogleg"
+    solver_kwargs = (solver = SimpleSolvers.DogLeg(),)
+elseif solver_name == "static"
+    solver_kwargs = (solver = SimpleSolvers.Newton(), linesearch = SimpleSolvers.Static(T))
+elseif solver_name == "strongwolfe"
+    solver_kwargs = (solver = SimpleSolvers.Newton(), linesearch = SimpleSolvers.StrongWolfe(T))
+else  # "backtracking" (default)
+    solver_kwargs = (solver = SimpleSolvers.Newton(), linesearch = SimpleSolvers.Backtracking(T))
+end
 
 # ── Harmonic Oscillator setup ────────────────────────────────────────────────
 # Uses LobattoLegendre quadrature (matching original test_shallownet_autodiff.jl).
@@ -40,13 +60,16 @@ HO_ref = GeometricProblems.HarmonicOscillator.exact_solution(
 ts_HO = collect(0:int_step:int_timespan)
 
 # ── Block 1: HO + ReLU ───────────────────────────────────────────────────────
-QLob = QuadratureRules.LobattoLegendreQuadrature(R)
+QGau= QuadratureRules.GaussLegendreQuadrature(R)
 try
     relu = x -> max(zero(T), x)^k_relu
     net = ShallowNetBasis{T}(relu, S)
-    nlmethod = ShallowNetAutodiff(net, QLob, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
+    nlmethod = ShallowNetAutodiff(net, QGau
+, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
-    HO_sol, HO_internal = integrate(HO_lode, nlmethod, regularization_factor = reg_factor, max_iterations = max_iterations)
+    HO_sol, HO_internal = integrate(HO_lode, nlmethod;
+        regularization_factor=reg_factor, max_iterations=max_iterations,
+        f_abstol=f_abstol, x_suctol=x_suctol, solver_kwargs...)
     qend = HO_sol.q[end]
     if !(eltype(qend) === T)
         @warn "upcast from $(T) for HO ReLU h=$(int_step) S=$(S) R=$(R) k=$(k_relu)"
@@ -71,9 +94,12 @@ end
 # ── Block 2: HO + tanh ───────────────────────────────────────────────────────
 try
     net = ShallowNetBasis{T}(tanh, S)
-    nlmethod = ShallowNetAutodiff(net, QLob, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
+    nlmethod = ShallowNetAutodiff(net, QGau
+, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
-    HO_sol, HO_internal = integrate(HO_lode, nlmethod)
+    HO_sol, HO_internal = integrate(HO_lode, nlmethod;
+        regularization_factor=reg_factor, max_iterations=max_iterations,
+        f_abstol=f_abstol, x_suctol=x_suctol, solver_kwargs...)
     qend = HO_sol.q[end]
     if !(eltype(qend) === T)
         @warn "upcast from $(T) for HO tanh h=$(int_step) S=$(S) R=$(R)"
@@ -97,6 +123,8 @@ end
 
 # ── Double Pendulum (optional) ────────────────────────────────────────────────
 if run_dp
+    QGau= QuadratureRules.GaussLegendreQuadrature(R)
+
     DP_params = (l₁=1.0, l₂=1.0, m₁=1.0, m₂=1.0, g=1.0)
     DP_ics = (t=0.0, q=[0.7853981633974483, 1.5707963267948966],
                p=[0.2776801836348979, 0.39269908169872414],
@@ -112,9 +140,12 @@ if run_dp
     try
         relu = x -> max(zero(T), x)^k_relu
         net = ShallowNetBasis{T}(relu, S)
-        nlmethod = ShallowNetAutodiff(net, QLob, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
+        nlmethod = ShallowNetAutodiff(net, QGau
+, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
-        DP_sol, DP_internal = integrate(DP_lode, nlmethod)
+        DP_sol, DP_internal = integrate(DP_lode, nlmethod;
+            regularization_factor=reg_factor, max_iterations=max_iterations,
+            f_abstol=f_abstol, x_suctol=x_suctol, solver_kwargs...)
         qend = DP_sol.q[end]
         if !(eltype(qend) === T)
             @warn "upcast from $(T) for DP ReLU h=$(int_step) S=$(S) R=$(R) k=$(k_relu)"
@@ -143,9 +174,11 @@ if run_dp
     # Block 4: DP + tanh
     try
         net = ShallowNetBasis{T}(tanh, S)
-        nlmethod = ShallowNetAutodiff(net, QLob, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
+        nlmethod = ShallowNetAutodiff(net, QGau, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
-        DP_sol, DP_internal = integrate(DP_lode, nlmethod)
+        DP_sol, DP_internal = integrate(DP_lode, nlmethod;
+            regularization_factor=reg_factor, max_iterations=max_iterations,
+            f_abstol=f_abstol, x_suctol=x_suctol, solver_kwargs...)
         qend = DP_sol.q[end]
         if !(eltype(qend) === T)
             @warn "upcast from $(T) for DP tanh h=$(int_step) S=$(S) R=$(R)"
