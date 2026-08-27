@@ -23,14 +23,18 @@ const sum_size_trend = (1100, 1200)
 """
 Scan `resultsdir` for all ReLU `.jld2` files matching `method_prefix` and
 `problem_prefix`. All secondary parameters (R, λ, fabs, xsuc, solver, dtype)
-are aggregated over. Returns `(data, best_err)` where `data` is a
-`Dict{NTuple{3,Int}, Vector{Float64}}` keyed by `(hi, Si, ki)` indices into
-`(h_list, S_list_sum, k_list_sum)`.
+are aggregated over. Returns `(data, best_err, best_by_key)` where:
+- `data` is a `Dict{NTuple{3,Int}, Vector{Float64}}` keyed by `(hi, Si, ki)`.
+- `best_err` is the global best hams_err series (lowest max error across all keys).
+- `best_by_key` is a `Dict{NTuple{3,Int}, Vector{Float64}}` with the best
+  hams_err series for each individual `(hi, Si, ki)` key.
 """
 function load_relu_tensor(resultsdir, method_prefix, problem_prefix, jld2_key_prefix)
-    data     = Dict{NTuple{3,Int}, Vector{Float64}}()
-    best_val = Inf
-    best_err = Float64[]
+    data        = Dict{NTuple{3,Int}, Vector{Float64}}()
+    best_by_key = Dict{NTuple{3,Int}, Vector{Float64}}()
+    best_val_by_key = Dict{NTuple{3,Int}, Float64}()
+    best_val    = Inf
+    best_err    = Float64[]
 
     pat = Regex("^$(method_prefix)_$(problem_prefix)_h([0-9.e+\\-]+)S(\\d+)R\\d+reluk=(\\d+).*\\.jld2\$")
     for fname in readdir(resultsdir, join=true)
@@ -50,7 +54,12 @@ function load_relu_tensor(resultsdir, method_prefix, problem_prefix, jld2_key_pr
             d   = load(fname)
             val = d["$(jld2_key_prefix)_max_hams_err"]
             isfinite(val) || continue
-            push!(get!(data, (hi, Si, ki), Float64[]), val)
+            key = (hi, Si, ki)
+            push!(get!(data, key, Float64[]), val)
+            if val < get(best_val_by_key, key, Inf)
+                best_val_by_key[key] = val
+                best_by_key[key]     = d["$(jld2_key_prefix)_hams_err"]
+            end
             if val < best_val
                 best_val = val
                 best_err = d["$(jld2_key_prefix)_hams_err"]
@@ -59,19 +68,23 @@ function load_relu_tensor(resultsdir, method_prefix, problem_prefix, jld2_key_pr
             println("Failed to load $fname: $e")
         end
     end
-    data, best_err
+    data, best_err, best_by_key
 end
 
 """
 Scan `resultsdir` for all tanh `.jld2` files matching `method_prefix` and
-`problem_prefix`. Returns `(data, best_err)` where `data` is a
-`Dict{NTuple{2,Int}, Vector{Float64}}` keyed by `(hi, Si)` indices into
-`(h_list, S_list_sum)`.
+`problem_prefix`. Returns `(data, best_err, best_by_key)` where:
+- `data` is a `Dict{NTuple{2,Int}, Vector{Float64}}` keyed by `(hi, Si)`.
+- `best_err` is the global best hams_err series.
+- `best_by_key` is a `Dict{NTuple{2,Int}, Vector{Float64}}` with the best
+  hams_err series for each individual `(hi, Si)` key.
 """
 function load_tanh_tensor(resultsdir, method_prefix, problem_prefix, jld2_key_prefix)
-    data     = Dict{NTuple{2,Int}, Vector{Float64}}()
-    best_val = Inf
-    best_err = Float64[]
+    data        = Dict{NTuple{2,Int}, Vector{Float64}}()
+    best_by_key = Dict{NTuple{2,Int}, Vector{Float64}}()
+    best_val_by_key = Dict{NTuple{2,Int}, Float64}()
+    best_val    = Inf
+    best_err    = Float64[]
 
     pat = Regex("^$(method_prefix)_$(problem_prefix)_h([0-9.e+\\-]+)S(\\d+)R\\d+tanh.*\\.jld2\$")
     for fname in readdir(resultsdir, join=true)
@@ -89,7 +102,12 @@ function load_tanh_tensor(resultsdir, method_prefix, problem_prefix, jld2_key_pr
             d   = load(fname)
             val = d["$(jld2_key_prefix)_max_hams_err"]
             isfinite(val) || continue
-            push!(get!(data, (hi, Si), Float64[]), val)
+            key = (hi, Si)
+            push!(get!(data, key, Float64[]), val)
+            if val < get(best_val_by_key, key, Inf)
+                best_val_by_key[key] = val
+                best_by_key[key]     = d["$(jld2_key_prefix)_hams_err"]
+            end
             if val < best_val
                 best_val = val
                 best_err = d["$(jld2_key_prefix)_hams_err"]
@@ -98,7 +116,7 @@ function load_tanh_tensor(resultsdir, method_prefix, problem_prefix, jld2_key_pr
             println("Failed to load $fname: $e")
         end
     end
-    data, best_err
+    data, best_err, best_by_key
 end
 
 # ── Aggregation helpers ───────────────────────────────────────────────────────
@@ -222,6 +240,45 @@ function save_hams_ts(figdir, figname, hams_err, title)
     end
 end
 
+# ── Per-entry best-run figures ────────────────────────────────────────────────
+
+"""
+Save one Hamiltonian time-series PNG per `(hi, Si, ki)` key in `best_by_key`.
+Files are named `{figbase}_relu_h{h}_S{S}_k{k}_best.png` and saved to `figdir`.
+Returns a `Dict{NTuple{3,Int}, String}` mapping each key to its figure filename
+(relative to `figdir`, suitable for embedding in Markdown).
+"""
+function save_relu_best_figures(figdir, figbase, best_by_key)
+    fignames = Dict{NTuple{3,Int}, String}()
+    for ((hi, Si, ki), hams_err) in best_by_key
+        isempty(hams_err) && continue
+        h = h_list[hi]; S = S_list_sum[Si]; k = k_list_sum[ki]
+        fname = "$(figbase)_relu_h$(h)_S$(S)_k$(k)_best"
+        save_hams_ts(figdir, fname, hams_err,
+            "Hamiltonian Error — h=$(h), S=$(S), k=$(k) (best run)")
+        fignames[(hi, Si, ki)] = "$(fname).png"
+    end
+    fignames
+end
+
+"""
+Save one Hamiltonian time-series PNG per `(hi, Si)` key in `best_by_key`.
+Files are named `{figbase}_tanh_h{h}_S{S}_best.png` and saved to `figdir`.
+Returns a `Dict{NTuple{2,Int}, String}` mapping each key to its figure filename.
+"""
+function save_tanh_best_figures(figdir, figbase, best_by_key)
+    fignames = Dict{NTuple{2,Int}, String}()
+    for ((hi, Si), hams_err) in best_by_key
+        isempty(hams_err) && continue
+        h = h_list[hi]; S = S_list_sum[Si]
+        fname = "$(figbase)_tanh_h$(h)_S$(S)_best"
+        save_hams_ts(figdir, fname, hams_err,
+            "Hamiltonian Error — h=$(h), S=$(S) (best run)")
+        fignames[(hi, Si)] = "$(fname).png"
+    end
+    fignames
+end
+
 # ── Markdown injection ───────────────────────────────────────────────────────
 
 """
@@ -244,11 +301,15 @@ end
 # ── Table: ReLU activation ────────────────────────────────────────────────────
 
 """
-Print a Markdown table of min max-error per (S, k) for each h value.
-Aggregates over all secondary parameters (R, λ, fabs, xsuc, solver, dtype).
-Pass `io` to write to a file instead of stdout.
+Print a Markdown table of min max-error per (S, k) for each h value, with an
+optional per-row Hamiltonian time-series figure embedded below each entry.
+
+- `figdir_rel`: path to the figures directory relative to the Markdown file
+  (e.g. `"figures"`). Pass `nothing` to omit figures.
+- `fignames`: `Dict{NTuple{3,Int}, String}` returned by `save_relu_best_figures`.
 """
-function print_relu_table(relu_data, header, io=stdout)
+function print_relu_table(relu_data, header, io=stdout;
+                          figdir_rel=nothing, fignames=nothing)
     println(io, "\n=== $(header) — ReLU ===")
     for (hi, h) in enumerate(h_list)
         println(io, "\n### h=$(h)")
@@ -259,17 +320,33 @@ function print_relu_table(relu_data, header, io=stdout)
             val  = isempty(vals) ? "—" : @sprintf("%.3e", minimum(vals))
             println(io, "| $(S) | $(k) | $(val) |")
         end
+        # Per-row figures, emitted after the table for this h block.
+        if figdir_rel !== nothing && fignames !== nothing
+            for (Si, S) in enumerate(S_list_sum), (ki, k) in enumerate(k_list_sum)
+                key  = (hi, Si, ki)
+                fname = get(fignames, key, nothing)
+                fname === nothing && continue
+                vals = get(relu_data, key, Float64[])
+                isempty(vals) && continue
+                val_str = @sprintf("%.3e", minimum(vals))
+                println(io, "\n**S=$(S), k=$(k)** — min max Hamiltonian error: $(val_str)\n")
+                println(io, "![Hamiltonian error time series (S=$(S), k=$(k), h=$(h))]($(figdir_rel)/$(fname))\n")
+            end
+        end
     end
 end
 
 # ── Table: tanh activation ────────────────────────────────────────────────────
 
 """
-Print a Markdown table of min max-error per S for each h value.
-Aggregates over all secondary parameters (R, λ, fabs, xsuc, solver, dtype).
-Pass `io` to write to a file instead of stdout.
+Print a Markdown table of min max-error per S for each h value, with an
+optional per-row Hamiltonian time-series figure embedded below each entry.
+
+- `figdir_rel`: path to the figures directory relative to the Markdown file.
+- `fignames`: `Dict{NTuple{2,Int}, String}` returned by `save_tanh_best_figures`.
 """
-function print_tanh_table(tanh_data, header, io=stdout)
+function print_tanh_table(tanh_data, header, io=stdout;
+                          figdir_rel=nothing, fignames=nothing)
     println(io, "\n=== $(header) — tanh ===")
     for (hi, h) in enumerate(h_list)
         println(io, "\n### h=$(h)")
@@ -279,6 +356,19 @@ function print_tanh_table(tanh_data, header, io=stdout)
             vals = get(tanh_data, (hi, Si), Float64[])
             val  = isempty(vals) ? "—" : @sprintf("%.3e", minimum(vals))
             println(io, "| $(S) | $(val) |")
+        end
+        # Per-row figures, emitted after the table for this h block.
+        if figdir_rel !== nothing && fignames !== nothing
+            for (Si, S) in enumerate(S_list_sum)
+                key   = (hi, Si)
+                fname = get(fignames, key, nothing)
+                fname === nothing && continue
+                vals = get(tanh_data, key, Float64[])
+                isempty(vals) && continue
+                val_str = @sprintf("%.3e", minimum(vals))
+                println(io, "\n**S=$(S)** — min max Hamiltonian error: $(val_str)\n")
+                println(io, "![Hamiltonian error time series (S=$(S), h=$(h))]($(figdir_rel)/$(fname))\n")
+            end
         end
     end
 end
