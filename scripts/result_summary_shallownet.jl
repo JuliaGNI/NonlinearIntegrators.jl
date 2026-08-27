@@ -21,10 +21,6 @@ save_relu_error_trend(figdir, "shallownet_HO_relu_error_trend",
     HO_relu_data, "ShallowNet — Harmonic Oscillator (ReLU)")
 save_tanh_error_trend(figdir, "shallownet_HO_tanh_error_trend",
     HO_tanh_data, "ShallowNet — Harmonic Oscillator (tanh)")
-save_hams_ts(figdir, "shallownet_HO_relu_hamiltonian_error_ts",
-    HO_relu_best_err, "ShallowNet — HO Best ReLU Run Hamiltonian Error")
-save_hams_ts(figdir, "shallownet_HO_tanh_hamiltonian_error_ts",
-    HO_tanh_best_err, "ShallowNet — HO Best tanh Run Hamiltonian Error")
 
 let io = IOBuffer()
     print_relu_table(HO_relu_data, "ShallowNet HO", io)
@@ -44,10 +40,6 @@ if run_dp
         DP_relu_data, "ShallowNet — Double Pendulum (ReLU)")
     save_tanh_error_trend(figdir, "shallownet_DP_tanh_error_trend",
         DP_tanh_data, "ShallowNet — Double Pendulum (tanh)")
-    save_hams_ts(figdir, "shallownet_DP_relu_hamiltonian_error_ts",
-        DP_relu_best_err, "ShallowNet — DP Best ReLU Run Hamiltonian Error")
-    save_hams_ts(figdir, "shallownet_DP_tanh_hamiltonian_error_ts",
-        DP_tanh_best_err, "ShallowNet — DP Best tanh Run Hamiltonian Error")
 
     let io = IOBuffer()
         print_relu_table(DP_relu_data, "ShallowNet DP", io)

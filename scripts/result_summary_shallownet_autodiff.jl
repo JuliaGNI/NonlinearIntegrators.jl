@@ -20,10 +20,6 @@ save_relu_error_trend(figdir, "shallownet_autodiff_HO_relu_error_trend",
     HO_relu_tensor, "ShallowNetAutodiff — Harmonic Oscillator (ReLU)")
 save_tanh_error_trend(figdir, "shallownet_autodiff_HO_tanh_error_trend",
     HO_tanh_tensor, "ShallowNetAutodiff — Harmonic Oscillator (tanh)")
-save_hams_ts(figdir, "shallownet_autodiff_HO_relu_hamiltonian_error_ts",
-    HO_relu_best_err, "ShallowNetAutodiff — HO Best ReLU Run Hamiltonian Error")
-save_hams_ts(figdir, "shallownet_autodiff_HO_tanh_hamiltonian_error_ts",
-    HO_tanh_best_err, "ShallowNetAutodiff — HO Best tanh Run Hamiltonian Error")
 
 print_relu_table(HO_relu_tensor, "ShallowNetAutodiff HO")
 print_tanh_table(HO_tanh_tensor, "ShallowNetAutodiff HO")
@@ -36,10 +32,6 @@ save_relu_error_trend(figdir, "shallownet_autodiff_DP_relu_error_trend",
     DP_relu_tensor, "ShallowNetAutodiff — Double Pendulum (ReLU)")
 save_tanh_error_trend(figdir, "shallownet_autodiff_DP_tanh_error_trend",
     DP_tanh_tensor, "ShallowNetAutodiff — Double Pendulum (tanh)")
-save_hams_ts(figdir, "shallownet_autodiff_DP_relu_hamiltonian_error_ts",
-    DP_relu_best_err, "ShallowNetAutodiff — DP Best ReLU Run Hamiltonian Error")
-save_hams_ts(figdir, "shallownet_autodiff_DP_tanh_hamiltonian_error_ts",
-    DP_tanh_best_err, "ShallowNetAutodiff — DP Best tanh Run Hamiltonian Error")
 
 print_relu_table(DP_relu_tensor, "ShallowNetAutodiff DP")
 print_tanh_table(DP_tanh_tensor, "ShallowNetAutodiff DP")

@@ -14,15 +14,15 @@ MAX_JOBS=${MAX_JOBS:-12}   # maximum number of Julia processes running simultane
 
 # Neural integrator parameter grid
 H_LIST="0.05 0.1 0.2 0.5 1.0" # 
-REG_LIST="0.0 1e-3 1e-5  1e-7" # 
-FABS_LIST="0.0" # 2.0 8.0
-XSUC_LIST="0.0" # 0.0 2.0 8.0
+REG_LIST="0.0 1e-3 1e-5 1e-7" # 
+FABS_LIST="0.0" # 0.0 2.0 8.0
+XSUC_LIST="2.0" # 0.0 2.0 8.0
 SOLVER_LIST="backtracking" # static strongwolfe dogleg
 DTYPE_LIST="Float64" #Float16 Float32
 INT_TIMESPAN="100.0"
 R_LIST="4 8 16"   # quadrature points
 S_LIST="4 6 8"    # hidden neurons
-K_LIST="2 3 4"    # ReLU exponent
+K_LIST="3 4"    # ReLU exponent
 
 # VISE parameter grid
 VISE_R_LIST="4 8 16"
