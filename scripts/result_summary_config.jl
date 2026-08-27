@@ -330,12 +330,15 @@ function print_relu_table(relu_data, header, io=stdout;
                     print(io, "—")
                 else
                     val_str = @sprintf("%.3e", minimum(vals))
-                    print(io, "<strong>S=$(S), k=$(k)</strong><br/>$(val_str)")
                     if figdir_rel !== nothing && fignames !== nothing
                         fname = get(fignames, (hi, Si, ki), nothing)
                         if fname !== nothing
-                            print(io, "<br/><img src=\"$(figdir_rel)/$(fname)\" style=\"width:100%;min-width:180px\"/>")
+                            print(io, "<strong>S=$(S), k=$(k), Max Error = $(val_str)<br/><img src=\"$(figdir_rel)/$(fname)\" style=\"width:100%;min-width:180px\"/>")
+                        else
+                            print(io, "<strong>S=$(S), k=$(k), Max Error = $(val_str)</strong>")
                         end
+                    else
+                        print(io, "<strong>S=$(S), k=$(k), Max Error = $(val_str)</strong>")
                     end
                 end
                 print(io, "</td>")
@@ -375,12 +378,15 @@ function print_tanh_table(tanh_data, header, io=stdout;
                 print(io, "—")
             else
                 val_str = @sprintf("%.3e", minimum(vals))
-                print(io, "<strong>S=$(S)</strong><br/>$(val_str)")
                 if figdir_rel !== nothing && fignames !== nothing
                     fname = get(fignames, (hi, Si), nothing)
                     if fname !== nothing
-                        print(io, "<br/><img src=\"$(figdir_rel)/$(fname)\" style=\"width:100%;min-width:180px\"/>")
+                        print(io, "<strong>S=$(S), Max Error = $(val_str)<br/><img src=\"$(figdir_rel)/$(fname)\" style=\"width:100%;min-width:180px\"/>")
+                    else
+                        print(io, "<strong>S=$(S), Max Error = $(val_str)</strong>")
                     end
+                else
+                    print(io, "<strong>S=$(S), Max Error = $(val_str)</strong>")
                 end
             end
             print(io, "</td>")
