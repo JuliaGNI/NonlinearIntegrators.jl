@@ -301,74 +301,90 @@ end
 # ── Table: ReLU activation ────────────────────────────────────────────────────
 
 """
-Print a Markdown table of min max-error per (S, k) for each h value, with an
-optional per-row Hamiltonian time-series figure embedded below each entry.
+Emit one HTML grid table per h value.  Each cell shows:
+  config label (S=x, k=y), min max-error, and the best-run figure (if available).
+Columns = S values, rows = k values.
 
-- `figdir_rel`: path to the figures directory relative to the Markdown file
-  (e.g. `"figures"`). Pass `nothing` to omit figures.
-- `fignames`: `Dict{NTuple{3,Int}, String}` returned by `save_relu_best_figures`.
+- `figdir_rel`: path to figures dir relative to the Markdown file (e.g. `"figures"`).
+- `fignames`: `Dict{NTuple{3,Int}, String}` from `save_relu_best_figures`.
 """
 function print_relu_table(relu_data, header, io=stdout;
                           figdir_rel=nothing, fignames=nothing)
-    println(io, "\n=== $(header) — ReLU ===")
+    println(io, "\n## $(header) — ReLU\n")
     for (hi, h) in enumerate(h_list)
-        println(io, "\n### h=$(h)")
-        println(io, "| S | k | min max Hamiltonian error |")
-        println(io, "|---|---|--------------------------|")
-        for (Si, S) in enumerate(S_list_sum), (ki, k) in enumerate(k_list_sum)
-            vals = get(relu_data, (hi, Si, ki), Float64[])
-            val  = isempty(vals) ? "—" : @sprintf("%.3e", minimum(vals))
-            println(io, "| $(S) | $(k) | $(val) |")
+        println(io, "### h = $(h)\n")
+        println(io, "<table>")
+        # Header row: blank corner + one column per S
+        print(io, "<thead><tr><th></th>")
+        for S in S_list_sum
+            print(io, "<th>S = $(S)</th>")
         end
-        # Per-row figures, emitted after the table for this h block.
-        if figdir_rel !== nothing && fignames !== nothing
-            for (Si, S) in enumerate(S_list_sum), (ki, k) in enumerate(k_list_sum)
-                key  = (hi, Si, ki)
-                fname = get(fignames, key, nothing)
-                fname === nothing && continue
-                vals = get(relu_data, key, Float64[])
-                isempty(vals) && continue
-                val_str = @sprintf("%.3e", minimum(vals))
-                println(io, "\n**S=$(S), k=$(k)** — min max Hamiltonian error: $(val_str)\n")
-                println(io, "![Hamiltonian error time series (S=$(S), k=$(k), h=$(h))]($(figdir_rel)/$(fname))\n")
+        println(io, "</tr></thead>")
+        println(io, "<tbody>")
+        for (ki, k) in enumerate(k_list_sum)
+            print(io, "<tr><th>k = $(k)</th>")
+            for (Si, S) in enumerate(S_list_sum)
+                vals = get(relu_data, (hi, Si, ki), Float64[])
+                print(io, "<td>")
+                if isempty(vals)
+                    print(io, "—")
+                else
+                    val_str = @sprintf("%.3e", minimum(vals))
+                    print(io, "<strong>S=$(S), k=$(k)</strong><br/>$(val_str)")
+                    if figdir_rel !== nothing && fignames !== nothing
+                        fname = get(fignames, (hi, Si, ki), nothing)
+                        if fname !== nothing
+                            print(io, "<br/><img src=\"$(figdir_rel)/$(fname)\" style=\"width:100%;min-width:180px\"/>")
+                        end
+                    end
+                end
+                print(io, "</td>")
             end
+            println(io, "</tr>")
         end
+        println(io, "</tbody></table>\n")
     end
 end
 
 # ── Table: tanh activation ────────────────────────────────────────────────────
 
 """
-Print a Markdown table of min max-error per S for each h value, with an
-optional per-row Hamiltonian time-series figure embedded below each entry.
+Emit one HTML grid table per h value.  Each cell shows:
+  config label (S=x), min max-error, and the best-run figure (if available).
+Columns = S values, single body row.
 
-- `figdir_rel`: path to the figures directory relative to the Markdown file.
-- `fignames`: `Dict{NTuple{2,Int}, String}` returned by `save_tanh_best_figures`.
+- `figdir_rel`: path to figures dir relative to the Markdown file.
+- `fignames`: `Dict{NTuple{2,Int}, String}` from `save_tanh_best_figures`.
 """
 function print_tanh_table(tanh_data, header, io=stdout;
                           figdir_rel=nothing, fignames=nothing)
-    println(io, "\n=== $(header) — tanh ===")
+    println(io, "\n## $(header) — tanh\n")
     for (hi, h) in enumerate(h_list)
-        println(io, "\n### h=$(h)")
-        println(io, "| S | min max Hamiltonian error |")
-        println(io, "|---|--------------------------|")
+        println(io, "### h = $(h)\n")
+        println(io, "<table>")
+        print(io, "<thead><tr>")
+        for S in S_list_sum
+            print(io, "<th>S = $(S)</th>")
+        end
+        println(io, "</tr></thead>")
+        println(io, "<tbody><tr>")
         for (Si, S) in enumerate(S_list_sum)
             vals = get(tanh_data, (hi, Si), Float64[])
-            val  = isempty(vals) ? "—" : @sprintf("%.3e", minimum(vals))
-            println(io, "| $(S) | $(val) |")
-        end
-        # Per-row figures, emitted after the table for this h block.
-        if figdir_rel !== nothing && fignames !== nothing
-            for (Si, S) in enumerate(S_list_sum)
-                key   = (hi, Si)
-                fname = get(fignames, key, nothing)
-                fname === nothing && continue
-                vals = get(tanh_data, key, Float64[])
-                isempty(vals) && continue
+            print(io, "<td>")
+            if isempty(vals)
+                print(io, "—")
+            else
                 val_str = @sprintf("%.3e", minimum(vals))
-                println(io, "\n**S=$(S)** — min max Hamiltonian error: $(val_str)\n")
-                println(io, "![Hamiltonian error time series (S=$(S), h=$(h))]($(figdir_rel)/$(fname))\n")
+                print(io, "<strong>S=$(S)</strong><br/>$(val_str)")
+                if figdir_rel !== nothing && fignames !== nothing
+                    fname = get(fignames, (hi, Si), nothing)
+                    if fname !== nothing
+                        print(io, "<br/><img src=\"$(figdir_rel)/$(fname)\" style=\"width:100%;min-width:180px\"/>")
+                    end
+                end
             end
+            print(io, "</td>")
         end
+        println(io, "</tr></tbody></table>\n")
     end
 end
