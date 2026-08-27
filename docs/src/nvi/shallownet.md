@@ -53,221 +53,57 @@ Results are written to `docs/src/nvi/figures/`.
 
 <!-- HO_RELU_TABLE_START -->
 
-=== ShallowNet HO — ReLU ===
-
-### h=0.05
-| S | k | min max Hamiltonian error |
-|---|---|--------------------------|
-| 4 | 2 | — |
-| 4 | 3 | 5.862e-13 |
-| 4 | 4 | 1.771e-02 |
-| 6 | 2 | — |
-| 6 | 3 | 1.769e-08 |
-| 6 | 4 | 3.744e-08 |
-| 8 | 2 | — |
-| 8 | 3 | 1.429e-08 |
-| 8 | 4 | 4.218e-07 |
-
-**S=4, k=3** — min max Hamiltonian error: 5.862e-13
-
-![Hamiltonian error time series (S=4, k=3, h=0.05)](figures/shallownet_HO_relu_h0.05_S4_k3_best.png)
-
-
-**S=4, k=4** — min max Hamiltonian error: 1.771e-02
-
-![Hamiltonian error time series (S=4, k=4, h=0.05)](figures/shallownet_HO_relu_h0.05_S4_k4_best.png)
-
-
-**S=6, k=3** — min max Hamiltonian error: 1.769e-08
-
-![Hamiltonian error time series (S=6, k=3, h=0.05)](figures/shallownet_HO_relu_h0.05_S6_k3_best.png)
-
-
-**S=6, k=4** — min max Hamiltonian error: 3.744e-08
-
-![Hamiltonian error time series (S=6, k=4, h=0.05)](figures/shallownet_HO_relu_h0.05_S6_k4_best.png)
-
-
-**S=8, k=3** — min max Hamiltonian error: 1.429e-08
-
-![Hamiltonian error time series (S=8, k=3, h=0.05)](figures/shallownet_HO_relu_h0.05_S8_k3_best.png)
-
-
-**S=8, k=4** — min max Hamiltonian error: 4.218e-07
-
-![Hamiltonian error time series (S=8, k=4, h=0.05)](figures/shallownet_HO_relu_h0.05_S8_k4_best.png)
-
-
-### h=0.1
-| S | k | min max Hamiltonian error |
-|---|---|--------------------------|
-| 4 | 2 | — |
-| 4 | 3 | 1.246e-12 |
-| 4 | 4 | 8.038e-03 |
-| 6 | 2 | — |
-| 6 | 3 | 2.684e-09 |
-| 6 | 4 | 1.128e-06 |
-| 8 | 2 | — |
-| 8 | 3 | 5.997e-09 |
-| 8 | 4 | 4.175e-07 |
-
-**S=4, k=3** — min max Hamiltonian error: 1.246e-12
-
-![Hamiltonian error time series (S=4, k=3, h=0.1)](figures/shallownet_HO_relu_h0.1_S4_k3_best.png)
-
-
-**S=4, k=4** — min max Hamiltonian error: 8.038e-03
-
-![Hamiltonian error time series (S=4, k=4, h=0.1)](figures/shallownet_HO_relu_h0.1_S4_k4_best.png)
-
-
-**S=6, k=3** — min max Hamiltonian error: 2.684e-09
-
-![Hamiltonian error time series (S=6, k=3, h=0.1)](figures/shallownet_HO_relu_h0.1_S6_k3_best.png)
-
-
-**S=6, k=4** — min max Hamiltonian error: 1.128e-06
-
-![Hamiltonian error time series (S=6, k=4, h=0.1)](figures/shallownet_HO_relu_h0.1_S6_k4_best.png)
-
-
-**S=8, k=3** — min max Hamiltonian error: 5.997e-09
-
-![Hamiltonian error time series (S=8, k=3, h=0.1)](figures/shallownet_HO_relu_h0.1_S8_k3_best.png)
-
-
-**S=8, k=4** — min max Hamiltonian error: 4.175e-07
-
-![Hamiltonian error time series (S=8, k=4, h=0.1)](figures/shallownet_HO_relu_h0.1_S8_k4_best.png)
-
-
-### h=0.2
-| S | k | min max Hamiltonian error |
-|---|---|--------------------------|
-| 4 | 2 | — |
-| 4 | 3 | 7.956e-11 |
-| 4 | 4 | 1.060e-03 |
-| 6 | 2 | — |
-| 6 | 3 | 1.713e-09 |
-| 6 | 4 | 1.700e-05 |
-| 8 | 2 | — |
-| 8 | 3 | 2.052e-09 |
-| 8 | 4 | 1.658e-06 |
-
-**S=4, k=3** — min max Hamiltonian error: 7.956e-11
-
-![Hamiltonian error time series (S=4, k=3, h=0.2)](figures/shallownet_HO_relu_h0.2_S4_k3_best.png)
-
-
-**S=4, k=4** — min max Hamiltonian error: 1.060e-03
-
-![Hamiltonian error time series (S=4, k=4, h=0.2)](figures/shallownet_HO_relu_h0.2_S4_k4_best.png)
-
-
-**S=6, k=3** — min max Hamiltonian error: 1.713e-09
-
-![Hamiltonian error time series (S=6, k=3, h=0.2)](figures/shallownet_HO_relu_h0.2_S6_k3_best.png)
-
-
-**S=6, k=4** — min max Hamiltonian error: 1.700e-05
-
-![Hamiltonian error time series (S=6, k=4, h=0.2)](figures/shallownet_HO_relu_h0.2_S6_k4_best.png)
-
-
-**S=8, k=3** — min max Hamiltonian error: 2.052e-09
-
-![Hamiltonian error time series (S=8, k=3, h=0.2)](figures/shallownet_HO_relu_h0.2_S8_k3_best.png)
-
-
-**S=8, k=4** — min max Hamiltonian error: 1.658e-06
-
-![Hamiltonian error time series (S=8, k=4, h=0.2)](figures/shallownet_HO_relu_h0.2_S8_k4_best.png)
-
-
-### h=0.5
-| S | k | min max Hamiltonian error |
-|---|---|--------------------------|
-| 4 | 2 | — |
-| 4 | 3 | 1.968e-08 |
-| 4 | 4 | 4.436e-05 |
-| 6 | 2 | — |
-| 6 | 3 | 1.150e-05 |
-| 6 | 4 | 1.874e-05 |
-| 8 | 2 | — |
-| 8 | 3 | 8.064e-06 |
-| 8 | 4 | 2.671e-05 |
-
-**S=4, k=3** — min max Hamiltonian error: 1.968e-08
-
-![Hamiltonian error time series (S=4, k=3, h=0.5)](figures/shallownet_HO_relu_h0.5_S4_k3_best.png)
-
-
-**S=4, k=4** — min max Hamiltonian error: 4.436e-05
-
-![Hamiltonian error time series (S=4, k=4, h=0.5)](figures/shallownet_HO_relu_h0.5_S4_k4_best.png)
-
-
-**S=6, k=3** — min max Hamiltonian error: 1.150e-05
-
-![Hamiltonian error time series (S=6, k=3, h=0.5)](figures/shallownet_HO_relu_h0.5_S6_k3_best.png)
-
-
-**S=6, k=4** — min max Hamiltonian error: 1.874e-05
-
-![Hamiltonian error time series (S=6, k=4, h=0.5)](figures/shallownet_HO_relu_h0.5_S6_k4_best.png)
-
-
-**S=8, k=3** — min max Hamiltonian error: 8.064e-06
-
-![Hamiltonian error time series (S=8, k=3, h=0.5)](figures/shallownet_HO_relu_h0.5_S8_k3_best.png)
-
-
-**S=8, k=4** — min max Hamiltonian error: 2.671e-05
-
-![Hamiltonian error time series (S=8, k=4, h=0.5)](figures/shallownet_HO_relu_h0.5_S8_k4_best.png)
-
-
-### h=1.0
-| S | k | min max Hamiltonian error |
-|---|---|--------------------------|
-| 4 | 2 | — |
-| 4 | 3 | 1.321e-06 |
-| 4 | 4 | 2.875e-05 |
-| 6 | 2 | — |
-| 6 | 3 | 3.232e-04 |
-| 6 | 4 | 4.471e-06 |
-| 8 | 2 | — |
-| 8 | 3 | 5.216e-04 |
-| 8 | 4 | 1.521e-05 |
-
-**S=4, k=3** — min max Hamiltonian error: 1.321e-06
-
-![Hamiltonian error time series (S=4, k=3, h=1.0)](figures/shallownet_HO_relu_h1.0_S4_k3_best.pdf)
-
-
-**S=4, k=4** — min max Hamiltonian error: 2.875e-05
-
-![Hamiltonian error time series (S=4, k=4, h=1.0)](figures/shallownet_HO_relu_h1.0_S4_k4_best.png)
-
-
-**S=6, k=3** — min max Hamiltonian error: 3.232e-04
-
-![Hamiltonian error time series (S=6, k=3, h=1.0)](figures/shallownet_HO_relu_h1.0_S6_k3_best.png)
-
-
-**S=6, k=4** — min max Hamiltonian error: 4.471e-06
-
-![Hamiltonian error time series (S=6, k=4, h=1.0)](figures/shallownet_HO_relu_h1.0_S6_k4_best.png)
-
-
-**S=8, k=3** — min max Hamiltonian error: 5.216e-04
-
-![Hamiltonian error time series (S=8, k=3, h=1.0)](figures/shallownet_HO_relu_h1.0_S8_k3_best.png)
-
-
-**S=8, k=4** — min max Hamiltonian error: 1.521e-05
-
-![Hamiltonian error time series (S=8, k=4, h=1.0)](figures/shallownet_HO_relu_h1.0_S8_k4_best.png)
+## ShallowNet HO — ReLU
+
+### h = 0.05
+
+<table>
+<thead><tr><th></th><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
+<tbody>
+<tr><th>k = 2</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>k = 3</th><td><strong>S=4, k=3, Max Error = 5.862e-13<br/><img src="figures/shallownet_HO_relu_h0.05_S4_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=3, Max Error = 1.769e-08<br/><img src="figures/shallownet_HO_relu_h0.05_S6_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=3, Max Error = 1.429e-08<br/><img src="figures/shallownet_HO_relu_h0.05_S8_k3_best.png" style="width:100%;min-width:180px"/></td></tr>
+<tr><th>k = 4</th><td><strong>S=4, k=4, Max Error = 1.771e-02<br/><img src="figures/shallownet_HO_relu_h0.05_S4_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=4, Max Error = 3.744e-08<br/><img src="figures/shallownet_HO_relu_h0.05_S6_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=4, Max Error = 4.218e-07<br/><img src="figures/shallownet_HO_relu_h0.05_S8_k4_best.png" style="width:100%;min-width:180px"/></td></tr>
+</tbody></table>
+
+### h = 0.1
+
+<table>
+<thead><tr><th></th><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
+<tbody>
+<tr><th>k = 2</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>k = 3</th><td><strong>S=4, k=3, Max Error = 1.246e-12<br/><img src="figures/shallownet_HO_relu_h0.1_S4_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=3, Max Error = 2.684e-09<br/><img src="figures/shallownet_HO_relu_h0.1_S6_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=3, Max Error = 5.997e-09<br/><img src="figures/shallownet_HO_relu_h0.1_S8_k3_best.png" style="width:100%;min-width:180px"/></td></tr>
+<tr><th>k = 4</th><td><strong>S=4, k=4, Max Error = 8.038e-03<br/><img src="figures/shallownet_HO_relu_h0.1_S4_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=4, Max Error = 1.128e-06<br/><img src="figures/shallownet_HO_relu_h0.1_S6_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=4, Max Error = 4.175e-07<br/><img src="figures/shallownet_HO_relu_h0.1_S8_k4_best.png" style="width:100%;min-width:180px"/></td></tr>
+</tbody></table>
+
+### h = 0.2
+
+<table>
+<thead><tr><th></th><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
+<tbody>
+<tr><th>k = 2</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>k = 3</th><td><strong>S=4, k=3, Max Error = 7.956e-11<br/><img src="figures/shallownet_HO_relu_h0.2_S4_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=3, Max Error = 1.713e-09<br/><img src="figures/shallownet_HO_relu_h0.2_S6_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=3, Max Error = 2.052e-09<br/><img src="figures/shallownet_HO_relu_h0.2_S8_k3_best.png" style="width:100%;min-width:180px"/></td></tr>
+<tr><th>k = 4</th><td><strong>S=4, k=4, Max Error = 1.060e-03<br/><img src="figures/shallownet_HO_relu_h0.2_S4_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=4, Max Error = 1.700e-05<br/><img src="figures/shallownet_HO_relu_h0.2_S6_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=4, Max Error = 1.658e-06<br/><img src="figures/shallownet_HO_relu_h0.2_S8_k4_best.png" style="width:100%;min-width:180px"/></td></tr>
+</tbody></table>
+
+### h = 0.5
+
+<table>
+<thead><tr><th></th><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
+<tbody>
+<tr><th>k = 2</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>k = 3</th><td><strong>S=4, k=3, Max Error = 1.968e-08<br/><img src="figures/shallownet_HO_relu_h0.5_S4_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=3, Max Error = 1.150e-05<br/><img src="figures/shallownet_HO_relu_h0.5_S6_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=3, Max Error = 8.064e-06<br/><img src="figures/shallownet_HO_relu_h0.5_S8_k3_best.png" style="width:100%;min-width:180px"/></td></tr>
+<tr><th>k = 4</th><td><strong>S=4, k=4, Max Error = 4.436e-05<br/><img src="figures/shallownet_HO_relu_h0.5_S4_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=4, Max Error = 1.874e-05<br/><img src="figures/shallownet_HO_relu_h0.5_S6_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=4, Max Error = 2.671e-05<br/><img src="figures/shallownet_HO_relu_h0.5_S8_k4_best.png" style="width:100%;min-width:180px"/></td></tr>
+</tbody></table>
+
+### h = 1.0
+
+<table>
+<thead><tr><th></th><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
+<tbody>
+<tr><th>k = 2</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>k = 3</th><td><strong>S=4, k=3, Max Error = 1.321e-06<br/><img src="figures/shallownet_HO_relu_h1.0_S4_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=3, Max Error = 3.232e-04<br/><img src="figures/shallownet_HO_relu_h1.0_S6_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=3, Max Error = 5.216e-04<br/><img src="figures/shallownet_HO_relu_h1.0_S8_k3_best.png" style="width:100%;min-width:180px"/></td></tr>
+<tr><th>k = 4</th><td><strong>S=4, k=4, Max Error = 2.875e-05<br/><img src="figures/shallownet_HO_relu_h1.0_S4_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=4, Max Error = 4.471e-06<br/><img src="figures/shallownet_HO_relu_h1.0_S6_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=4, Max Error = 1.521e-05<br/><img src="figures/shallownet_HO_relu_h1.0_S8_k4_best.png" style="width:100%;min-width:180px"/></td></tr>
+</tbody></table>
 
 
 <!-- HO_RELU_TABLE_END -->
@@ -278,116 +114,42 @@ Results are written to `docs/src/nvi/figures/`.
 
 <!-- HO_TANH_TABLE_START -->
 
-=== ShallowNet HO — tanh ===
+## ShallowNet HO — tanh
 
-### h=0.05
-| S | min max Hamiltonian error |
-|---|--------------------------|
-| 4 | 1.947e-04 |
-| 6 | 1.093e-06 |
-| 8 | 1.222e-08 |
+### h = 0.05
 
-**S=4** — min max Hamiltonian error: 1.947e-04
+<table>
+<thead><tr><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
+<tbody><tr>
+<td><strong>S=4, Max Error = 1.947e-04<br/><img src="figures/shallownet_HO_tanh_h0.05_S4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, Max Error = 1.093e-06<br/><img src="figures/shallownet_HO_tanh_h0.05_S6_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, Max Error = 1.222e-08<br/><img src="figures/shallownet_HO_tanh_h0.05_S8_best.png" style="width:100%;min-width:180px"/></td></tr></tbody></table>
 
-![Hamiltonian error time series (S=4, h=0.05)](figures/shallownet_HO_tanh_h0.05_S4_best.png)
+### h = 0.1
 
+<table>
+<thead><tr><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
+<tbody><tr>
+<td><strong>S=4, Max Error = 4.881e-05<br/><img src="figures/shallownet_HO_tanh_h0.1_S4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, Max Error = 6.733e-06<br/><img src="figures/shallownet_HO_tanh_h0.1_S6_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, Max Error = 1.657e-08<br/><img src="figures/shallownet_HO_tanh_h0.1_S8_best.png" style="width:100%;min-width:180px"/></td></tr></tbody></table>
 
-**S=6** — min max Hamiltonian error: 1.093e-06
+### h = 0.2
 
-![Hamiltonian error time series (S=6, h=0.05)](figures/shallownet_HO_tanh_h0.05_S6_best.png)
+<table>
+<thead><tr><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
+<tbody><tr>
+<td><strong>S=4, Max Error = 1.262e-05<br/><img src="figures/shallownet_HO_tanh_h0.2_S4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, Max Error = 1.664e-06<br/><img src="figures/shallownet_HO_tanh_h0.2_S6_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, Max Error = 1.764e-09<br/><img src="figures/shallownet_HO_tanh_h0.2_S8_best.png" style="width:100%;min-width:180px"/></td></tr></tbody></table>
 
+### h = 0.5
 
-**S=8** — min max Hamiltonian error: 1.222e-08
+<table>
+<thead><tr><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
+<tbody><tr>
+<td><strong>S=4, Max Error = 1.566e-04<br/><img src="figures/shallownet_HO_tanh_h0.5_S4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, Max Error = 5.515e-07<br/><img src="figures/shallownet_HO_tanh_h0.5_S6_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, Max Error = 5.900e-08<br/><img src="figures/shallownet_HO_tanh_h0.5_S8_best.png" style="width:100%;min-width:180px"/></td></tr></tbody></table>
 
-![Hamiltonian error time series (S=8, h=0.05)](figures/shallownet_HO_tanh_h0.05_S8_best.png)
+### h = 1.0
 
-
-### h=0.1
-| S | min max Hamiltonian error |
-|---|--------------------------|
-| 4 | 4.881e-05 |
-| 6 | 6.733e-06 |
-| 8 | 1.657e-08 |
-
-**S=4** — min max Hamiltonian error: 4.881e-05
-
-![Hamiltonian error time series (S=4, h=0.1)](figures/shallownet_HO_tanh_h0.1_S4_best.png)
-
-
-**S=6** — min max Hamiltonian error: 6.733e-06
-
-![Hamiltonian error time series (S=6, h=0.1)](figures/shallownet_HO_tanh_h0.1_S6_best.png)
-
-
-**S=8** — min max Hamiltonian error: 1.657e-08
-
-![Hamiltonian error time series (S=8, h=0.1)](figures/shallownet_HO_tanh_h0.1_S8_best.png)
-
-
-### h=0.2
-| S | min max Hamiltonian error |
-|---|--------------------------|
-| 4 | 1.262e-05 |
-| 6 | 1.664e-06 |
-| 8 | 1.764e-09 |
-
-**S=4** — min max Hamiltonian error: 1.262e-05
-
-![Hamiltonian error time series (S=4, h=0.2)](figures/shallownet_HO_tanh_h0.2_S4_best.png)
-
-
-**S=6** — min max Hamiltonian error: 1.664e-06
-
-![Hamiltonian error time series (S=6, h=0.2)](figures/shallownet_HO_tanh_h0.2_S6_best.png)
-
-
-**S=8** — min max Hamiltonian error: 1.764e-09
-
-![Hamiltonian error time series (S=8, h=0.2)](figures/shallownet_HO_tanh_h0.2_S8_best.png)
-
-
-### h=0.5
-| S | min max Hamiltonian error |
-|---|--------------------------|
-| 4 | 1.566e-04 |
-| 6 | 5.515e-07 |
-| 8 | 5.900e-08 |
-
-**S=4** — min max Hamiltonian error: 1.566e-04
-
-![Hamiltonian error time series (S=4, h=0.5)](figures/shallownet_HO_tanh_h0.5_S4_best.png)
-
-
-**S=6** — min max Hamiltonian error: 5.515e-07
-
-![Hamiltonian error time series (S=6, h=0.5)](figures/shallownet_HO_tanh_h0.5_S6_best.png)
-
-
-**S=8** — min max Hamiltonian error: 5.900e-08
-
-![Hamiltonian error time series (S=8, h=0.5)](figures/shallownet_HO_tanh_h0.5_S8_best.png)
-
-
-### h=1.0
-| S | min max Hamiltonian error |
-|---|--------------------------|
-| 4 | 7.956e-04 |
-| 6 | 2.571e-07 |
-| 8 | 5.975e-08 |
-
-**S=4** — min max Hamiltonian error: 7.956e-04
-
-![Hamiltonian error time series (S=4, h=1.0)](figures/shallownet_HO_tanh_h1.0_S4_best.png)
-
-
-**S=6** — min max Hamiltonian error: 2.571e-07
-
-![Hamiltonian error time series (S=6, h=1.0)](figures/shallownet_HO_tanh_h1.0_S6_best.png)
-
-
-**S=8** — min max Hamiltonian error: 5.975e-08
-
-![Hamiltonian error time series (S=8, h=1.0)](figures/shallownet_HO_tanh_h1.0_S8_best.png)
+<table>
+<thead><tr><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
+<tbody><tr>
+<td><strong>S=4, Max Error = 7.956e-04<br/><img src="figures/shallownet_HO_tanh_h1.0_S4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, Max Error = 2.571e-07<br/><img src="figures/shallownet_HO_tanh_h1.0_S6_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, Max Error = 5.975e-08<br/><img src="figures/shallownet_HO_tanh_h1.0_S8_best.png" style="width:100%;min-width:180px"/></td></tr></tbody></table>
 
 
 <!-- HO_TANH_TABLE_END -->
