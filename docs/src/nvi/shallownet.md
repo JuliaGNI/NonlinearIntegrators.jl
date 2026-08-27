@@ -53,6 +53,8 @@ Results are written to `docs/src/nvi/figures/`.
 
 <!-- HO_RELU_TABLE_START -->
 
+=== ShallowNet HO — ReLU ===
+
 ### h=0.05
 | S | k | min max Hamiltonian error |
 |---|---|--------------------------|
@@ -65,6 +67,36 @@ Results are written to `docs/src/nvi/figures/`.
 | 8 | 2 | — |
 | 8 | 3 | 1.429e-08 |
 | 8 | 4 | 4.218e-07 |
+
+**S=4, k=3** — min max Hamiltonian error: 5.862e-13
+
+![Hamiltonian error time series (S=4, k=3, h=0.05)](figures/shallownet_HO_relu_h0.05_S4_k3_best.png)
+
+
+**S=4, k=4** — min max Hamiltonian error: 1.771e-02
+
+![Hamiltonian error time series (S=4, k=4, h=0.05)](figures/shallownet_HO_relu_h0.05_S4_k4_best.png)
+
+
+**S=6, k=3** — min max Hamiltonian error: 1.769e-08
+
+![Hamiltonian error time series (S=6, k=3, h=0.05)](figures/shallownet_HO_relu_h0.05_S6_k3_best.png)
+
+
+**S=6, k=4** — min max Hamiltonian error: 3.744e-08
+
+![Hamiltonian error time series (S=6, k=4, h=0.05)](figures/shallownet_HO_relu_h0.05_S6_k4_best.png)
+
+
+**S=8, k=3** — min max Hamiltonian error: 1.429e-08
+
+![Hamiltonian error time series (S=8, k=3, h=0.05)](figures/shallownet_HO_relu_h0.05_S8_k3_best.png)
+
+
+**S=8, k=4** — min max Hamiltonian error: 4.218e-07
+
+![Hamiltonian error time series (S=8, k=4, h=0.05)](figures/shallownet_HO_relu_h0.05_S8_k4_best.png)
+
 
 ### h=0.1
 | S | k | min max Hamiltonian error |
@@ -79,6 +111,36 @@ Results are written to `docs/src/nvi/figures/`.
 | 8 | 3 | 5.997e-09 |
 | 8 | 4 | 4.175e-07 |
 
+**S=4, k=3** — min max Hamiltonian error: 1.246e-12
+
+![Hamiltonian error time series (S=4, k=3, h=0.1)](figures/shallownet_HO_relu_h0.1_S4_k3_best.png)
+
+
+**S=4, k=4** — min max Hamiltonian error: 8.038e-03
+
+![Hamiltonian error time series (S=4, k=4, h=0.1)](figures/shallownet_HO_relu_h0.1_S4_k4_best.png)
+
+
+**S=6, k=3** — min max Hamiltonian error: 2.684e-09
+
+![Hamiltonian error time series (S=6, k=3, h=0.1)](figures/shallownet_HO_relu_h0.1_S6_k3_best.png)
+
+
+**S=6, k=4** — min max Hamiltonian error: 1.128e-06
+
+![Hamiltonian error time series (S=6, k=4, h=0.1)](figures/shallownet_HO_relu_h0.1_S6_k4_best.png)
+
+
+**S=8, k=3** — min max Hamiltonian error: 5.997e-09
+
+![Hamiltonian error time series (S=8, k=3, h=0.1)](figures/shallownet_HO_relu_h0.1_S8_k3_best.png)
+
+
+**S=8, k=4** — min max Hamiltonian error: 4.175e-07
+
+![Hamiltonian error time series (S=8, k=4, h=0.1)](figures/shallownet_HO_relu_h0.1_S8_k4_best.png)
+
+
 ### h=0.2
 | S | k | min max Hamiltonian error |
 |---|---|--------------------------|
@@ -91,6 +153,36 @@ Results are written to `docs/src/nvi/figures/`.
 | 8 | 2 | — |
 | 8 | 3 | 2.052e-09 |
 | 8 | 4 | 1.658e-06 |
+
+**S=4, k=3** — min max Hamiltonian error: 7.956e-11
+
+![Hamiltonian error time series (S=4, k=3, h=0.2)](figures/shallownet_HO_relu_h0.2_S4_k3_best.png)
+
+
+**S=4, k=4** — min max Hamiltonian error: 1.060e-03
+
+![Hamiltonian error time series (S=4, k=4, h=0.2)](figures/shallownet_HO_relu_h0.2_S4_k4_best.png)
+
+
+**S=6, k=3** — min max Hamiltonian error: 1.713e-09
+
+![Hamiltonian error time series (S=6, k=3, h=0.2)](figures/shallownet_HO_relu_h0.2_S6_k3_best.png)
+
+
+**S=6, k=4** — min max Hamiltonian error: 1.700e-05
+
+![Hamiltonian error time series (S=6, k=4, h=0.2)](figures/shallownet_HO_relu_h0.2_S6_k4_best.png)
+
+
+**S=8, k=3** — min max Hamiltonian error: 2.052e-09
+
+![Hamiltonian error time series (S=8, k=3, h=0.2)](figures/shallownet_HO_relu_h0.2_S8_k3_best.png)
+
+
+**S=8, k=4** — min max Hamiltonian error: 1.658e-06
+
+![Hamiltonian error time series (S=8, k=4, h=0.2)](figures/shallownet_HO_relu_h0.2_S8_k4_best.png)
+
 
 ### h=0.5
 | S | k | min max Hamiltonian error |
@@ -105,6 +197,36 @@ Results are written to `docs/src/nvi/figures/`.
 | 8 | 3 | 8.064e-06 |
 | 8 | 4 | 2.671e-05 |
 
+**S=4, k=3** — min max Hamiltonian error: 1.968e-08
+
+![Hamiltonian error time series (S=4, k=3, h=0.5)](figures/shallownet_HO_relu_h0.5_S4_k3_best.png)
+
+
+**S=4, k=4** — min max Hamiltonian error: 4.436e-05
+
+![Hamiltonian error time series (S=4, k=4, h=0.5)](figures/shallownet_HO_relu_h0.5_S4_k4_best.png)
+
+
+**S=6, k=3** — min max Hamiltonian error: 1.150e-05
+
+![Hamiltonian error time series (S=6, k=3, h=0.5)](figures/shallownet_HO_relu_h0.5_S6_k3_best.png)
+
+
+**S=6, k=4** — min max Hamiltonian error: 1.874e-05
+
+![Hamiltonian error time series (S=6, k=4, h=0.5)](figures/shallownet_HO_relu_h0.5_S6_k4_best.png)
+
+
+**S=8, k=3** — min max Hamiltonian error: 8.064e-06
+
+![Hamiltonian error time series (S=8, k=3, h=0.5)](figures/shallownet_HO_relu_h0.5_S8_k3_best.png)
+
+
+**S=8, k=4** — min max Hamiltonian error: 2.671e-05
+
+![Hamiltonian error time series (S=8, k=4, h=0.5)](figures/shallownet_HO_relu_h0.5_S8_k4_best.png)
+
+
 ### h=1.0
 | S | k | min max Hamiltonian error |
 |---|---|--------------------------|
@@ -118,6 +240,36 @@ Results are written to `docs/src/nvi/figures/`.
 | 8 | 3 | 5.216e-04 |
 | 8 | 4 | 1.521e-05 |
 
+**S=4, k=3** — min max Hamiltonian error: 1.321e-06
+
+![Hamiltonian error time series (S=4, k=3, h=1.0)](figures/shallownet_HO_relu_h1.0_S4_k3_best.pdf)
+
+
+**S=4, k=4** — min max Hamiltonian error: 2.875e-05
+
+![Hamiltonian error time series (S=4, k=4, h=1.0)](figures/shallownet_HO_relu_h1.0_S4_k4_best.png)
+
+
+**S=6, k=3** — min max Hamiltonian error: 3.232e-04
+
+![Hamiltonian error time series (S=6, k=3, h=1.0)](figures/shallownet_HO_relu_h1.0_S6_k3_best.png)
+
+
+**S=6, k=4** — min max Hamiltonian error: 4.471e-06
+
+![Hamiltonian error time series (S=6, k=4, h=1.0)](figures/shallownet_HO_relu_h1.0_S6_k4_best.png)
+
+
+**S=8, k=3** — min max Hamiltonian error: 5.216e-04
+
+![Hamiltonian error time series (S=8, k=3, h=1.0)](figures/shallownet_HO_relu_h1.0_S8_k3_best.png)
+
+
+**S=8, k=4** — min max Hamiltonian error: 1.521e-05
+
+![Hamiltonian error time series (S=8, k=4, h=1.0)](figures/shallownet_HO_relu_h1.0_S8_k4_best.png)
+
+
 <!-- HO_RELU_TABLE_END -->
 
 ### tanh Activation
@@ -126,12 +278,29 @@ Results are written to `docs/src/nvi/figures/`.
 
 <!-- HO_TANH_TABLE_START -->
 
+=== ShallowNet HO — tanh ===
+
 ### h=0.05
 | S | min max Hamiltonian error |
 |---|--------------------------|
 | 4 | 1.947e-04 |
 | 6 | 1.093e-06 |
 | 8 | 1.222e-08 |
+
+**S=4** — min max Hamiltonian error: 1.947e-04
+
+![Hamiltonian error time series (S=4, h=0.05)](figures/shallownet_HO_tanh_h0.05_S4_best.png)
+
+
+**S=6** — min max Hamiltonian error: 1.093e-06
+
+![Hamiltonian error time series (S=6, h=0.05)](figures/shallownet_HO_tanh_h0.05_S6_best.png)
+
+
+**S=8** — min max Hamiltonian error: 1.222e-08
+
+![Hamiltonian error time series (S=8, h=0.05)](figures/shallownet_HO_tanh_h0.05_S8_best.png)
+
 
 ### h=0.1
 | S | min max Hamiltonian error |
@@ -140,12 +309,42 @@ Results are written to `docs/src/nvi/figures/`.
 | 6 | 6.733e-06 |
 | 8 | 1.657e-08 |
 
+**S=4** — min max Hamiltonian error: 4.881e-05
+
+![Hamiltonian error time series (S=4, h=0.1)](figures/shallownet_HO_tanh_h0.1_S4_best.png)
+
+
+**S=6** — min max Hamiltonian error: 6.733e-06
+
+![Hamiltonian error time series (S=6, h=0.1)](figures/shallownet_HO_tanh_h0.1_S6_best.png)
+
+
+**S=8** — min max Hamiltonian error: 1.657e-08
+
+![Hamiltonian error time series (S=8, h=0.1)](figures/shallownet_HO_tanh_h0.1_S8_best.png)
+
+
 ### h=0.2
 | S | min max Hamiltonian error |
 |---|--------------------------|
 | 4 | 1.262e-05 |
 | 6 | 1.664e-06 |
 | 8 | 1.764e-09 |
+
+**S=4** — min max Hamiltonian error: 1.262e-05
+
+![Hamiltonian error time series (S=4, h=0.2)](figures/shallownet_HO_tanh_h0.2_S4_best.png)
+
+
+**S=6** — min max Hamiltonian error: 1.664e-06
+
+![Hamiltonian error time series (S=6, h=0.2)](figures/shallownet_HO_tanh_h0.2_S6_best.png)
+
+
+**S=8** — min max Hamiltonian error: 1.764e-09
+
+![Hamiltonian error time series (S=8, h=0.2)](figures/shallownet_HO_tanh_h0.2_S8_best.png)
+
 
 ### h=0.5
 | S | min max Hamiltonian error |
@@ -154,12 +353,42 @@ Results are written to `docs/src/nvi/figures/`.
 | 6 | 5.515e-07 |
 | 8 | 5.900e-08 |
 
+**S=4** — min max Hamiltonian error: 1.566e-04
+
+![Hamiltonian error time series (S=4, h=0.5)](figures/shallownet_HO_tanh_h0.5_S4_best.png)
+
+
+**S=6** — min max Hamiltonian error: 5.515e-07
+
+![Hamiltonian error time series (S=6, h=0.5)](figures/shallownet_HO_tanh_h0.5_S6_best.png)
+
+
+**S=8** — min max Hamiltonian error: 5.900e-08
+
+![Hamiltonian error time series (S=8, h=0.5)](figures/shallownet_HO_tanh_h0.5_S8_best.png)
+
+
 ### h=1.0
 | S | min max Hamiltonian error |
 |---|--------------------------|
 | 4 | 7.956e-04 |
 | 6 | 2.571e-07 |
 | 8 | 5.975e-08 |
+
+**S=4** — min max Hamiltonian error: 7.956e-04
+
+![Hamiltonian error time series (S=4, h=1.0)](figures/shallownet_HO_tanh_h1.0_S4_best.png)
+
+
+**S=6** — min max Hamiltonian error: 2.571e-07
+
+![Hamiltonian error time series (S=6, h=1.0)](figures/shallownet_HO_tanh_h1.0_S6_best.png)
+
+
+**S=8** — min max Hamiltonian error: 5.975e-08
+
+![Hamiltonian error time series (S=8, h=1.0)](figures/shallownet_HO_tanh_h1.0_S8_best.png)
+
 
 <!-- HO_TANH_TABLE_END -->
 
