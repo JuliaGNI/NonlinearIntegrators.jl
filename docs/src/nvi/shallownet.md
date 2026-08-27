@@ -14,15 +14,7 @@ DP_FLAG=""             # set to "--double-pendulum" to include double pendulum
 bash parallel_run.sh
 ```
 
-After all jobs complete, generate the summary figures and error tables:
-
-```bash
-julia --project=scripts scripts/result_summary_shallownet.jl
-```
-
-Results are written to `docs/src/nvi/figures/`.
-
-The following results are based on the configurations:
+The following results are based on the configurations in the above bash file:
 ```bash
 # ── Configuration ─────────────────────────────────────────────────────────────
 INTEGRATOR="shallownet"   # change to target integrator
@@ -42,6 +34,16 @@ R_LIST="4 8 16"   # quadrature points
 S_LIST="4 6 8"    # hidden neurons
 K_LIST="3 4"    # ReLU exponent
 ```
+
+After all jobs complete, generate the summary figures and error tables:
+
+```bash
+julia --project=scripts scripts/result_summary_shallownet.jl
+```
+
+Results are written to `docs/src/nvi/figures/`.
+
+
 
 ## Harmonic Oscillator Results
 

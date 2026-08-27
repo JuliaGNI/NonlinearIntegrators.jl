@@ -15,7 +15,7 @@ using NonlinearIntegrators
 # summary section.
 function generate_benchmark_figures()
     benchdir = normpath(joinpath(@__DIR__, "..", "benchmark"))
-    figdir   = joinpath(@__DIR__, "src", "Benchmarks", "figures")
+    figdir   = joinpath(@__DIR__, "src", "benchmarks", "figures")
     resdir   = joinpath(benchdir, "results")
     mkpath(figdir)
     julia = Base.julia_cmd()
@@ -99,14 +99,15 @@ makedocs(
             "vise/vise.md",
         "Neural Variational Integrators" => [
             "ShallowNet"                 => "nvi/shallownet.md",
-            "ShallowNet (Reversible)"    => "nvi/shallownet_reversible.md",
-            "ShallowNet (Autodiff)"      => "nvi/shallownet_autodiff.md",
-            "ShallowNet (Autodiff+Rev.)" => "nvi/shallownet_autodiff_reversible.md",
-            "DenseNet"                   => "nvi/densenet.md",
-            "VISE Results"               => "nvi/vise_results.md",
+            # "ShallowNet (Reversible)"    => "nvi/shallownet_reversible.md",
+            # "ShallowNet (Autodiff)"      => "nvi/shallownet_autodiff.md",
+            # "ShallowNet (Autodiff+Rev.)" => "nvi/shallownet_autodiff_reversible.md",
+            # "DenseNet"                   => "nvi/densenet.md",
+            # "VISE Results"               => "nvi/vise_results.md",
         ],
-        "Benchmarks" => "Benchmarks/benchmarks.md",
+        "Benchmarks" => "benchmarks/benchmarks.md",
     ],
+    warnonly = [:cross_references],
 )
 
 # `devurl` is deliberately absent, i.e. left at Documenter's default of `"dev"`. It used to be
