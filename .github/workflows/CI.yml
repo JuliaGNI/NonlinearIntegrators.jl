@@ -102,3 +102,4 @@ jobs:
                   using NonlinearIntegrators
                   DocMeta.setdocmeta!(NonlinearIntegrators, :DocTestSetup, :(using NonlinearIntegrators); recursive=true)
                   doctest(NonlinearIntegrators)
+
