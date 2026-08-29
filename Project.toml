@@ -1,6 +1,6 @@
 name = "NonlinearIntegrators"
 uuid = "4ad56de4-0342-4c02-9694-ab2f23251d8c"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["Michael Kraus <michael.kraus@ipp.mpg.de> and contributors"]
 
 [deps]
@@ -23,47 +23,55 @@ SymbolicNeuralNetworks = "aed23131-dcd0-47ca-8090-d21e605652e3"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
-# 0.7.1 and not 0.7. 0.7.0 pins `NeuralNetworkParameters = "0.1"`, so it cannot coexist with the
-# 0.2 container this package requires below -- a bound of "0.7" admits a version that is never
-# satisfiable here. The resolver works that out on its own, but a bound is a statement about what
-# this package supports, and this one would be making a false one. `SymbolicNeuralNetworks` 0.7
-# names 0.7.1 for the same reason.
-AbstractNeuralNetworks = "0.7.1"
+# 0.8.0 takes a whole set of parameters as a `NetworkParameters` and renames `ArrayNamedTuple` to
+# `NamedTupleOfArrays`. Neither reaches this package: nothing here names either alias, and the
+# parameters this package builds are handed to `Optimizer` already flattened. The bump moves with
+# `NeuralNetworkParameters` and `SymbolicNeuralNetworks` below -- 0.8.0 requires the 0.3 container --
+# so the three move together or none of them resolves.
+AbstractNeuralNetworks = "0.8"
 CompactBasisFunctions = "0.3"
 ForwardDiff = "1"
-GeometricBase = "0.14.8"
+GeometricBase = "0.14.9"
 GeometricEquations = "0.21"
 GeometricIntegratorsBase = "0.6.3"
-# 0.5.0 drops the `ParameterHandling` shim and lets `NeuralNetworkParameters` do the flattening,
-# which makes the 0.2 container a requirement rather than a choice: 0.4 and earlier want the 0.1
-# container. This bound and the two below therefore move together or none of them resolves. 0.6.0
-# takes a whole `NetworkParameters` through the optimizer; nothing here hands it one -- the
-# `ShallowNet` initialisation flattens to a plain `Vector` before `Optimizer` sees it
-# (`src/nvi/shallownet.jl`) -- so the bump is a compat entry and no code.
-GeometricOptimizers = "0.6"
+# 0.7.0 takes a whole set of parameters *only* as a `NetworkParameters`, and turns a bare
+# `NamedTuple` away at `Optimizer`. That is the breaking half of the de-piracy wave and it costs this
+# package nothing, for the reason the 0.6.0 note already gave: the `ShallowNet` initialisation
+# flattens to a plain `Vector` before `Optimizer` sees it (`src/nvi/shallownet.jl`), so no parameter
+# set is ever handed over whole. The bump is a compat entry and no code. It also requires
+# `SimpleSolvers` 0.13.2, which is why that bound moved below.
+GeometricOptimizers = "0.7"
 GeometricSolutions = "0.6"
 LinearAlgebra = "1"
-# 0.2.1 and not 0.2. The call sites here name only `NetworkParameters`, `params`, `flatten`,
-# `unflatten` and `unflatten!`, all of which 0.2.0 has, so this is not a bound about what loads.
-# It is a bound about what `test/quality/inference_and_allocations.jl` measures: the un-batched
-# `unflatten` on the symbolic `residual!` path is this package's dependency directly, and 0.2.1 is
-# the release that took its `map` over a closure off the per-call path
-# (NeuralNetworkParameters#13). Against 0.2.0 the `ShallowNet` and `ShallowNetReversible` budgets
-# fail on Julia 1.10 -- that is the downstream half of SymbolicNeuralNetworks#55, whose upstream
-# half is `SymbolicNeuralNetworks` 0.7.0. SNN 0.7 pins 0.2.1 itself, so today's resolution would
-# be right either way; this states the requirement rather than inheriting it. 0.2.2 moves the same
-# figure again and downwards, by writing the across-children walks out instead of recursing with
-# `Base.tail`; the budgets below are measured against it.
-NeuralNetworkParameters = "0.2.2"
+# 0.3.0 removes `ParameterSet`, the `Union{NetworkParameters, NamedTuple}` the rest of this
+# ecosystem dispatched on. The call sites here name only `NetworkParameters`, `params`, `flatten`,
+# `unflatten` and `unflatten!`, none of which changed, so this is not a bound about what loads.
+#
+# It is a bound about what `test/quality/inference_and_allocations.jl` measures. Those budgets were
+# set against 0.2.2, whose across-children walks are written out rather than recursed with
+# `Base.tail`; the un-batched `unflatten` on the symbolic `residual!` path is this package's
+# dependency directly. **They were re-measured against 0.3.0 and hold unchanged** -- 0.3.0 touches the
+# type a set is dispatched on, not the walk a set is flattened by.
+#
+# 0.3.0 also takes `GeometricBase` as a hard dependency, for `L2norm` over a parameter set, which is
+# why the bound above is 0.14.9 rather than 0.14.8.
+NeuralNetworkParameters = "0.3"
 QuadratureRules = "0.2"
 Random = "1"
-SimpleSolvers = "0.12.1, 0.13"
+# 0.13.2 and not "0.12.1, 0.13": `GeometricOptimizers` 0.7.0 requires it, so the lower halves of that
+# range are no longer reachable from here. 0.13.2 is also where `GradientAutodiff`, `GradientFunction`
+# and `alloc_h` for a parameter set live, as an extension on `NeuralNetworkParameters` -- they were
+# `GeometricOptimizers`' type piracy until 0.7.0. Nothing here calls them; this package hands the
+# solver a flat `Vector`.
+SimpleSolvers = "0.13.2"
 StaticArrays = "1"
 Statistics = "1"
-# 0.7.0 is the first release that permits the 0.2 container; 0.6.0 allows only 0.1. It also
-# carries the upstream half of SymbolicNeuralNetworks#55 -- see the `NeuralNetworkParameters`
-# bound above. 0.7.1 writes the batched half of that walk out as well, which this package does not
-# reach (`residual!` calls `DQDθ` on a length-one `Vector`) but which moves nothing here either way.
-SymbolicNeuralNetworks = "0.7"
+# 0.8.0 gives an equation set its own name back -- `EquationSet`, which 0.7 had folded into
+# `NeuralNetworkParameters.ParameterSet` -- and is the first release permitting the 0.3 container.
+# Nothing here names `EquationSet`: this package builds its symbolic functions through
+# `build_nn_function` on a network, so the shape it passes is the one `SymbolicNeuralNetwork` gives
+# it. The batched half of the SymbolicNeuralNetworks#55 walk is still not reached (`residual!` calls
+# `DQDθ` on a length-one `Vector`).
+SymbolicNeuralNetworks = "0.8"
 Symbolics = "7"
 julia = "1.11"

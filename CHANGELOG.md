@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-08-30
+
+The de-piracy wave, taken as a set of compat bounds. Nothing in this package's exported surface
+changes, and neither does any of its code.
+
+### Changed
+
+- **`NeuralNetworkParameters` 0.2.2 → 0.3, `AbstractNeuralNetworks` 0.7.1 → 0.8,
+  `SymbolicNeuralNetworks` 0.7 → 0.8, `GeometricOptimizers` 0.6 → 0.7, `SimpleSolvers`
+  "0.12.1, 0.13" → 0.13.2, `GeometricBase` 0.14.8 → 0.14.9.** One constraint again, not six.
+
+  `NeuralNetworkParameters` 0.3.0 removes `ParameterSet`, the `Union{NetworkParameters, NamedTuple}`
+  the rest of this ecosystem dispatched on, because a method written on it was a method on
+  `Base.NamedTuple`. Every other bound follows: 0.8.0, 0.8.0 and 0.7.0 are the first releases of the
+  three packages above that permit the 0.3 container, `GeometricOptimizers` 0.7.0 requires
+  `SimpleSolvers` 0.13.2, and 0.3.0 takes `GeometricBase` as a hard dependency at 0.14.9. Any one of
+  them alone is unsatisfiable.
+
+  **None of it reaches code here.** This package names only `NetworkParameters`, `params`, `flatten`,
+  `unflatten` and `unflatten!` from the container package, and none of those changed; it names neither
+  `ParameterSet` nor `EquationSet` nor `ArrayNamedTuple`. `GeometricOptimizers` 0.7.0 turning a bare
+  `NamedTuple` away at `Optimizer` costs nothing for the reason 0.4.2 already gave: the `ShallowNet`
+  initialisation flattens to a plain `Vector` before `Optimizer` sees it (`src/nvi/shallownet.jl`), so
+  no parameter set is ever handed over whole.
+
+- **The `residual!` budgets are re-measured, and two of the four rows moved — downwards.**
+
+  | | 0.4.2 | 0.4.3 |
+  |---|---|---|
+  | `ShallowNet` | 11 424 | 11 424 |
+  | `ShallowNetReversible` | 11 424 | 11 424 |
+  | `ShallowNetAutodiff` | 54 656 | **52 096** |
+  | `ShallowNetAutodiffReversible` | 54 656 | **52 096** |
+
+  Worth stating rather than quietly re-recording, and worth noting which way: 0.4.2 moved these same
+  two rows *up* by 3 072 bytes and left the symbolic pair alone. This release moves them back down by
+  2 560 and again leaves the symbolic pair alone — so the autodiff path, which reaches its derivatives
+  through `ForwardDiff` rather than a generated kernel, is the one that feels these releases, and the
+  generated one is not. The ceilings (17 000 and 78 000) hold with room, so none of them moves.
+
+## [0.4.2] - 2026-08-26
+
+Julia 1.11 becomes the floor and `GeometricOptimizers` moves to 0.6. Nothing in this package's
+exported surface changes.
+
+> [!NOTE]
+> This entry was written after the fact. 0.4.2 was released without one; its content is taken from
+> the commit that made the change and from the figures recorded there.
+
+### Changed
+
+- **`GeometricOptimizers` 0.5 → 0.6.** 0.6.0 takes a whole `NetworkParameters` through the optimizer
+  and is breaking: it deletes four `outer!`/`_mul!` methods, one `update!(::BFGSState, …)`, `add!` on
+  a parameter set, and two `l2norm` methods that moved upstream to `GeometricBase`. Nothing here hands
+  it a container, so the bump is a compat entry and no code.
+
+- **`NeuralNetworkParameters` 0.2.1 → 0.2.2**, which is what `SymbolicNeuralNetworks` 0.7.1 requires
+  anyway.
+
+- **Julia 1.11 is the floor**, in step with `NeuralNetworkParameters`, `SimpleSolvers`,
+  `GeometricOptimizers`, `AbstractNeuralNetworks`, `SymbolicNeuralNetworks` and
+  `GeometricMachineLearning`. `GeometricBase` deliberately stays on 1.10.
+
+- **The `residual!` budgets were re-measured on 1.11.9 rather than carried over**, and two of the four
+  rows moved: `ShallowNetAutodiff` and `ShallowNetAutodiffReversible` from 51 584 to 54 656, while
+  `ShallowNet` and `ShallowNetReversible` stayed at 11 424. The prediction had been the other way
+  round — `NeuralNetworkParameters` 0.2.2 took `SymbolicNeuralNetworks`' single-sample split from 768
+  bytes to 560, and the symbolic `residual!` here calls `DQDθ` on a length-one `Vector`, so that is
+  the path it takes — and it moved this figure by nothing.
+
 ## [0.4.1] - 2026-08-25
 
 Three compat bounds move together, and the two things the releases behind them bring make code
