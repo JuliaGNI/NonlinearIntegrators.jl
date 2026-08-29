@@ -12,24 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The de-piracy wave, taken as a set of compat bounds. Nothing in this package's exported surface
 changes, and neither does any of its code.
 
-### Fixed
-
-- **`test/unit/network_integrators_unit.jl` was a lottery, and it had been one all along.** Every
-  case there builds a network with random weights, and the OGA/Newton path on those weights is
-  ill-conditioned by nature — `Float32` `ShallowNet` under `OGA1dStable` sits close enough to a
-  singular Gram matrix that whether it *is* singular depends on which weights were drawn. Nothing
-  seeded them: the only `Random.seed!` in the suite is in `dispatch_variants_unit.jl`, which
-  `runtests.jl` includes *after* this file, so the draw depended on how many times `rand` had been
-  called by whatever ran earlier — which differs by platform and by Julia version.
-
-  It surfaced here because this release moved dependency versions, but it is not caused by them.
-  Run against `main`'s **unchanged** bounds on the same runners on the same day, the same test fails
-  the same way with `SingularException(13)`: 5 of 13 jobs there, 8 of 13 here, with identical
-  resolved versions of everything either branch touches, while 24 consecutive local runs on macOS ARM
-  passed under both. `main` being green on 2026-08-26 was a draw, not a state.
-
-  The file seeds itself now, before the cross product and independently of the include order.
-
 ### Changed
 
 - **`NeuralNetworkParameters` 0.2.2 → 0.3, `AbstractNeuralNetworks` 0.7.1 → 0.8,

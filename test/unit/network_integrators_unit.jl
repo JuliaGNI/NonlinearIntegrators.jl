@@ -11,27 +11,7 @@
 # The `Float16` OGA dictionary regression below is *not* part of the cross-product and keeps
 # its own testset.
 
-# ---- determinism -------------------------------------------------------------
-#
-# Every case below builds a network with random weights, and the OGA/Newton path on those weights is
-# ill-conditioned by nature: `Float32` `ShallowNet` under `OGA1dStable` sits close enough to a
-# singular Gram matrix that whether it *is* singular depends on which weights were drawn.
-#
-# Without this line the draw depends on how many times `rand` was called by whatever ran earlier in
-# `runtests.jl`, which differs by platform and by Julia version -- so the suite was a lottery whose
-# odds changed whenever an unrelated dependency moved. That is what it looked like: `SingularException(13)`
-# on 8 of 13 CI jobs on one branch and 5 of 13 on another with *identical* dependency versions, while
-# 24 consecutive local runs on macOS ARM passed. `main` being green on 2026-08-26 was a draw, not a
-# state.
-#
-# Seeded here rather than in `testsetup.jl` so that this file's draws do not depend on the include
-# order in `runtests.jl`. `dispatch_variants_unit.jl` already does the same for its reference check,
-# and for the same reason.
-Random.seed!(0xC0FFEE)
-
 # ---- accuracy guards: default seed, ten steps, analytic reference ------------
-#
-# "seed" here is the `initial_guess_method`, not an RNG seed -- see `NETWORK_INTEGRATORS`.
 for row in NETWORK_INTEGRATORS, T in TEST_TYPES
     row.tol === nothing && continue
     accuracy_guard(row.name, row.make, T; tol = getfield(row.tol, Symbol(T)),
