@@ -23,47 +23,21 @@ SymbolicNeuralNetworks = "aed23131-dcd0-47ca-8090-d21e605652e3"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
-# 0.7.1 and not 0.7. 0.7.0 pins `NeuralNetworkParameters = "0.1"`, so it cannot coexist with the
-# 0.2 container this package requires below -- a bound of "0.7" admits a version that is never
-# satisfiable here. The resolver works that out on its own, but a bound is a statement about what
-# this package supports, and this one would be making a false one. `SymbolicNeuralNetworks` 0.7
-# names 0.7.1 for the same reason.
 AbstractNeuralNetworks = "0.7.1"
 CompactBasisFunctions = "0.3"
 ForwardDiff = "1"
 GeometricBase = "0.14.8"
 GeometricEquations = "0.21"
 GeometricIntegratorsBase = "0.6.3"
-# 0.5.0 drops the `ParameterHandling` shim and lets `NeuralNetworkParameters` do the flattening,
-# which makes the 0.2 container a requirement rather than a choice: 0.4 and earlier want the 0.1
-# container. This bound and the two below therefore move together or none of them resolves. 0.6.0
-# takes a whole `NetworkParameters` through the optimizer; nothing here hands it one -- the
-# `ShallowNet` initialisation flattens to a plain `Vector` before `Optimizer` sees it
-# (`src/nvi/shallownet.jl`) -- so the bump is a compat entry and no code.
 GeometricOptimizers = "0.6"
 GeometricSolutions = "0.6"
 LinearAlgebra = "1"
-# 0.2.1 and not 0.2. The call sites here name only `NetworkParameters`, `params`, `flatten`,
-# `unflatten` and `unflatten!`, all of which 0.2.0 has, so this is not a bound about what loads.
-# It is a bound about what `test/quality/inference_and_allocations.jl` measures: the un-batched
-# `unflatten` on the symbolic `residual!` path is this package's dependency directly, and 0.2.1 is
-# the release that took its `map` over a closure off the per-call path
-# (NeuralNetworkParameters#13). Against 0.2.0 the `ShallowNet` and `ShallowNetReversible` budgets
-# fail on Julia 1.10 -- that is the downstream half of SymbolicNeuralNetworks#55, whose upstream
-# half is `SymbolicNeuralNetworks` 0.7.0. SNN 0.7 pins 0.2.1 itself, so today's resolution would
-# be right either way; this states the requirement rather than inheriting it. 0.2.2 moves the same
-# figure again and downwards, by writing the across-children walks out instead of recursing with
-# `Base.tail`; the budgets below are measured against it.
-NeuralNetworkParameters = "0.2.2"
+NeuralNetworkParameters = "0.2.2, 0.3"
 QuadratureRules = "0.2"
 Random = "1"
 SimpleSolvers = "0.12.1, 0.13"
 StaticArrays = "1"
 Statistics = "1"
-# 0.7.0 is the first release that permits the 0.2 container; 0.6.0 allows only 0.1. It also
-# carries the upstream half of SymbolicNeuralNetworks#55 -- see the `NeuralNetworkParameters`
-# bound above. 0.7.1 writes the batched half of that walk out as well, which this package does not
-# reach (`residual!` calls `DQDθ` on a length-one `Vector`) but which moves nothing here either way.
 SymbolicNeuralNetworks = "0.7"
 Symbolics = "7"
 julia = "1.11"
