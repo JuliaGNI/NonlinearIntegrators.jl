@@ -1,57 +1,61 @@
+# Canonical documentation workflow. Copied verbatim into every repository that has a tracked
+# docs/make.jl, by install-workflows.sh — edit this file and re-run the installer, never a copy in a
+# repository.
+#
+# The file name is Documenter.yml everywhere. Three repositories called it Documentation.yml and one
+# Documentation.yaml; nothing depends on the file name, but a tree in which the same workflow has
+# three names cannot be checked for drift.
+#
+# DOCTESTS ARE NOT HERE. They run in CI.yml, in a job pinned to one OS and one Julia version, so
+# that they produce a required status check of their own. Before that, five repositories listed
+# `:doctest` in `warnonly` and one had `doctest = false`, which meant a doctest failure was a
+# warning inside a docs build that nothing gated.
+#
+# Two repositories legitimately keep their own version of this file, because their docs are a
+# multi-job pipeline rather than a single build and so are not scaffolding drift:
+# Experiments/GeometricExamples (Weave matrix) and Experiments/SolverBenchmark (sweep matrix).
+
 name: Documentation
 
 on:
-  push:
-    branches:
-      - main
-    tags: ['*']
-  pull_request:
+    push:
+        branches:
+            - main
+            - master
+        tags: ["*"]
+    pull_request:
+    workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
-# Temporary: go straight to the General registry instead of through a package server.
-#
-# `AbstractNeuralNetworks` 0.7.0 was registered at 04:00 UTC on 2026-08-23, `SymbolicNeuralNetworks`
-# 0.6.0 at 16:11, and the package servers were still serving a registry that stopped at ANN 0.6.4
-# and SNN 0.5.0 a day later — so every job here died in `Pkg.resolve` ("possible versions are:
-# 0.1.0 - 0.6.4 ... restricted to versions 0.7 by NonlinearIntegrators") before running a single
-# test. An empty `JULIA_PKG_SERVER` makes Pkg clone the registry over git and fetch packages from
-# their own repositories, which resolves the same environment that resolves locally.
-#
-# The cost is speed: no CDN and no registry tarball. Remove this once the package servers have
-# caught up, and check that rather than assuming it: a server's `/meta` reports a
-# `last_registry_update` that is a heartbeat, not the content date, so compare the registry it
-# actually serves against General.
-#
-#   curl -sSL https://pkg.julialang.org/registries
-#   curl -sSL -o reg.tar.gz https://pkg.julialang.org/registry/<uuid>/<hash> \
-#     && tar xzf reg.tar.gz && tail -3 A/AbstractNeuralNetworks/Versions.toml
-#
-# Same block in `CI.yml`; `SymbolicNeuralNetworks` carries it too.
-env:
-  JULIA_PKG_SERVER: ""
 jobs:
-  docs:
-    name: Build and deploy documentation
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: read
-      statuses: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: julia-actions/setup-julia@v3
-        with:
-          version: '1'
-      - uses: julia-actions/cache@v3
-      - name: Install documentation dependencies
-        run: julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-      - name: Install benchmark dependencies
-        run: julia --project=benchmark -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-      - name: Build and deploy
+    build:
+        name: Documentation
+        runs-on: ubuntu-latest
+        timeout-minutes: 90
+        permissions:
+            actions: write
+            contents: write
+            statuses: write
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-        run: julia --project=docs docs/make.jl
+            # GR needs a headless backend on the runner. Harmless where the docs use CairoMakie.
+            GKSwstype: "100"
+        steps:
+            - uses: actions/checkout@v7
+            - uses: julia-actions/setup-julia@v3
+              with:
+                  version: "1"
+            - uses: julia-actions/cache@v3
+            - name: Instantiate the documentation environment
+              run: |
+                  julia --project=docs -e '
+                    using Pkg
+                    Pkg.develop(PackageSpec(path = pwd()))
+                    Pkg.instantiate()'
+            - uses: julia-actions/julia-buildpkg@v1
+            - uses: julia-actions/julia-docdeploy@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
