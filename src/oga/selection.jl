@@ -93,8 +93,8 @@ Fill `score` with the selection score of every dictionary atom.
 Returns `score`. Unusable atoms are set to `-one(T)`.
 """
 function oga_scores!(score::AbstractVector{T}, ::RawProjection, Ψ::AbstractMatrix{T},
-                     rownorms::AbstractVector{T}, nfloor::T, r̂::AbstractVector{T},
-                     ::IncrementalQRState{T}, ::AbstractMatrix{T}) where {T}
+        rownorms::AbstractVector{T}, nfloor::T, r̂::AbstractVector{T},
+        ::IncrementalQRState{T}, ::AbstractMatrix{T}) where {T}
     mul!(score, Ψ, r̂)
     @inbounds for i in eachindex(score)
         s = abs(score[i])
@@ -103,9 +103,10 @@ function oga_scores!(score::AbstractVector{T}, ::RawProjection, Ψ::AbstractMatr
     return score
 end
 
-function oga_scores!(score::AbstractVector{T}, ::NormalizedProjection, Ψ::AbstractMatrix{T},
-                     rownorms::AbstractVector{T}, nfloor::T, r̂::AbstractVector{T},
-                     ::IncrementalQRState{T}, ::AbstractMatrix{T}) where {T}
+function oga_scores!(
+        score::AbstractVector{T}, ::NormalizedProjection, Ψ::AbstractMatrix{T},
+        rownorms::AbstractVector{T}, nfloor::T, r̂::AbstractVector{T},
+        ::IncrementalQRState{T}, ::AbstractMatrix{T}) where {T}
     mul!(score, Ψ, r̂)
     @inbounds for i in eachindex(score)
         n = rownorms[i]
@@ -115,9 +116,10 @@ function oga_scores!(score::AbstractVector{T}, ::NormalizedProjection, Ψ::Abstr
     return score
 end
 
-function oga_scores!(score::AbstractVector{T}, rule::OrthogonalProjection, Ψ::AbstractMatrix{T},
-                     rownorms::AbstractVector{T}, nfloor::T, r̂::AbstractVector{T},
-                     qr::IncrementalQRState{T}, proj::AbstractMatrix{T}) where {T}
+function oga_scores!(
+        score::AbstractVector{T}, rule::OrthogonalProjection, Ψ::AbstractMatrix{T},
+        rownorms::AbstractVector{T}, nfloor::T, r̂::AbstractVector{T},
+        qr::IncrementalQRState{T}, proj::AbstractMatrix{T}) where {T}
     mul!(score, Ψ, r̂)
     k = qr.k
     gainfloor = _min_gain(rule.min_gain, T)

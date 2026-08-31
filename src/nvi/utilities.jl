@@ -6,7 +6,7 @@ integrator caches to hold the stage values `Q`, `P`, `V` and `F`.
 """
 create_internal_stage_vector(DT, D, S) = [zeros(DT, D) for _ in 1:S]
 
-function simpson_quadrature(N::Int, ::Type{T}=Float64) where {T}
+function simpson_quadrature(N::Int, ::Type{T} = Float64) where {T}
     if N % 2 != 0
         error("N must be even for Simpson's rule.")
     end
@@ -25,7 +25,7 @@ function simpson_quadrature(N::Int, ::Type{T}=Float64) where {T}
             w[i] = 2 * h / 3 # Odd-indexed weights
         end
     end
-    
+
     return w
 end
 
@@ -48,7 +48,7 @@ what has to be avoided here: the four call sites in `DenseNet`'s `components!` f
 A `@generated` walk needs no layout at all. The training loops, which flatten one long-lived
 parameter set, do use the upstream pair — see `initial_params!` in `shallownet.jl`.
 """
-@generated function _param_arrays(params::NamedTuple{LN,LT}) where {LN,LT}
+@generated function _param_arrays(params::NamedTuple{LN, LT}) where {LN, LT}
     entries = Expr[]
     for (i, lname) in enumerate(LN)
         for f in fieldnames(LT.parameters[i])
@@ -58,8 +58,9 @@ parameter set, do use the upstream pair — see `initial_params!` in `shallownet
     Expr(:tuple, entries...)
 end
 
-_param_arrays(params::NetworkParameters) =
+function _param_arrays(params::NetworkParameters)
     _param_arrays(NeuralNetworkParameters.params(params))
+end
 
 """
     flatten_params!(dest, params) -> dest
@@ -92,7 +93,6 @@ the element type generic, where the old splatted `vcat` over a `Vector{Any}` inf
 """
 flatten_params(params) = reduce(vcat, _param_arrays(params))
 
-
 """
     box_init_plain(input_dim, output_dim, ::Type{T}; rng = Random.default_rng())
 
@@ -110,7 +110,7 @@ reseeded Julia's global RNG and then drew from it, so consecutive calls returned
 draws and any seeding the caller had done was discarded. Seed at the call site instead.
 """
 function box_init_plain(input_dim::Int, output_dim::Int, ::Type{T};
-                        rng::Random.AbstractRNG = Random.default_rng()) where {T}
+        rng::Random.AbstractRNG = Random.default_rng()) where {T}
     W = zeros(T, output_dim, input_dim)
     b = zeros(T, output_dim)
 
@@ -126,9 +126,9 @@ function box_init_plain(input_dim::Int, output_dim::Int, ::Type{T};
     return W, b
 end
 
-function lsgd_loss(network_inputs,labels,NN,ps)
+function lsgd_loss(network_inputs, labels, NN, ps)
     NN_output = NN(network_inputs, ps)
-    return sqrt(mean((labels .- NN_output).^2))
+    return sqrt(mean((labels .- NN_output) .^ 2))
 end
 
 """
@@ -154,7 +154,7 @@ end
 # Least-specific fallback: `NetworkIntegratorCore.jl` covers the three supported
 # extrapolations for every NetworkIntegratorMethod, and several integrators override those.
 # Anything else lands here and gets a readable message rather than a MethodError.
-function initial_trajectory!(sol, history, params, ::GeometricIntegrator, initial_trajectory::Extrapolation)
+function initial_trajectory!(
+        sol, history, params, ::GeometricIntegrator, initial_trajectory::Extrapolation)
     error("For extrapolation $(initial_trajectory) method is not implemented!")
 end
-

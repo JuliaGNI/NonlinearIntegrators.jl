@@ -67,7 +67,7 @@ gauss(::Type{T}, R = 8) where {T} = QuadratureRules.GaussLegendreQuadrature(T, R
 #
 # Anything that varies the *construction* (`symbolic = false`, `cse`/`inplace`) is part of the
 # key, so `dispatch_variants_unit.jl` and `bases_smoke.jl` still get their own objects.
-const _BASIS_CACHE = Dict{Any,Any}()
+const _BASIS_CACHE = Dict{Any, Any}()
 
 function cached_shallownet_basis(::Type{T}; S = 4, k = 3, kwargs...) where {T}
     key = (:shallow, T, S, k, NamedTuple(kwargs))
@@ -85,7 +85,9 @@ end
 
 # The plain names route through the memoised builders above. Only `bases_smoke.jl`, which tests
 # *construction*, calls the concrete constructors directly and gets fresh objects.
-build_shallownet_basis(::Type{T}; kwargs...) where {T} = cached_shallownet_basis(T; kwargs...)
+function build_shallownet_basis(::Type{T}; kwargs...) where {T}
+    cached_shallownet_basis(T; kwargs...)
+end
 build_densenet_basis(::Type{T}; kwargs...) where {T} = cached_densenet_basis(T; kwargs...)
 
 # A smooth target on the unit interval and the Simpson weights the integrators use — the
@@ -135,7 +137,7 @@ assert_no_upcast(q, ::Type{T}) where {T} = @test eltype(q[end]) == T
 # rather than a new class. `TEST_TYPES` stops at `Float32`, where these problems are well
 # conditioned on every platform, so every other integration calls `integrate` directly and a
 # give-up is a real failure.
-const SOLVER_GAVE_UP = Union{SingularException,NonlinearSolverException}
+const SOLVER_GAVE_UP = Union{SingularException, NonlinearSolverException}
 
 # `initial_trajectory_method` selects which `initial_trajectory!` method runs; `iguess` is the
 # extrapolation `GeometricIntegratorsBase.solutionstep!` actually applies, and its default
@@ -143,7 +145,9 @@ const SOLVER_GAVE_UP = Union{SingularException,NonlinearSolverException}
 # `initial_trajectory_method = HermiteExtrapolation()` takes the Hermite code path but
 # extrapolates nothing. Passing both is what `benchmark/shallownet_benchmark_common.jl` does, and it is
 # what makes these rows measure something.
-hermite_kw(extrap) = extrap isa HermiteExtrapolation ? (; initialguess = HermiteExtrapolation()) : (;)
+function hermite_kw(extrap)
+    extrap isa HermiteExtrapolation ? (; initialguess = HermiteExtrapolation()) : (;)
+end
 
 # Newton iteration cap for the unit tests. Measured on the ShallowNetAutodiff accuracy guard: the solve
 # converges in 88 iterations, but with a 10000 cap some *earlier* step burns the whole budget,
@@ -160,9 +164,9 @@ const MAX_NEWTON_ITERATIONS = 100
 # The three extrapolation variants every network integrator is driven over. This literal used
 # to be repeated, identically, in five separate unit files.
 const EXTRAPOLATIONS = [
-    (NoExtrapolation(),          "NoExtrapolation"),
-    (IntegratorExtrapolation(),  "IntegratorExtrapolation"),
-    (HermiteExtrapolation(),     "HermiteExtrapolation"),
+    (NoExtrapolation(), "NoExtrapolation"),
+    (IntegratorExtrapolation(), "IntegratorExtrapolation"),
+    (HermiteExtrapolation(), "HermiteExtrapolation")
 ]
 
 # ---- the integrator table ---------------------------------------------------
@@ -183,47 +187,47 @@ const EXTRAPOLATIONS = [
 #            are not stable enough for one, so its rows assert dispatch and finiteness only
 #            (this is deliberate — see the note in runtests.jl).
 
-shallow_kw(::Type{T}) where {T} = (; show_status = false, bias_interval = [-T(pi), T(pi)],
-                                     dict_amount = 400)
+function shallow_kw(::Type{T}) where {T}
+    (; show_status = false, bias_interval = [-T(pi), T(pi)],
+        dict_amount = 400)
+end
 
 const NETWORK_INTEGRATORS = [
-    (name  = "ShallowNet",
-     make  = (T; kw...) -> ShallowNet(cached_shallownet_basis(T; S = 4), gauss(T, 8);
-                                      shallow_kw(T)..., kw...),
-     seeds = [(OGA1d(),                "OGA1d"),
-              (OGA1dNormalized(),      "OGA1dNormalized"),
-              (OGA1dStable(),          "OGA1dStable"),
-              (OGA1dNormalEquations(), "OGA1dNormalEquations")],
-     tol   = (Float64 = 1e-8, Float32 = 1e-3)),
-
-    (name  = "ShallowNetReversible",
-     make  = (T; kw...) -> ShallowNetReversible(cached_shallownet_basis(T; S = 4), gauss(T, 8);
-                                                shallow_kw(T)..., kw...),
-     seeds = [(OGA1d(), "OGA1d")],
-     tol   = (Float64 = 1e-8, Float32 = 1e-3)),
+    (name = "ShallowNet",
+        make = (T; kw...) -> ShallowNet(cached_shallownet_basis(T; S = 4), gauss(T, 8);
+            shallow_kw(T)..., kw...),
+        seeds = [(OGA1d(), "OGA1d"),
+            (OGA1dNormalized(), "OGA1dNormalized"),
+            (OGA1dStable(), "OGA1dStable"),
+            (OGA1dNormalEquations(), "OGA1dNormalEquations")],
+        tol = (Float64 = 1e-8, Float32 = 1e-3)),
+    (name = "ShallowNetReversible",
+        make = (T; kw...) -> ShallowNetReversible(
+            cached_shallownet_basis(T; S = 4), gauss(T, 8);
+            shallow_kw(T)..., kw...),
+        seeds = [(OGA1d(), "OGA1d")],
+        tol = (Float64 = 1e-8, Float32 = 1e-3)),
 
     # `symbolic = false`: the autodiff integrators differentiate their own ansatz with
     # ForwardDiff and never read the compiled derivative slots, so building them is wasted
     # work. This also keeps the cached basis distinct from the symbolic one above.
-    (name  = "ShallowNetAutodiff",
-     make  = (T; kw...) -> ShallowNetAutodiff(
-                 cached_shallownet_basis(T; S = 4, symbolic = false), gauss(T, 8);
-                 shallow_kw(T)..., kw...),
-     seeds = [(OGA1dNormalized(), "OGA1dNormalized")],
-     tol   = (Float64 = 1e-4, Float32 = 1e-3)),
-
-    (name  = "ShallowNetAutodiffReversible",
-     make  = (T; kw...) -> ShallowNetAutodiffReversible(
-                 cached_shallownet_basis(T; S = 4, symbolic = false), gauss(T, 8);
-                 shallow_kw(T)..., kw...),
-     seeds = [(OGA1d(), "OGA1d")],
-     tol   = (Float64 = 1e-4, Float32 = 1e-3)),
-
-    (name  = "DenseNet",
-     make  = (T; kw...) -> DenseNet(cached_densenet_basis(T; S₁ = 3, S = 3), gauss(T, 8);
-                                    show_status = false, training_epochs = 3, kw...),
-     seeds = [(TrainingMethod(), "TrainingMethod"), (LSGD(), "LSGD")],
-     tol   = nothing),
+    (name = "ShallowNetAutodiff",
+        make = (T; kw...) -> ShallowNetAutodiff(
+            cached_shallownet_basis(T; S = 4, symbolic = false), gauss(T, 8);
+            shallow_kw(T)..., kw...),
+        seeds = [(OGA1dNormalized(), "OGA1dNormalized")],
+        tol = (Float64 = 1e-4, Float32 = 1e-3)),
+    (name = "ShallowNetAutodiffReversible",
+        make = (T; kw...) -> ShallowNetAutodiffReversible(
+            cached_shallownet_basis(T; S = 4, symbolic = false), gauss(T, 8);
+            shallow_kw(T)..., kw...),
+        seeds = [(OGA1d(), "OGA1d")],
+        tol = (Float64 = 1e-4, Float32 = 1e-3)),
+    (name = "DenseNet",
+        make = (T; kw...) -> DenseNet(cached_densenet_basis(T; S₁ = 3, S = 3), gauss(T, 8);
+            show_status = false, training_epochs = 3, kw...),
+        seeds = [(TrainingMethod(), "TrainingMethod"), (LSGD(), "LSGD")],
+        tol = nothing)
 ]
 
 # The endpoint of a run must be finite *and* still at the working element type. Spelled out
@@ -276,4 +280,3 @@ function dispatch_case(name, make, ::Type{T}, extrap; kwargs...) where {T}
         hermite_kw(extrap)...)
     assert_finite_endpoint(sol, T)
 end
-

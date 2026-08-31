@@ -161,18 +161,18 @@ symmetries. An odd count is an `ArgumentError` rather than a silently short fit;
 Runs entirely at `T = eltype(nodes)`.
 """
 function oga_fit(oga::OGA, σ, nodes::AbstractVector{T}, w::AbstractVector{T},
-                 y::AbstractVector{T}, nneurons::Int;
-                 bias_interval, dict_amount::Integer,
-                 modulation::Union{Nothing,AbstractVector{T}} = nothing,
-                 symmetry::OGASymmetry = NoSymmetry()) where {T}
+        y::AbstractVector{T}, nneurons::Int;
+        bias_interval, dict_amount::Integer,
+        modulation::Union{Nothing, AbstractVector{T}} = nothing,
+        symmetry::OGASymmetry = NoSymmetry()) where {T}
     oga_check_precision(σ, T)
     M = length(nodes)
     @assert length(w) == M && length(y) == M
     oga_check_neuron_count(nneurons, symmetry)
 
     mod = modulation === nothing ? ones(T, M) : modulation
-    sw  = sqrt.(w)                      # quadrature weights are positive ⇒ real sqrt
-    ŷ   = sw .* y
+    sw = sqrt.(w)                      # quadrature weights are positive ⇒ real sqrt
+    ŷ = sw .* y
 
     A = oga_atoms(oga.dictionary, bias_interval, dict_amount, T)
     natoms = size(A, 1)
@@ -211,7 +211,7 @@ function oga_fit(oga::OGA, σ, nodes::AbstractVector{T}, w::AbstractVector{T},
     # subnormal range, `ldexp(one(Float16), 20)` already overflows, and scaling by `Inf`
     # would destroy the dictionary rather than condition it. Fall back to no scaling.
     scale = (finite_max > zero(T) && isfinite(finite_max)) ?
-        ldexp(one(T), -exponent(finite_max)) : one(T)
+            ldexp(one(T), -exponent(finite_max)) : one(T)
     (isfinite(scale) && scale > zero(T)) || (scale = one(T))
     if scale != one(T)
         Ψ .*= scale
@@ -233,19 +233,19 @@ function oga_fit(oga::OGA, σ, nodes::AbstractVector{T}, w::AbstractVector{T},
     nfloor = oga.norm_guard ? oga_norm_floor(T, finite_max) : zero(T)
     coherence_cap = one(T) - sqrt(eps(T))
 
-    nsteps  = nneurons ÷ neurons_per_atom(symmetry)
-    percol  = columns_per_atom(symmetry)
+    nsteps = nneurons ÷ neurons_per_atom(symmetry)
+    percol = columns_per_atom(symmetry)
     maxcols = nsteps * percol
 
-    qr   = IncrementalQRState{T}(M, maxcols)
+    qr = IncrementalQRState{T}(M, maxcols)
     Âsel = zeros(T, M, maxcols)
-    r̂    = copy(ŷ)
-    score   = Vector{T}(undef, natoms)
+    r̂ = copy(ŷ)
+    score = Vector{T}(undef, natoms)
     blocked = falses(natoms)
     # `Ψ Q` scratch, only needed by `OrthogonalProjection`; the other rules ignore it, so
     # they get a zero-column matrix instead of a dictionary-sized allocation.
     proj = oga.selection isa OrthogonalProjection ? Matrix{T}(undef, natoms, maxcols) :
-                                                    Matrix{T}(undef, natoms, 0)
+           Matrix{T}(undef, natoms, 0)
 
     W = zeros(T, nneurons)
     B = zeros(T, nneurons)
@@ -258,7 +258,7 @@ function oga_fit(oga::OGA, σ, nodes::AbstractVector{T}, w::AbstractVector{T},
     # reject a candidate only when it contributes exactly nothing, leaving the atom
     # sequences they produce on well-conditioned problems untouched.
     gainfloor = oga.selection isa OrthogonalProjection ?
-        _min_gain(oga.selection.min_gain, T) : zero(T)
+                _min_gain(oga.selection.min_gain, T) : zero(T)
 
     step = 0
     rejected = 0
@@ -279,10 +279,10 @@ function oga_fit(oga::OGA, σ, nodes::AbstractVector{T}, w::AbstractVector{T},
 
         wa, ba = A[best, 1], A[best, 2]
         wa, ba = oga_refine(oga.dictionary,
-                            (ww, bb) -> _candidate_score(oga.selection, σ, ww, bb, nodes,
-                                                         mod, sw, symmetry, r̂, qr, gcand,
-                                                         nfloor, gainfloor),
-                            wa, ba)
+            (ww, bb) -> _candidate_score(oga.selection, σ, ww, bb, nodes,
+                mod, sw, symmetry, r̂, qr, gcand,
+                nfloor, gainfloor),
+            wa, ba)
 
         # Tentatively append this atom's columns; roll the factorisation back if any of
         # them adds no new direction.
@@ -293,7 +293,7 @@ function oga_fit(oga::OGA, σ, nodes::AbstractVector{T}, w::AbstractVector{T},
             _fit_column!(g, σ, wa, ba, nodes, mod, sw, symmetry, col)
             ρ = oga_qr_append!(qr, g; min_gain = gainfloor)
             if qr.k == k0 + col
-                Âsel[:, ncols+col] .= g
+                Âsel[:, ncols + col] .= g
                 gain = col == 1 ? ρ : min(gain, ρ)
             else
                 ok = false
@@ -341,8 +341,8 @@ end
 # The `√w`-scaled row used for *scoring* a candidate atom. For the shared-pair symmetry
 # this is the summed pair, because that is also the column the fit sees.
 function _score_column!(g::AbstractVector{T}, σ, w::T, b::T, nodes::AbstractVector{T},
-                        mod::AbstractVector{T}, sw::AbstractVector{T},
-                        sym::OGASymmetry) where {T}
+        mod::AbstractVector{T}, sw::AbstractVector{T},
+        sym::OGASymmetry) where {T}
     if sym isa SharedMirrorPairs
         wm, bm = _mirror(w, b)
         @inbounds for j in eachindex(nodes)
@@ -360,8 +360,8 @@ end
 # The `√w`-scaled column number `col` contributed by an accepted atom. Only
 # `MirrorPairs` has a second column, the mirrored neuron with its own output weight.
 function _fit_column!(g::AbstractVector{T}, σ, w::T, b::T, nodes::AbstractVector{T},
-                      mod::AbstractVector{T}, sw::AbstractVector{T},
-                      sym::OGASymmetry, col::Int) where {T}
+        mod::AbstractVector{T}, sw::AbstractVector{T},
+        sym::OGASymmetry, col::Int) where {T}
     if sym isa MirrorPairs && col == 2
         wm, bm = _mirror(w, b)
         @inbounds for j in eachindex(nodes)
@@ -373,28 +373,28 @@ function _fit_column!(g::AbstractVector{T}, σ, w::T, b::T, nodes::AbstractVecto
 end
 
 function _place_neurons!(W::AbstractVector{T}, B::AbstractVector{T}, step::Int,
-                         w::T, b::T, sym::OGASymmetry) where {T}
+        w::T, b::T, sym::OGASymmetry) where {T}
     if sym isa NoSymmetry
         W[step] = w
         B[step] = b
     else
         wm, bm = _mirror(w, b)
-        W[2step-1] = w
-        B[2step-1] = b
-        W[2step]   = wm
-        B[2step]   = bm
+        W[2step - 1] = w
+        B[2step - 1] = b
+        W[2step] = wm
+        B[2step] = bm
     end
     return nothing
 end
 
 function _place_coefficients!(c::AbstractVector{T}, x::AbstractVector{T}, step::Int,
-                              sym::OGASymmetry) where {T}
+        sym::OGASymmetry) where {T}
     if sym isa SharedMirrorPairs
         # One coefficient per atom, copied to both members of the pair — the constraint
         # that makes the ansatz time-reversible.
         for j in 1:step
-            c[2j-1] = x[j]
-            c[2j]   = x[j]
+            c[2j - 1] = x[j]
+            c[2j] = x[j]
         end
     else
         for i in eachindex(x)
@@ -411,8 +411,8 @@ end
 # from a normalised copy of the dictionary, which saves a second dictionary-sized array.
 # `score` is reused as scratch — it is recomputed from scratch next iteration.
 function _block_coherent!(blocked::BitVector, Ψ::AbstractMatrix{T},
-                          rownorms::AbstractVector{T}, best::Int, cap::T,
-                          scratch::AbstractVector{T}) where {T}
+        rownorms::AbstractVector{T}, best::Int, cap::T,
+        scratch::AbstractVector{T}) where {T}
     nb = rownorms[best]
     (nb == zero(T) || !isfinite(nb)) && return nothing
     mul!(scratch, Ψ, view(Ψ, best, :))
@@ -429,8 +429,8 @@ end
 # a rank-deficient seed into a rank-deficient Newton Jacobian — the failure moves rather
 # than goes away.
 function _fill_unused!(W::AbstractVector{T}, B::AbstractVector{T}, A::AbstractMatrix{T},
-                       blocked::BitVector, nplaced::Int, nneurons::Int,
-                       sym::OGASymmetry) where {T}
+        blocked::BitVector, nplaced::Int, nneurons::Int,
+        sym::OGASymmetry) where {T}
     natoms = size(A, 1)
     candidates = findall(!, blocked)
     isempty(candidates) && (candidates = collect(1:natoms))
@@ -443,7 +443,8 @@ function _fill_unused!(W::AbstractVector{T}, B::AbstractVector{T}, A::AbstractMa
 
     for f in 1:nfill
         idx = candidates[min(length(candidates), 1 + (f - 1) * stride)]
-        _place_neurons!(W, B, nplaced ÷ neurons_per_atom(sym) + f, A[idx, 1], A[idx, 2], sym)
+        _place_neurons!(
+            W, B, nplaced ÷ neurons_per_atom(sym) + f, A[idx, 1], A[idx, 2], sym)
     end
     return nothing
 end
@@ -453,10 +454,10 @@ end
 # Score a single candidate atom `(w, b)` that is not in the dictionary, using the same
 # criterion as the selection rule so the polish optimises what the greedy step ranks.
 function _candidate_score(rule::OGASelection, σ, w::T, b::T, nodes::AbstractVector{T},
-                          mod::AbstractVector{T}, sw::AbstractVector{T},
-                          sym::OGASymmetry, r̂::AbstractVector{T},
-                          qr::IncrementalQRState{T}, g::AbstractVector{T},
-                          nfloor::T, gainfloor::T) where {T}
+        mod::AbstractVector{T}, sw::AbstractVector{T},
+        sym::OGASymmetry, r̂::AbstractVector{T},
+        qr::IncrementalQRState{T}, g::AbstractVector{T},
+        nfloor::T, gainfloor::T) where {T}
     _score_column!(g, σ, w, b, nodes, mod, sw, sym)
     n = sqrt(sum(abs2, g))
     p = abs(dot(g, r̂))

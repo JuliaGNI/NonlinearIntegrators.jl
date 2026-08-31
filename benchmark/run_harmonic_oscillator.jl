@@ -10,10 +10,11 @@ using GeometricProblems.HarmonicOscillator
 
 const NAME = "harmonic_oscillator"
 
-build_prob(::Type{T}, timespan, timestep) where {T} =
+function build_prob(::Type{T}, timespan, timestep) where {T}
     HarmonicOscillator.lodeproblem([T(0.5)], [T(0.0)];
         timespan = timespan, timestep = timestep,
         parameters = HarmonicOscillator.default_parameters(T))
+end
 
 ham(t, q, p, params) = HarmonicOscillator.hamiltonian(t, q, p, params)
 
@@ -27,7 +28,7 @@ let mode = pick_mode()
     # cap without getting there.
     over = mode == "quick" ? (; Ss = [10]) : (;)
     csv = run_sweep(; problem_name = NAME, build_prob = build_prob,
-                    hamiltonian = ham, mode = mode, over...)
+        hamiltonian = ham, mode = mode, over...)
     write_report(read_results(csv);
         title = "Shallow-net benchmark — Harmonic Oscillator ($(mode))",
         mode = mode, outdir = RESULTS_DIR, prefix = "$(NAME)_$(mode)")

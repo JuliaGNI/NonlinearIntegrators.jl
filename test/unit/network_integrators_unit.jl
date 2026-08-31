@@ -13,9 +13,10 @@
 
 # ---- accuracy guards: default seed, ten steps, analytic reference ------------
 for row in NETWORK_INTEGRATORS, T in TEST_TYPES
+
     row.tol === nothing && continue
     accuracy_guard(row.name, row.make, T; tol = getfield(row.tol, Symbol(T)),
-                   initial_guess_method = first(first(row.seeds)))
+        initial_guess_method = first(first(row.seeds)))
 end
 
 # ---- cross product: seeds × extrapolations, two steps, finiteness only -------
@@ -28,7 +29,6 @@ for row in NETWORK_INTEGRATORS,
     T in TEST_TYPES,
     (seed, seed_name) in row.seeds,
     (extrap, extrap_name) in EXTRAPOLATIONS
-
     @testset "$(row.name) $seed_name × $extrap_name ($T)" begin
         dispatch_case(row.name, row.make, T, extrap; initial_guess_method = seed)
     end
@@ -77,7 +77,7 @@ end
     # Written as `typeof(err) <: Union{...}` rather than `err isa ...` so that a failure names
     # the offending exception type in the CI log — the earlier form printed only the
     # expression, which is why an added error class took a local repro to identify.
-    @test typeof(err) <: Union{Nothing,SOLVER_GAVE_UP}
+    @test typeof(err) <: Union{Nothing, SOLVER_GAVE_UP}
 end
 
 # ---- D = 2 layout guard ------------------------------------------------------

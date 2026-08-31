@@ -31,7 +31,7 @@ relu_k(k::Int) = x -> max(zero(x), x)^k
 # Float64 literals) so Float16/Float32 sweeps do not upcast — same rule as relu_k.
 # ELU is written branch-free with max/min (not a `?:` ternary) so the symbolic
 # gradient build can trace it, exactly like relu_k's `max`.
-elu(x)  = max(zero(x), x) + min(zero(x), exp(x) - one(x))
+elu(x) = max(zero(x), x) + min(zero(x), exp(x) - one(x))
 gelu(x) = x / 2 * (one(x) + tanh(sqrt(oftype(x, 2 / pi)) *
                                  (x + oftype(x, 0.044715) * x^3)))
 
@@ -48,29 +48,32 @@ gelu(x) = x / 2 * (one(x) + tanh(sqrt(oftype(x, 2 / pi)) *
 
 # ---- axis definitions -------------------------------------------------------
 
-const ACTIVATIONS_FULL  = [("relu2", relu_k(2)), ("relu3", relu_k(3)),
-                           ("relu4", relu_k(4)), ("elu", elu),
-                           ("gelu", gelu), ("tanh", tanh)]
+const ACTIVATIONS_FULL = [("relu2", relu_k(2)), ("relu3", relu_k(3)),
+    ("relu4", relu_k(4)), ("elu", elu),
+    ("gelu", gelu), ("tanh", tanh)]
 const ACTIVATIONS_QUICK = [("gelu", gelu), ("tanh", tanh)]
 
 # A solver strategy: a labelled `NonlinearSolverMethod` plus an optional linesearch
 # factory (built at the working type `T`). `DogLeg` takes no linesearch.
-mkstrat(solver, ls, makesolver, makels) =
+function mkstrat(solver, ls, makesolver, makels)
     (solver = solver, linesearch = ls, makesolver = makesolver, makels = makels)
+end
 
 const SOLVERS_FULL = [
-    mkstrat("Newton", "Static",       () -> SimpleSolvers.Newton(), T -> SimpleSolvers.Static(T)),
+    mkstrat("Newton", "Static", () -> SimpleSolvers.Newton(), T -> SimpleSolvers.Static(T)),
     mkstrat("Newton", "Backtracking", () -> SimpleSolvers.Newton(), T -> SimpleSolvers.Backtracking(T)),
-    mkstrat("Newton", "StrongWolfe",  () -> SimpleSolvers.Newton(), T -> SimpleSolvers.StrongWolfe(T)),
-    mkstrat("DogLeg", "-",            () -> SimpleSolvers.DogLeg(),  nothing),
+    mkstrat("Newton", "StrongWolfe", () -> SimpleSolvers.Newton(), T -> SimpleSolvers.StrongWolfe(T)),
+    mkstrat("DogLeg", "-", () -> SimpleSolvers.DogLeg(), nothing)
 ]
 # DogLeg and Newton with backtracking. Two strategies rather than one because they diverge
 # in ways the suite exists to compare, and one of them alone leaves a whole precision column
 # uninformative: measured at `Float64` on the harmonic oscillator, DogLeg exhausts the
 # 1000-iteration budget while Newton/Backtracking converges in 767. Selected by label rather
 # than by index so reordering `SOLVERS_FULL` cannot silently change the quick preset.
-const SOLVERS_QUICK = filter(s -> (s.solver, s.linesearch) in
-                                  (("DogLeg", "-"), ("Newton", "Backtracking")), SOLVERS_FULL)
+const SOLVERS_QUICK = filter(
+    s -> (s.solver, s.linesearch) in
+         (("DogLeg", "-"), ("Newton", "Backtracking")),
+    SOLVERS_FULL)
 
 # An initial-guess strategy: the method's `initial_trajectory` field plus whether the
 # integrator also needs `initialguess = HermiteExtrapolation()` (the Hermite branch
@@ -79,8 +82,8 @@ mkig(label, extrap, hermite) = (label = label, extrap = extrap, hermite = hermit
 
 const IGS_FULL = [
     mkig("midpoint", IntegratorExtrapolation(), false),
-    mkig("Hermite",  HermiteExtrapolation(),    true),
-    mkig("previous", NoExtrapolation(),         false),
+    mkig("Hermite", HermiteExtrapolation(), true),
+    mkig("previous", NoExtrapolation(), false)
 ]
 const IGS_QUICK = [IGS_FULL[1]]                   # midpoint only
 
@@ -91,21 +94,21 @@ const IGS_QUICK = [IGS_FULL[1]]                   # midpoint only
 mklam(label, f) = (label = label, f = f)
 lam_scaled() = mklam("16sqrt(eps)", T -> 16 * sqrt(eps(T)))
 
-const LAMBDAS_FULL  = [mklam("0", T -> zero(T)), mklam("1e-7", T -> T(1e-7)),
-                       mklam("1e-5", T -> T(1e-5)), mklam("1e-3", T -> T(1e-3)), lam_scaled()]
+const LAMBDAS_FULL = [mklam("0", T -> zero(T)), mklam("1e-7", T -> T(1e-7)),
+    mklam("1e-5", T -> T(1e-5)), mklam("1e-3", T -> T(1e-3)), lam_scaled()]
 const LAMBDAS_QUICK = [lam_scaled()]
 
 function preset(mode::AbstractString)
     if mode == "full"
         return (dts = [0.01, 0.1, 1.0, 10.0], types = [Float16, Float32, Float64],
-                Rs = [4, 8, 16], Ss = [4, 6, 8], activations = ACTIVATIONS_FULL,
-                solvers = SOLVERS_FULL, lambdas = LAMBDAS_FULL,
-                igs = IGS_FULL, maxit = 10000)
+            Rs = [4, 8, 16], Ss = [4, 6, 8], activations = ACTIVATIONS_FULL,
+            solvers = SOLVERS_FULL, lambdas = LAMBDAS_FULL,
+            igs = IGS_FULL, maxit = 10000)
     elseif mode == "quick"
         return (dts = [0.1, 1.0, 10.0], types = [Float64, Float32, Float16],
-                Rs = [8], Ss = [8], activations = ACTIVATIONS_QUICK,
-                solvers = SOLVERS_QUICK, lambdas = LAMBDAS_QUICK,
-                igs = IGS_QUICK, maxit = nothing)
+            Rs = [8], Ss = [8], activations = ACTIVATIONS_QUICK,
+            solvers = SOLVERS_QUICK, lambdas = LAMBDAS_QUICK,
+            igs = IGS_QUICK, maxit = nothing)
     else
         error("unknown mode $(repr(mode)); use \"quick\" or \"full\"")
     end
@@ -153,7 +156,8 @@ end
 function compute_ham_drift(sol, hamfn, params)
     hamfn === nothing && return NaN
     try
-        qs = collect(sol.q[:]); ps = collect(sol.p[:])
+        qs = collect(sol.q[:])
+        ps = collect(sol.p[:])
         hams = Float64[Float64(hamfn(0, q, p, params)) for (q, p) in zip(qs, ps)]
         H0 = hams[1]
         (!isfinite(H0) || H0 == 0) && return NaN
@@ -174,26 +178,34 @@ end
 # `total_secs` is the wall-clock time of the whole `integrate` call — the network
 # integrators no longer record per-step nonlinear-solve time, so this is the only
 # run-time metric available.
-function run_case(prob, method, ::Type{T}, ig, strat, λ, maxit, refq, hamfn, params) where {T}
-    kw = Pair{Symbol,Any}[:solver => strat.makesolver(),
-                          :regularization_factor => T(λ)]
+function run_case(
+        prob, method, ::Type{T}, ig, strat, λ, maxit, refq, hamfn, params) where {T}
+    kw = Pair{Symbol, Any}[:solver => strat.makesolver(),
+        :regularization_factor => T(λ)]
     maxit === nothing || push!(kw, :max_iterations => maxit)
     strat.makels === nothing || push!(kw, :linesearch => strat.makels(T))
     ig.hermite && push!(kw, :initialguess => HermiteExtrapolation())
 
-    status = "ok"; ref_err = NaN; ham_drift = NaN; iters = NaN; total_secs = NaN
+    status = "ok"
+    ref_err = NaN
+    ham_drift = NaN
+    iters = NaN
+    total_secs = NaN
     try
         int = GeometricIntegrator(prob, method; kw...)
         itcap = SimpleSolvers.config(solver(int)).max_iterations
         t0 = time()
         sol, _ = integrate(int)
         total_secs = time() - t0
-        try; iters = Float64(solverstate(int).iterations); catch; end
+        try
+            iters = Float64(solverstate(int).iterations)
+        catch
+        end
         qend = collect(sol.q[:])[end]
         if any(x -> !isfinite(x), qend)
             status = "nonfinite"
         else
-            ref_err   = compute_ref_err(sol, refq)
+            ref_err = compute_ref_err(sol, refq)
             ham_drift = compute_ham_drift(sol, hamfn, params)
             # A finite result is not a converged one: `integrate` returns a finite state
             # after exhausting `max_iterations`, and stalls concentrate in the
@@ -235,7 +247,8 @@ final state is compared against it (computed once per `dt` and cached).
 
 Writes `results/<problem_name>_<mode>.csv` and returns its path.
 """
-function run_sweep(; problem_name, build_prob, hamiltonian, mode, Rs = nothing, Ss = nothing)
+function run_sweep(;
+        problem_name, build_prob, hamiltonian, mode, Rs = nothing, Ss = nothing)
     cfg = preset(mode)
     dt_min = minimum(cfg.dts)
     Rs = Rs === nothing ? cfg.Rs : Rs
@@ -249,48 +262,61 @@ function run_sweep(; problem_name, build_prob, hamiltonian, mode, Rs = nothing, 
 
     println("="^90)
     println("Benchmark: $(problem_name)  [mode=$(mode)]  —  $(total) cases, 10 steps each")
-    mode == "full" && @warn "full mode is large ($(total) cases); expect a long run. Partial results are flushed to CSV."
+    mode == "full" &&
+        @warn "full mode is large ($(total) cases); expect a long run. Partial results are flushed to CSV."
     println("="^90)
     @printf("%-6s %-8s %6s %2s %2s %-6s %-11s %-9s %-11s | %-10s %-10s %-10s %-5s %-8s\n",
-            "T", "dt", "", "R", "S", "act", "solver/ls", "iguess", "λ",
-            "status", "ref_err", "ham_drift", "iter", "total_s")
+        "T", "dt", "", "R", "S", "act", "solver/ls", "iguess", "λ",
+        "status", "ref_err", "ham_drift", "iter", "total_s")
     println("-"^116)
 
-    refcache  = Dict{Float64,Any}()
-    probcache = Dict{Tuple{DataType,Float64},Any}()   # problem depends only on (T, dt)
+    refcache = Dict{Float64, Any}()
+    probcache = Dict{Tuple{DataType, Float64}, Any}()   # problem depends only on (T, dt)
     idx = 0
     open(csvpath, "w") do io
         println(io, CSV_HEADER)
         flush(io)
         for T in cfg.types
             for S in Ss, (actlabel, act) in cfg.activations
+
                 basis = ShallowNetBasis{T}(act, S)            # expensive symbolic build, amortized
                 for R in Rs, ig in cfg.igs
-                    method = ShallowNet(basis, QuadratureRules.GaussLegendreQuadrature(T, R);
-                                show_status = false,
-                                bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
-                                initial_trajectory_method = ig.extrap)
+
+                    method = ShallowNet(
+                        basis, QuadratureRules.GaussLegendreQuadrature(T, R);
+                        show_status = false,
+                        bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
+                        initial_trajectory_method = ig.extrap)
                     for dt in cfg.dts
-                        prob   = get!(() -> build_prob(T, (T(0), T(10 * dt)), T(dt)), probcache, (T, dt))
+                        prob = get!(() -> build_prob(T, (T(0), T(10 * dt)), T(dt)), probcache, (
+                            T, dt))
                         params = prob.parameters
-                        refq   = get!(() -> build_gauss_reference(build_prob, dt, dt_min), refcache, dt)
+                        refq = get!(() -> build_gauss_reference(build_prob, dt, dt_min), refcache, dt)
                         for strat in cfg.solvers, lamspec in cfg.lambdas
+
                             idx += 1
                             λ = lamspec.f(T)
-                            r = run_case(prob, method, T, ig, strat, λ, cfg.maxit, refq, hamiltonian, params)
-                            lslabel = strat.makels === nothing ? strat.solver : "$(strat.solver)/$(strat.linesearch)"
+                            r = run_case(prob, method, T, ig, strat, λ,
+                                cfg.maxit, refq, hamiltonian, params)
+                            lslabel = strat.makels === nothing ? strat.solver :
+                                      "$(strat.solver)/$(strat.linesearch)"
                             @printf("%-6s %-8.3g %5d/%d %2d %2d %-6s %-11s %-9s %-11s | %-10s %-10s %-10s %-5s %-8s\n",
-                                    string(T), dt, idx, total, R, S, actlabel, lslabel, ig.label,
-                                    "$(lamspec.label)=$(@sprintf("%.1e", Float64(λ)))",
-                                    r.status,
-                                    isnan(r.ref_err)   ? "—" : @sprintf("%.2e", r.ref_err),
-                                    isnan(r.ham_drift) ? "—" : @sprintf("%.2e", r.ham_drift),
-                                    isnan(r.iters)     ? "—" : string(round(Int, r.iters)),
-                                    isnan(r.total_secs) ? "—" : @sprintf("%.3f", r.total_secs))
-                            row = join((problem_name, string(T), csvnum(dt), "10", csvnum(R), csvnum(S),
-                                        actlabel, strat.solver, strat.linesearch, ig.label, csvnum(Float64(λ)),
-                                        r.status, csvnum(r.ref_err), csvnum(r.ham_drift), csvint(r.iters),
-                                        csvnum(r.total_secs)), ",")
+                                string(T), dt, idx, total, R, S, actlabel, lslabel, ig.label,
+                                "$(lamspec.label)=$(@sprintf("%.1e", Float64(λ)))",
+                                r.status,
+                                isnan(r.ref_err) ? "—" : @sprintf("%.2e", r.ref_err),
+                                isnan(r.ham_drift) ? "—" : @sprintf("%.2e", r.ham_drift),
+                                isnan(r.iters) ? "—" : string(round(Int, r.iters)),
+                                isnan(r.total_secs) ? "—" : @sprintf("%.3f", r.total_secs))
+                            row = join(
+                                (problem_name, string(T), csvnum(dt),
+                                    "10", csvnum(R), csvnum(S),
+                                    actlabel, strat.solver, strat.linesearch,
+                                    ig.label, csvnum(Float64(λ)),
+                                    r.status, csvnum(r.ref_err),
+                                    csvnum(r.ham_drift), csvint(r.iters),
+                                    csvnum(r.total_secs)),
+                                ",")
                             println(io, row)
                             flush(io)
                         end

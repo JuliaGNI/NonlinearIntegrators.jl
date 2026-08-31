@@ -35,31 +35,31 @@ method = ShallowNet(basis, quad; bias_interval = [-π, π], dict_amount = 400)
 ```
 """
 struct ShallowNet{T, NNODES, basisType <: Basis{T},
-                               ET <: Extrapolation,
-                               IPMT <: InitialParametersMethod} <: ShallowNetMethod
-    common        :: NetworkIntegratorCore{T, NNODES, basisType, ET, IPMT}
-    bias_interval :: SVector{2, T}
-    dict_amount   :: Int
+    ET <: Extrapolation,
+    IPMT <: InitialParametersMethod} <: ShallowNetMethod
+    common::NetworkIntegratorCore{T, NNODES, basisType, ET, IPMT}
+    bias_interval::SVector{2, T}
+    dict_amount::Int
 
     function ShallowNet(basis::Basis{T}, quadrature::QuadratureRule{T};
-        extrapolation_substep      :: Int  = 10,
-        training_epochs           :: Int  = 50000,
-        show_status               :: Bool = false,
-        initial_trajectory_method :: ET   = IntegratorExtrapolation(),
-        initial_guess_method      :: IPMT = OGA1d(),
-        record_grid_points = 41,
-        bias_interval = [-pi, pi],
-        dict_amount   :: Int = 50000,) where {T, ET, IPMT}
+            extrapolation_substep::Int = 10,
+            training_epochs::Int = 50000,
+            show_status::Bool = false,
+            initial_trajectory_method::ET = IntegratorExtrapolation(),
+            initial_guess_method::IPMT = OGA1d(),
+            record_grid_points = 41,
+            bias_interval = [-pi, pi],
+            dict_amount::Int = 50000) where {T, ET, IPMT}
         require_symbolic_derivatives(basis, "ShallowNet")
         common = NetworkIntegratorCore(basis, quadrature;
-            extrapolation_substep=extrapolation_substep,
-            training_epochs=training_epochs,
+            extrapolation_substep = extrapolation_substep,
+            training_epochs = training_epochs,
             show_status = show_status,
-            initial_trajectory_method=initial_trajectory_method,
-            initial_guess_method=initial_guess_method,
-            record_grid_points =  record_grid_points)
+            initial_trajectory_method = initial_trajectory_method,
+            initial_guess_method = initial_guess_method,
+            record_grid_points = record_grid_points)
         new{T, nnodes(quadrature), typeof(basis), ET, IPMT}(
-            common, SVector{2,T}(bias_interval), dict_amount)
+            common, SVector{2, T}(bias_interval), dict_amount)
     end
 end
 
@@ -68,15 +68,16 @@ end
 # below. `CacheType` returns `SymbolicShallowNetCache{ST}` — a *concrete* type, which it was
 # not while the basis size and sub-step count were (runtime-computed) type parameters.
 
-function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::ShallowNet; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(
+        problem::AbstractProblemIODE, method::ShallowNet; kwargs...) where {ST}
     local S = nbasis(method)
     SymbolicShallowNetCache{ST}(initial_conditions(problem), 3 * S + 1, S, nnodes(method),
         extrapolation_substep(method);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::ShallowNet) =
-    SymbolicShallowNetCache{ST}
+@inline GeometricIntegratorsBase.CacheType(
+    ST, problem::AbstractProblemIODE, method::ShallowNet) = SymbolicShallowNetCache{ST}
 
 function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::TrainingMethod, sol)
     local D = length(cache(int).q̃)
@@ -140,15 +141,16 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::
         @debug "dimension" k "final loss:" mae_loss(network_inputs, labels, NN, PNN.params) "in" GeometricOptimizers.iteration_number(state) "of" nepochs "epochs; converged:" GeometricOptimizers.isconverged(optstatus)
 
         for i in 1:S
-            x[D*(i-1)+k] = PNN.params[2].W[i]
-            x[D*(S+1)+D*(i-1)+k] = PNN.params[1].W[i]
-            x[D*(S+1+S)+D*(i-1)+k] = PNN.params[1].b[i]
+            x[D * (i - 1) + k] = PNN.params[2].W[i]
+            x[D * (S + 1) + D * (i - 1) + k] = PNN.params[1].W[i]
+            x[D * (S + 1 + S) + D * (i - 1) + k] = PNN.params[1].b[i]
         end
     end
     @debug "Initial guess from network training" x
 end
 
-function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:ShallowNet}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params,
+        int::GeometricIntegrator{<:ShallowNet}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local C = cache(int, ST)
@@ -186,20 +188,20 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     # copy x to X
     for i in eachindex(X)
         for k in eachindex(X[i])
-            X[i][k] = x[D*(i-1)+k]
+            X[i][k] = x[D * (i - 1) + k]
         end
     end
 
     # copy x to p # momenta
     for k in eachindex(p)
-        p[k] = x[D*S+k]
+        p[k] = x[D * S + k]
     end
 
     for k in 1:D
         for i in 1:S
-            ps[k][2].W[i] = x[D*(i-1)+k]
-            ps[k][1].W[i] = x[D*(S+1)+D*(i-1)+k]
-            ps[k][1].b[i] = x[D*(S+1+S)+D*(i-1)+k]
+            ps[k][2].W[i] = x[D * (i - 1) + k]
+            ps[k][1].W[i] = x[D * (S + 1) + D * (i - 1) + k]
+            ps[k][1].b[i] = x[D * (S + 1 + S) + D * (i - 1) + k]
         end
     end
 
@@ -284,8 +286,8 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     end
 end
 
-
-function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:ShallowNet}) where {ST}
+function GeometricIntegratorsBase.residual!(
+        b::Vector{ST}, sol, params, int::GeometricIntegrator{<:ShallowNet}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q
@@ -317,7 +319,7 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
                 z += method(int).b[j] * m[j, i, k] * F[j][k] * timestep(int)
                 z += method(int).b[j] * a[j, i, k] * P[j][k]
             end
-            b[D*(i-1)+k] = (r₁[i, k] * p̃[k] - r₀[i, k] * p̄[k]) - z
+            b[D * (i - 1) + k] = (r₁[i, k] * p̃[k] - r₀[i, k] * p̄[k]) - z
         end
     end
 
@@ -327,7 +329,7 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
         for j in eachindex(X)
             y += r₀[j, k] * X[j][k]
         end
-        b[D*S+k] = q̄[k] - y
+        b[D * S + k] = q̄[k] - y
     end
 
     for i in 1:S
@@ -337,7 +339,7 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
                 z += timestep(int) * method(int).b[j] * F[j][k] * dqdWc[j, i, k]
                 z += method(int).b[j] * P[j][k] * dvdWc[j, i, k]
             end
-            b[D*(S+1)+D*(i-1)+k] = dqdWr₁[i, k] * p̃[k] - z
+            b[D * (S + 1) + D * (i - 1) + k] = dqdWr₁[i, k] * p̃[k] - z
         end
     end
 
@@ -348,17 +350,14 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
                 z += timestep(int) * method(int).b[j] * F[j][k] * dqdbc[j, i, k]
                 z += method(int).b[j] * P[j][k] * dvdbc[j, i, k]
             end
-            b[D*(S+1+S)+D*(i-1)+k] = (dqdbr₁[i, k] * p̃[k] - dqdbr₀[i, k] * p̄[k]) - z
+            b[D * (S + 1 + S) + D * (i - 1) + k] = (dqdbr₁[i, k] * p̃[k] -
+                                                    dqdbr₀[i, k] * p̄[k]) - z
         end
     end
     # @debug " Residual vector b: " b
     # @debug " Norm of Residual vector b: " norm(b)
 
 end
-
-
-
-
 
 function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNet})
     local x = nlsolution(int)
@@ -377,9 +376,9 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNet})
 
     for k in 1:D
         for i in 1:S
-            ps[k][2].W[i] = x[D*(i-1)+k]
-            ps[k][1].W[i] = x[D*(S+1)+D*(i-1)+k]
-            ps[k][1].b[i] = x[D*(S+1+S)+D*(i-1)+k]
+            ps[k][2].W[i] = x[D * (i - 1) + k]
+            ps[k][1].W[i] = x[D * (S + 1) + D * (i - 1) + k]
+            ps[k][1].b[i] = x[D * (S + 1 + S) + D * (i - 1) + k]
         end
         stage_values[:, k] = NN(network_inputs, ps[k])[:]
     end
@@ -387,5 +386,3 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNet})
     @debug "stages prediction after solving" stage_values
     @debug "sol from this step q:", sol.q, "p:", sol.p
 end
-
-

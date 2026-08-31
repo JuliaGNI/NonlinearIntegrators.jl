@@ -114,7 +114,6 @@ using JLD2
 #         @show relative_maximum_error(HO_imp_sol.q,HO_truth.q)
 #         @show maximum(HO_relative_imp_ham_err)
 
-
 #         QGau = GaussLegendreQuadrature(R)
 #         BGau = Lagrange(QuadratureRules.nodes(QGau))
 #         HO_cgvi_sol = integrate(HO_lode, CGVI(BGau, QGau))
@@ -251,10 +250,7 @@ using JLD2
 #         record_results[("Pendulum_cgvi_hams_err3")] = maximum(pd_relative_cgvi_ham_err3)
 #         record_results[("Pendulum_cgvi_qerror3")] = relative_maximum_error(pd_cgvi_sol3.q,pd_ref_sol.q)
 
-
 #     end
-
-
 
 #     ### Perturbed Pendulum
 #     begin
@@ -330,7 +326,6 @@ using JLD2
 #         record_results[("PerturbedPendulum_cgvi_qerror3")] = relative_maximum_error(pp_cgvi_sol3.q,pp_ref_sol.q)
 
 #     end
-
 
 #     #### Henon Heiles
 #     begin
@@ -423,7 +418,6 @@ using JLD2
 #     max_iterations = parse(Int,ARGS[2])
 #     h_step = parse(Float64,ARGS[1])
 
-
 #     filename2 = @sprintf(
 #         "parallel_results/Backtracking2_R%d_h%.2f_iter%d_fabs%.2e_fsuc%.2e_TT%d.jld2",
 #         R, h_step, max_iterations, f_abstol, f_suctol,TT)
@@ -453,7 +447,6 @@ using JLD2
 #         scatter!(q1_axis, t_coarse, collect(HO_cgvi_sol.q[:,1]), label="Galerkin Integrator Solution",color = :green)
 #         scatter!(q1_axis,t_coarse, collect(vise_sol.q[:,1]), label="VISE Discrete Solution",color = :blue)
 #         vlines!(q1_axis,[30.0],linestyle=:dashdot,color = :purple,label = "Training Region")
-
 
 #         # Plot 2: p₁ over time
 #         lines!(q2_axis, t_dense, collect(HO_plot.p[:,1]), label="Analytical Solution" ,color = :black,linestyle = :dash,linewidth = linewidth)
@@ -514,7 +507,6 @@ using JLD2
 #         #     framevisible = false,nbanks = 2)
 #         # save("results/hopd.pdf", fig)
 #         # fig
-
 
 #         # legend_fig = Legend(fig[1,1:3],)
 #         q1_axis = Axis(fig[3, 1],xlabel = "Time", ylabel = "q₁",xlabelsize = label_size, ylabelsize = label_size,yticklabelsize = tick_size,xticklabelsize = tick_size)
@@ -587,7 +579,6 @@ using JLD2
 #         scatter!(p1_axis, t_coarse, collect(HH_imp_sol.p[:,1]), label="Implicit Midpoint Solution ",color = :red)
 #         scatter!(p1_axis, t_coarse, collect(HH_vise_sol.p[:,1]), label="VISE Discrete Solution ",color = :blue)
 
-
 #         # Plot 1: q2 over time
 #         lines!(q2_axis, t_dense, collect(HH_sol_plot.q[:,2]), label="Reference Solution ",color = :black,linestyle = :dash,linewidth = linewidth)
 #         lines!(q2_axis, t_vise_dense, vcat(hcat(internal_q2...)[2:end,:]...), label="VISE Continuous Solution", color = :orange)
@@ -601,7 +592,6 @@ using JLD2
 #         scatter!(p2_axis, t_coarse, collect(HH_cgvi_sol.p[:,2]), label="Galerkin Integrator Solution ",color = :green)
 #         scatter!(p2_axis, t_coarse, collect(HH_imp_sol.p[:,2]), label="Implicit Midpoint Solution ",color = :red)
 #         scatter!(p2_axis, t_coarse, collect(HH_vise_sol.p[:,2]), label="VISE Discrete Solution ",color = :blue)
-
 
 #         # Plot 3: Relative Hamiltonian error
 #         lines!(ham_axis, t_coarse, HH_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
@@ -673,7 +663,6 @@ using JLD2
 #     function pendulum_q_prediction(t,params)
 #         params[1] * cos(params[2] * t + params[3])
 #     end
-
 
 #     ill_fig2 = Figure(size = (800,1200), linewidth = 2, markersize = 8)
 #     pq_axis = Axis(ill_fig2[1,1],xlabel = "q(t)", ylabel = "p(t)",xlabelsize = 25, ylabelsize = 25,yticklabelsize = 20,xticklabelsize = 20)
@@ -756,7 +745,6 @@ using JLD2
 
 #     line_ref = lines!(pq_axis,collect(pd_ref_sol.q[:,1]) ,collect(pd_ref_sol.p[:,1]), label="Pendulum Reference Solution", linewidth = 1, color = :blue,linestyle = :dash)
 #     Label(ill_fig2[1,0],"Pendulum", rotation = pi/2,fontsize = 30,tellheight = false)
-
 
 #     border_x = collect(-5:0.01:1)
 #     t1 = collect(0:0.01:0.1)
@@ -843,7 +831,6 @@ using JLD2
 #     Label(ill_fig2[2,0],"Linear Transport Equation", rotation = pi/2,fontsize = 30,tellheight = false)
 #     Colorbar(ill_fig2[2, 2], hm)
 
-
 #     Legend(ill_fig2[3, 1], [line_ref,lin1,hl1],["Pendulum Reference Solution",
 #             "Pendulum VISE Solution",
 #             "Discrete Time Step"],
@@ -853,8 +840,6 @@ using JLD2
 #     save("results/ill_pendulum_lp_right.pdf", ill_fig2)
 # end
 
-
-
 # Toda Lattice Problem
 TT = 1.0
 h = 1.0
@@ -862,9 +847,10 @@ h = 1.0
 
 μ = 0.0
 σ = 0.4
-q0 = exp.(- (collect(-0.5:0.2:0.5) .- μ).^2 ./ (2 * σ^2))
+q0 = exp.(- (collect(-0.5:0.2:0.5) .- μ) .^ 2 ./ (2 * σ^2))
 
-TL_lode = GeometricProblems.TodaLattice.lodeproblem(6, q0, zeros(6),timespan = (0,TT),timestep = h)
+TL_lode = GeometricProblems.TodaLattice.lodeproblem(
+    6, q0, zeros(6), timespan = (0, TT), timestep = h)
 # ref_sol = integrate(TL_lode, Gauss(8))
 
 @variables ttt
@@ -874,28 +860,34 @@ TL_lode = GeometricProblems.TodaLattice.lodeproblem(6, q0, zeros(6),timespan = (
 q₁_expr = W1[1] * cos(W1[2] * ttt + W1[3]) + W1[4]
 
 #plot_f(x1) = 0.7033961135550455 + (0.02564308151958197 * ((cos(x1 * 1.374470223088057) + cos(x1 * -0.10262191236947937)) + (-0.05196883935607318 * (x1 * cos(x1)))))
-q₂_expr = W2[1]+ (W2[2] * ((cos(ttt * W2[3]) + cos(ttt * W2[4])) + (W2[5] * (ttt * cos(ttt)))))
+q₂_expr = W2[1] +
+          (W2[2] * ((cos(ttt * W2[3]) + cos(ttt * W2[4])) + (W2[5] * (ttt * cos(ttt)))))
 
 # plot_f(x1) = 0.74607 - ((cos(-0.65807 - (-0.15913 * x1)) * -0.27609) * cos(x1 / 1.2536))
 q₃_expr = W3[1] - ((cos(W3[2] - (W3[3] * ttt)) * W3[4]) * cos(ttt / W3[5]))
 
 # plot_f(x₁) = ((((0.073415 * cos(x₁ / -0.77546)) - cos(x₁ * 0.8083)) * -0.25817) - -0.76175) - 0.041198
-q₄_expr = (((W4[1] * cos(W4[2]*ttt)) - cos(ttt * W4[3])) * W4[4]) +W4[5]
+q₄_expr = (((W4[1] * cos(W4[2]*ttt)) - cos(ttt * W4[3])) * W4[4]) + W4[5]
 
 # plot_f(x₁) = ((0.025836 * cos(1.3949 * x₁)) + 0.72447) - (((-1.5715 + cos(-0.41176)) + (x₁ - cos((x₁ / 0.46104) / 1.2723))) * (0.0022377 * cos(-0.50813 * x₁)))
-q₅_expr = ((W5[1] * cos(W5[2] * ttt)) + W5[3]) - ((W5[4] + (ttt - cos((ttt * W5[5])) * (W5[6] * cos(W5[7] * ttt)))))
+q₅_expr = ((W5[1] * cos(W5[2] * ttt)) + W5[3]) -
+          ((W5[4] + (ttt - cos((ttt * W5[5])) * (W5[6] * cos(W5[7] * ttt)))))
 
 # plot_f(x₁) = (cos(-0.2401) + -0.22056) - (cos(x₁ / -1.2461) * (0.25121 - (cos(-0.77484 * x₁) * -0.03474)))
-q₆_expr = W6[1]  - (cos(ttt * W6[2]) * (W6[3] - (cos(W6[4] * ttt) * W6[5])))
+q₆_expr = W6[1] - (cos(ttt * W6[2]) * (W6[3] - (cos(W6[4] * ttt) * W6[5])))
 
-vise_basis = VISEBasis{Float64}([q₁_expr, q₂_expr, q₃_expr, q₄_expr, q₅_expr, q₆_expr], [W1, W2, W3, W4, W5, W6],ttt,6)
+vise_basis = VISEBasis{Float64}([q₁_expr, q₂_expr, q₃_expr, q₄_expr, q₅_expr, q₆_expr],
+    [W1, W2, W3, W4, W5, W6], ttt, 6)
 R = 8
 QGau = QuadratureRules.GaussLegendreQuadrature(R)
-vise_method = VISE(vise_basis, QGau,[[-0.25275,0.7854,0.08030715,0.71809],
-[0.7033961135550455,0.02564308151958197,1.374470223088057,-0.10262191236947937,-0.05196883935607318],
-[0.74607,0.65807,0.15913,-0.27609,1.2536],
-[-0.073415,-1.2895571,0.8083,-0.25817,0.720552],
-[0.025836,1.3949,-0.72447,-0.655082149674823,1.7047938,-0.0022377,-0.50813],
-[0.7507541997327366,-0.8025038118931065,0.25121,-0.77484,-0.03474]])
+vise_method = VISE(vise_basis,
+    QGau,
+    [[-0.25275, 0.7854, 0.08030715, 0.71809],
+        [0.7033961135550455, 0.02564308151958197, 1.374470223088057,
+            -0.10262191236947937, -0.05196883935607318],
+        [0.74607, 0.65807, 0.15913, -0.27609, 1.2536],
+        [-0.073415, -1.2895571, 0.8083, -0.25817, 0.720552],
+        [0.025836, 1.3949, -0.72447, -0.655082149674823, 1.7047938, -0.0022377, -0.50813],
+        [0.7507541997327366, -0.8025038118931065, 0.25121, -0.77484, -0.03474]])
 
-TL_vise_sol,TL_internal_sol,TL_x_list = integrate(TL_lode, vise_method)
+TL_vise_sol, TL_internal_sol, TL_x_list = integrate(TL_lode, vise_method)

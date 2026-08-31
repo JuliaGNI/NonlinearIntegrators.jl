@@ -101,8 +101,8 @@ Float16 case — is the fit retried with a `√λ·I` augmentation, where the ri
 """
 function weighted_lstsq(Φ::AbstractMatrix{T}, w::AbstractVector{T}, y::AbstractVector{T}; C = 100) where {T}
     sw = sqrt.(w)                     # weights are positive ⇒ real sqrt
-    Â  = sw .* Φ'                     # (nnodes × natoms): row j scaled by √wⱼ
-    ŷ  = sw .* y
+    Â = sw .* Φ'                     # (nnodes × natoms): row j scaled by √wⱼ
+    ŷ = sw .* y
     return scaled_lstsq(Â, ŷ; C = C)
 end
 
@@ -131,8 +131,10 @@ function scaled_lstsq(Â::AbstractMatrix{T}, ŷ::AbstractVector{T}; C = 100) whe
     return ridged_lstsq(Â, ŷ; C = C)
 end
 
-_is_rank_failure(e) = e isa SingularException || e isa LinearAlgebra.RankDeficientException ||
-                      e isa LinearAlgebra.LAPACKException
+function _is_rank_failure(e)
+    e isa SingularException || e isa LinearAlgebra.RankDeficientException ||
+        e isa LinearAlgebra.LAPACKException
+end
 
 """
     ridged_lstsq(Â, ŷ; C = 100) -> Vector
@@ -202,8 +204,8 @@ Generic in `eltype(Â)`; see the note above on why `qr(Â, ColumnNorm())` cannot
 """
 function pivoted_qr_lstsq(Â::AbstractMatrix{T}, ŷ::AbstractVector{T}, rtol::T) where {T}
     m, n = size(Â)
-    R    = Matrix{T}(Â)
-    qty  = Vector{T}(ŷ)
+    R = Matrix{T}(Â)
+    qty = Vector{T}(ŷ)
     perm = collect(1:n)
     # Squared norms of the *not yet eliminated* part of each column, recomputed rather
     # than downdated after every elimination: downdating subtracts the eliminated
@@ -239,12 +241,12 @@ function pivoted_qr_lstsq(Â::AbstractMatrix{T}, ŷ::AbstractVector{T}, rtol::T)
             rhs .-= (β * dot(v, rhs)) .* v
         end
         R[k, k] = α
-        for r in (k+1):m
+        for r in (k + 1):m
             R[r, k] = zero(T)
         end
 
-        for j in (k+1):n
-            cnorm[j] = sum(abs2, view(R, (k+1):m, j))
+        for j in (k + 1):n
+            cnorm[j] = sum(abs2, view(R, (k + 1):m, j))
         end
     end
 
@@ -280,7 +282,8 @@ function jacobi_svd(Â::AbstractMatrix{T}; sweeps::Int = 30) where {T}
 
     for _ in 1:sweeps
         rotated = false
-        for i in 1:(n-1), j in (i+1):n
+        for i in 1:(n - 1), j in (i + 1):n
+
             bi = view(B, :, i)
             bj = view(B, :, j)
             α = sum(abs2, bi)

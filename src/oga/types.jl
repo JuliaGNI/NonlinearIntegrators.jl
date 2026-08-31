@@ -58,7 +58,7 @@ ShallowNet(basis, quadrature;
     initial_guess_method = OGA(BiasGrid1d(), OrthogonalProjection(), TruncatedSVD()))
 ```
 """
-struct OGA{D<:OGADictionary,S<:OGASelection,F<:OGAFit} <: InitialParametersMethod
+struct OGA{D <: OGADictionary, S <: OGASelection, F <: OGAFit} <: InitialParametersMethod
     dictionary::D
     selection::S
     fit::F
@@ -67,10 +67,11 @@ struct OGA{D<:OGADictionary,S<:OGASelection,F<:OGAFit} <: InitialParametersMetho
     fill_unused::Bool
 
     function OGA(dictionary::D = BiasGrid1d(), selection::S = RawProjection(),
-                 fit::F = WeightedQR();
-                 coherence::Bool = true, norm_guard::Bool = true,
-                 fill_unused::Bool = true) where {D<:OGADictionary,S<:OGASelection,F<:OGAFit}
-        new{D,S,F}(dictionary, selection, fit, coherence, norm_guard, fill_unused)
+            fit::F = WeightedQR();
+            coherence::Bool = true, norm_guard::Bool = true,
+            fill_unused::Bool = true) where {
+            D <: OGADictionary, S <: OGASelection, F <: OGAFit}
+        new{D, S, F}(dictionary, selection, fit, coherence, norm_guard, fill_unused)
     end
 end
 
@@ -95,7 +96,9 @@ by `|⟨r, g⟩_w| / ‖g‖_w` rather than by the raw projection. Which of the 
 uses changes which neurons get picked and therefore which basin the Newton solve lands in,
 so each keeps the rule it was tuned with rather than inheriting a single default.
 """
-OGA1dNormalized(; kwargs...) = OGA(BiasGrid1d(), NormalizedProjection(), WeightedQR(); kwargs...)
+function OGA1dNormalized(; kwargs...)
+    OGA(BiasGrid1d(), NormalizedProjection(), WeightedQR(); kwargs...)
+end
 
 """
     OGA1dStable(; kwargs...)
@@ -107,7 +110,9 @@ The combination aimed squarely at the 16-bit failure mode: an atom that adds no 
 direction is never selected, so the selected design matrix cannot go rank-deficient
 regardless of precision.
 """
-OGA1dStable(; kwargs...) = OGA(BiasGrid1d(), OrthogonalProjection(), IncrementalQR(); kwargs...)
+function OGA1dStable(; kwargs...)
+    OGA(BiasGrid1d(), OrthogonalProjection(), IncrementalQR(); kwargs...)
+end
 
 """
     OGA2d(; dictionary = WeightBiasGrid2d(), kwargs...)
@@ -116,8 +121,9 @@ A 2-D `(w, b)` dictionary with normalised selection and the incremental QR fit: 
 variant for activations that are *not* positively homogeneous (ELU, GELU, tanh), where
 `|w|` is a genuine length-scale degree of freedom rather than redundant with `b` and `c`.
 """
-OGA2d(; dictionary = WeightBiasGrid2d(), kwargs...) =
+function OGA2d(; dictionary = WeightBiasGrid2d(), kwargs...)
     OGA(dictionary, NormalizedProjection(), IncrementalQR(); kwargs...)
+end
 
 """
     OGASphere(; dictionary = AngularGrid(), kwargs...)
@@ -126,8 +132,9 @@ Atoms sampled uniformly on the sphere of `(w, b)` space rather than uniformly in
 the dictionary the underlying approximation theory is stated for. See
 [`AngularGrid`](@ref).
 """
-OGASphere(; dictionary = AngularGrid(), kwargs...) =
+function OGASphere(; dictionary = AngularGrid(), kwargs...)
     OGA(dictionary, NormalizedProjection(), IncrementalQR(); kwargs...)
+end
 
 """
     OGA1dNormalEquations()
@@ -155,6 +162,8 @@ Select it with `ShallowNet(...; initial_guess_method = OGA1dNormalEquations())`.
 """
 struct OGA1dNormalEquations <: InitialParametersMethod end
 
-oga_label(oga::OGA) = string(oga_label(oga.dictionary), "/", oga_label(oga.selection),
-                             "/", oga_label(oga.fit))
+function oga_label(oga::OGA)
+    string(oga_label(oga.dictionary), "/", oga_label(oga.selection),
+        "/", oga_label(oga.fit))
+end
 oga_label(::OGA1dNormalEquations) = "reference/raw/normaleq+f64"

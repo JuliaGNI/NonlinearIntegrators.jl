@@ -6,44 +6,49 @@ using GeometricProblems
 # using BenchmarkTools
 using Plots
 using CairoMakie
-using GeometricSolutions:relative_maximum_error
+using GeometricSolutions: relative_maximum_error
 using GeometricIntegrators
 using JLD2
 using SimpleSolvers
 
-int_step = parse(Float64,ARGS[1])
+int_step = parse(Float64, ARGS[1])
 reg_factor = eval(Meta.parse(ARGS[2]))
 
 # int_step = 0.1
 # f_abs = 2.0
 # x_abs = 2.0
 
-
-GeometricIntegratorsBase.default_options(method::ShallowNetReversible) = (
-    max_iterations = 10000,
-    regularization_factor = reg_factor,
-    linesearch=GeometricIntegratorsBase.default_linesearch(method),
-    # linesearch=SimpleSolvers.Static(),
-)
+function GeometricIntegratorsBase.default_options(method::ShallowNetReversible)
+    (
+        max_iterations = 10000,
+        regularization_factor = reg_factor,
+        linesearch = GeometricIntegratorsBase.default_linesearch(method)
+        # linesearch=SimpleSolvers.Static(),
+    )
+end
 # SimpleSolvers.Backtracking() # The default linear search method is Backtracking()
 # # GeometricIntegrators.Integrators.default_linesearch(method::VISE) =SimpleSolvers.Quadratic()
 # SimpleSolvers.Bisection()
 # SimpleSolvers.Static()
 
-R_list = [4,8,16,]#
-S_list = [4,6,8]#
-k_list = [3,2,4]#
+R_list = [4, 8, 16]#
+S_list = [4, 6, 8]#
+k_list = [3, 2, 4]#
 
 tick_size = 22
 label_size = 22
 
 # Set up the Harmonic Oscillator problem
 int_timespan = 1000.0
-HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep=int_step,timespan=(0,int_timespan))
-initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
+HO_lode = GeometricProblems.HarmonicOscillator.lodeproblem(timestep = int_step, timespan = (
+    0, int_timespan))
+initial_hamiltonian = GeometricProblems.HarmonicOscillator.hamiltonian(
+    0.0, HO_lode.ics.q, HO_lode.ics.p, HO_lode.parameters)
 
-HO_ref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timestep=int_step,timespan=(0,int_timespan)))
-HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(timestep=int_step/40,timespan=(0,int_timespan)))
+HO_ref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(
+    timestep = int_step, timespan = (0, int_timespan)))
+HO_pref = GeometricProblems.HarmonicOscillator.exact_solution(GeometricProblems.HarmonicOscillator.podeproblem(
+    timestep = int_step/40, timespan = (0, int_timespan)))
 
 for R in R_list
     Q = 2 * R
@@ -57,73 +62,85 @@ for R in R_list
 
                 # open(log_file, "w") do io
                 #     redirect_stdio(stdout=log_file, stderr=log_file) do
-                        record_results = Dict()
+                record_results = Dict()
 
-                        relu = x->max(0.0,x) ^ k_relu
-                        net = ShallowNetBasis{Float64}(relu,S)
-                        nlmethod = ShallowNetReversible(net, QGau, show_status = false, bias_interval = [-pi,pi], dict_amount = 400000)
+                relu = x->max(0.0, x) ^ k_relu
+                net = ShallowNetBasis{Float64}(relu, S)
+                nlmethod = ShallowNetReversible(net, QGau, show_status = false,
+                    bias_interval = [-pi, pi], dict_amount = 400000)
 
-                        #HarmonicOscillator
-                        HO_sol,internal_values = integrate(HO_lode, nlmethod)
-                        HO_qerror = relative_maximum_error(HO_sol.q,HO_ref.q)
+                #HarmonicOscillator
+                HO_sol, internal_values = integrate(HO_lode, nlmethod)
+                HO_qerror = relative_maximum_error(HO_sol.q, HO_ref.q)
 
-                        hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters) for (q, p) in zip(collect(HO_sol.q[:]), collect(HO_sol.p[:]))]
-                        relative_hams_err = abs.((hams .- initial_hamiltonian) / initial_hamiltonian)
+                hams = [GeometricProblems.HarmonicOscillator.hamiltonian(0, q, p, HO_lode.parameters)
+                        for (q, p) in zip(collect(HO_sol.q[:]), collect(HO_sol.p[:]))]
+                relative_hams_err = abs.((hams .- initial_hamiltonian) /
+                                         initial_hamiltonian)
 
-                        record_results[("HO_sol_q")] = collect(HO_sol.q[:,1])
-                        record_results[("HO_sol_p")] = collect(HO_sol.p[:,1])
-                        record_results[("HO_internal_sol")] = internal_values
+                record_results[("HO_sol_q")] = collect(HO_sol.q[:, 1])
+                record_results[("HO_sol_p")] = collect(HO_sol.p[:, 1])
+                record_results[("HO_internal_sol")] = internal_values
 
-                        record_results[("HO_qerror")] = HO_qerror
-                        record_results[("HO_hams_err")] = relative_hams_err
-                        record_results[("HO_max_hams_err")] = maximum(relative_hams_err)
+                record_results[("HO_qerror")] = HO_qerror
+                record_results[("HO_hams_err")] = relative_hams_err
+                record_results[("HO_max_hams_err")] = maximum(relative_hams_err)
 
-                        save("time_reversible/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).jld2",record_results)
+                save(
+                    "time_reversible/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).jld2",
+                    record_results)
 
-                        # # figure for q
-                        # plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
-                        # plot!(int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Truth", linestyle=:dash, linecolor=:black)
-                        # scatter!(collect(0:int_step:int_timespan), collect(HO_sol.q[:, 1]), label="Discrete solution")
-                        # savefig("results/nn_harmonic_oscillator_solution.png")
+                # # figure for q
+                # plot(int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...))
+                # plot!(int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Truth", linestyle=:dash, linecolor=:black)
+                # scatter!(collect(0:int_step:int_timespan), collect(HO_sol.q[:, 1]), label="Discrete solution")
+                # savefig("results/nn_harmonic_oscillator_solution.png")
 
-                        fig = Figure(size = (1000, 650))
-                        # Label(fig[0, 1], "Step Size h = $h", fontsize = 28, tellwidth = false)
+                fig = Figure(size = (1000, 650))
+                # Label(fig[0, 1], "Step Size h = $h", fontsize = 28, tellwidth = false)
 
-                        sol_q = collect(HO_sol.q[:, 1])
-                        total_length = length(sol_q)
-                        half_length = Int((length(sol_q) -1 ) ÷ 2)
+                sol_q = collect(HO_sol.q[:, 1])
+                total_length = length(sol_q)
+                half_length = Int((length(sol_q) - 1) ÷ 2)
 
-                        ax = Axis(fig[1, 1], xlabel="Time", ylabel = "q(t)",
-                        xticks = ([0,half_length,total_length], ["0","500","1000"]),yticklabelsize=tick_size, xticklabelsize=tick_size,xlabelsize=label_size, ylabelsize=label_size)
-                        lines!(ax, sol_q, )
+                ax = Axis(fig[1, 1], xlabel = "Time", ylabel = "q(t)",
+                    xticks = ([0, half_length, total_length], ["0", "500", "1000"]), yticklabelsize = tick_size, xticklabelsize = tick_size,
+                    xlabelsize = label_size, ylabelsize = label_size)
+                lines!(ax, sol_q)
 
-                        sol_p = collect(HO_sol.p[:, 1])
-                        ax = Axis(fig[2, 1], xlabel="Time", ylabel = "p(t)",
-                        xticks = ([0,half_length,total_length], ["0","500","1000"]),yticklabelsize=tick_size, xticklabelsize=tick_size,xlabelsize=label_size, ylabelsize=label_size)
-                        lines!(ax, sol_p, )
+                sol_p = collect(HO_sol.p[:, 1])
+                ax = Axis(fig[2, 1], xlabel = "Time", ylabel = "p(t)",
+                    xticks = ([0, half_length, total_length], ["0", "500", "1000"]), yticklabelsize = tick_size, xticklabelsize = tick_size,
+                    xlabelsize = label_size, ylabelsize = label_size)
+                lines!(ax, sol_p)
 
-                        hams_err = relative_hams_err
-                        ax = Axis(fig[3, 1], xlabel="Time", ylabel = "Relative Hamiltonian Error",
-                        xticks = ([0,half_length,total_length], ["0","500","1000"]),yticklabelsize=tick_size, xticklabelsize=tick_size,xlabelsize=label_size, ylabelsize=label_size)
-                        lines!(ax, hams_err)
-                        save("time_reversible/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).pdf", fig)
+                hams_err = relative_hams_err
+                ax = Axis(
+                    fig[3, 1], xlabel = "Time", ylabel = "Relative Hamiltonian Error",
+                    xticks = ([0, half_length, total_length], ["0", "500", "1000"]), yticklabelsize = tick_size, xticklabelsize = tick_size,
+                    xlabelsize = label_size, ylabelsize = label_size)
+                lines!(ax, hams_err)
+                save(
+                    "time_reversible/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).pdf",
+                    fig)
 
+                ### Figures in the paper
+                # p = plot(layout=@layout([a; b; c]), label="", size=(700, 700), plot_title="HarmonicOscillator,h = $(int_step)")
 
-                        ### Figures in the paper
-                        # p = plot(layout=@layout([a; b; c]), label="", size=(700, 700), plot_title="HarmonicOscillator,h = $(int_step)")
+                # plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...), label="S$(S)R$(R)Q$(Q)reluk=$(k_relu)", ylims=(-0.6, 0.6))
+                # plot!(p[1], int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Analytic Solution", xaxis="time", yaxis="q₁")
 
-                        # plot!(p[1], int_step/40:int_step/40:int_timespan, vcat(hcat(internal_values...)[2:end,:]...), label="S$(S)R$(R)Q$(Q)reluk=$(k_relu)", ylims=(-0.6, 0.6))
-                        # plot!(p[1], int_step/40:int_step/40:int_timespan, collect(HO_pref.q[:, 1])[2:end], label="Analytic Solution", xaxis="time", yaxis="q₁")
+                # plot!(p[2], 0:int_step:int_timespan, collect(HO_sol.p[:, 1]), label="S$(S)R$(R)Q$(Q)reluk=$(k_relu)", ylims=(-0.6, 0.6))
+                # plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
 
-                        # plot!(p[2], 0:int_step:int_timespan, collect(HO_sol.p[:, 1]), label="S$(S)R$(R)Q$(Q)reluk=$(k_relu)", ylims=(-0.6, 0.6))
-                        # plot!(p[2], 0:int_step/40:int_timespan, collect(HO_pref.p[:, 1]), label="Analytic Solution", xaxis="time", yaxis="p₁")
-
-                        # plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)reluk=$(k_relu)", xaxis="time", yaxis="Relative Hamiltonian error")
-                        # savefig(p, "time_reversible/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).pdf")
-                    # end
+                # plot!(p[3], 0:int_step:int_timespan, relative_hams_err, label="S$(S)R$(R)Q$(Q)reluk=$(k_relu)", xaxis="time", yaxis="Relative Hamiltonian error")
+                # savefig(p, "time_reversible/NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg_factor=$(reg_factor).pdf")
+                # end
                 # end
             catch e
-                println("Error on Harmonic Oscillator, NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)reluk=$(k_relu)",e)
+                println(
+                    "Error on Harmonic Oscillator, NVI_HO_h$(int_step)S$(S)R$(R)fabs$(f_abs)xabs$(x_abs)reluk=$(k_relu)",
+                    e)
                 continue
             end
         end

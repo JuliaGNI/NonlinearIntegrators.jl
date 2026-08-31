@@ -1,32 +1,33 @@
 struct NetworkIntegratorCore{T, NNODES, basisType <: Basis{T},
-                              ET <: Extrapolation,
-                              IPMT <: InitialParametersMethod}
-    basis                     :: basisType
-    quadrature                :: QuadratureRule{T, NNODES}
-    b                         :: SVector{NNODES, T}
-    c                         :: SVector{NNODES, T}
-    extrapolation_substep      :: Int
-    network_inputs            :: Matrix{T}
-    initial_trajectory_method :: ET
-    initial_guess_method      :: IPMT
-    training_epochs           :: Int
-    show_status               :: Bool
-    record_grid_points        :: Int
+    ET <: Extrapolation,
+    IPMT <: InitialParametersMethod}
+    basis::basisType
+    quadrature::QuadratureRule{T, NNODES}
+    b::SVector{NNODES, T}
+    c::SVector{NNODES, T}
+    extrapolation_substep::Int
+    network_inputs::Matrix{T}
+    initial_trajectory_method::ET
+    initial_guess_method::IPMT
+    training_epochs::Int
+    show_status::Bool
+    record_grid_points::Int
 
     function NetworkIntegratorCore(
-        basis :: Basis{T}, quadrature :: QuadratureRule{T};
-        extrapolation_substep      :: Int  = 10,
-        training_epochs           :: Int  = 50000,
-        show_status               :: Bool = false,
-        initial_trajectory_method :: ET   = IntegratorExtrapolation(),
-        initial_guess_method      :: IPMT = OGA1d(),
-        record_grid_points        :: Int  = 41,
+            basis::Basis{T}, quadrature::QuadratureRule{T};
+            extrapolation_substep::Int = 10,
+            training_epochs::Int = 50000,
+            show_status::Bool = false,
+            initial_trajectory_method::ET = IntegratorExtrapolation(),
+            initial_guess_method::IPMT = OGA1d(),
+            record_grid_points::Int = 41
     ) where {T, ET <: Extrapolation, IPMT <: InitialParametersMethod}
         NNODES = nnodes(quadrature)
         b = SVector{NNODES, T}(QuadratureRules.weights(quadrature))
         c = SVector{NNODES, T}(QuadratureRules.nodes(quadrature))
         network_inputs = reshape(
-            collect(zero(T):one(T)/extrapolation_substep:one(T)), 1, extrapolation_substep + 1)
+            collect(zero(T):(one(T) / extrapolation_substep):one(T)), 1, extrapolation_substep +
+                                                                         1)
         new{T, NNODES, typeof(basis), ET, IPMT}(
             basis, quadrature, b, c, extrapolation_substep, network_inputs,
             initial_trajectory_method, initial_guess_method, training_epochs, show_status,
@@ -41,8 +42,8 @@ end
 @inline function Base.getproperty(m::NetworkIntegratorMethod, s::Symbol)
     if hasfield(typeof(m), :common) &&
        s in (:basis, :quadrature, :b, :c, :extrapolation_substep,
-             :network_inputs, :initial_trajectory_method, :initial_guess_method,
-             :training_epochs, :show_status, :record_grid_points)
+        :network_inputs, :initial_trajectory_method, :initial_guess_method,
+        :training_epochs, :show_status, :record_grid_points)
         return getfield(getfield(m, :common), s)
     end
     return getfield(m, s)
@@ -50,36 +51,51 @@ end
 
 # Without this, `hasproperty(m, :basis)` is false even though `m.basis` works, and REPL
 # tab-completion lists only the concrete struct's own fields.
-Base.propertynames(m::NetworkIntegratorMethod, private::Bool = false) =
+function Base.propertynames(m::NetworkIntegratorMethod, private::Bool = false)
     (fieldnames(typeof(m))..., fieldnames(NetworkIntegratorCore)...)
+end
 
 # Shared accessor functions
-basis(m::NetworkIntegratorMethod)  = m.basis
+basis(m::NetworkIntegratorMethod) = m.basis
 nbasis(m::NetworkIntegratorMethod) = m.basis.S
-quadrature(m::NetworkIntegratorMethod)                   = m.quadrature
-nnodes(m::NetworkIntegratorMethod)                       = nnodes(m.quadrature)
-activation(m::NetworkIntegratorMethod)                   = m.basis.activation
-extrapolation_substep(m::NetworkIntegratorMethod)         = m.common.extrapolation_substep
-training_epochs(m::NetworkIntegratorMethod)              = m.common.training_epochs
-show_status(m::NetworkIntegratorMethod)                  = m.common.show_status
-initial_trajectory_method(m::NetworkIntegratorMethod)    = m.common.initial_trajectory_method
+quadrature(m::NetworkIntegratorMethod) = m.quadrature
+nnodes(m::NetworkIntegratorMethod) = nnodes(m.quadrature)
+activation(m::NetworkIntegratorMethod) = m.basis.activation
+extrapolation_substep(m::NetworkIntegratorMethod) = m.common.extrapolation_substep
+training_epochs(m::NetworkIntegratorMethod) = m.common.training_epochs
+show_status(m::NetworkIntegratorMethod) = m.common.show_status
+initial_trajectory_method(m::NetworkIntegratorMethod) = m.common.initial_trajectory_method
 
 # Shared trait functions 
-GeometricIntegratorsBase.isexplicit(::Union{NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}}) = false
-GeometricIntegratorsBase.isimplicit(::Union{NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}}) = true
-GeometricIntegratorsBase.issymmetric(::Union{NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}}) = missing
+function GeometricIntegratorsBase.isexplicit(::Union{
+        NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}})
+    false
+end
+function GeometricIntegratorsBase.isimplicit(::Union{
+        NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}})
+    true
+end
+function GeometricIntegratorsBase.issymmetric(::Union{
+        NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}})
+    missing
+end
 # issymmetric = true is overridden in shallownet_reversible.jl and shallownet_autodiff_reversible.jl
 # `missing`, not `true`: the continuous-Galerkin construction is symplectic for a linear basis,
 # but nothing here establishes it for a network ansatz whose parameters are re-fitted every step.
 # Claiming symplecticity would let downstream code select these methods on a property they have
 # not been shown to have. Override per integrator once there is a proof or a measurement.
-GeometricIntegratorsBase.issymplectic(::Union{NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}}) = missing
+function GeometricIntegratorsBase.issymplectic(::Union{
+        NetworkIntegratorMethod, Type{<:NetworkIntegratorMethod}})
+    missing
+end
 
 default_solver(::NetworkIntegratorMethod) = Newton()
 # `initial_trajectory!` below integrates a LODE sub-problem and reads both `q` and `p` back out, so
 # this needs the `IODEProblem`/`LODEProblem` methods of `ImplicitMidpoint` rather than an
 # ODE-only or `q`-only implicit midpoint.
-default_iguess_integrator(::NetworkIntegratorMethod) = GeometricIntegratorsBase.ImplicitMidpoint()
+function default_iguess_integrator(::NetworkIntegratorMethod)
+    GeometricIntegratorsBase.ImplicitMidpoint()
+end
 
 # `iguess` and `initial_trajectory_method` are two different vocabularies, and conflating them
 # was a bug. `initial_trajectory_method` is *ours*: it picks which `initial_trajectory!` runs.
@@ -146,7 +162,8 @@ struct SymbolicShallowNetCache{ST} <: NetworkIntegratorCache{ST}
     V::Vector{Vector{ST}}
     F::Vector{Vector{ST}}
 
-    ps::Vector{@NamedTuple{L1::@NamedTuple{W::Matrix{ST}, b::Vector{ST}},L2::@NamedTuple{W::Matrix{ST}}}}
+    ps::Vector{@NamedTuple{
+        L1::@NamedTuple{W::Matrix{ST}, b::Vector{ST}}, L2::@NamedTuple{W::Matrix{ST}}}}
 
     # One-element input buffer for the network / derivative kernels, which take a *vector* of
     # evaluation points. Every call site used to write the literal `[quad_nodes[j]]`,
@@ -156,13 +173,13 @@ struct SymbolicShallowNetCache{ST} <: NetworkIntegratorCache{ST}
 
     r₀::Matrix{ST}
     r₁::Matrix{ST}
-    m::Array{ST,3}
-    a::Array{ST,3}
+    m::Array{ST, 3}
+    a::Array{ST, 3}
 
-    dqdWc::Array{ST,3}
-    dqdbc::Array{ST,3}
-    dvdWc::Array{ST,3}
-    dvdbc::Array{ST,3}
+    dqdWc::Array{ST, 3}
+    dqdbc::Array{ST, 3}
+    dvdWc::Array{ST, 3}
+    dvdbc::Array{ST, 3}
 
     dqdWr₁::Matrix{ST}
     dqdWr₀::Matrix{ST}
@@ -173,7 +190,7 @@ struct SymbolicShallowNetCache{ST} <: NetworkIntegratorCache{ST}
     network_labels::Matrix{ST}
 
     function SymbolicShallowNetCache{ST}(ics, nx::Int, S::Int, R::Int, N::Int;
-                                         record_grid_points::Int = 41) where {ST}
+            record_grid_points::Int = 41) where {ST}
         D = length(vec(ics.q))
 
         x = zeros(ST, D * nx)
@@ -192,7 +209,8 @@ struct SymbolicShallowNetCache{ST} <: NetworkIntegratorCache{ST}
         V = create_internal_stage_vector(ST, D, R)
         F = create_internal_stage_vector(ST, D, R)
 
-        ps = [(L1=(W=zeros(ST, S, 1), b=zeros(ST, S)), L2=(W=zeros(ST, 1, S),)) for _ in 1:D]
+        ps = [(L1 = (W = zeros(ST, S, 1), b = zeros(ST, S)), L2 = (W = zeros(ST, 1, S),))
+              for _ in 1:D]
 
         tbuf = zeros(ST, 1)
 
@@ -248,7 +266,8 @@ struct AutodiffShallowNetCache{ST} <: NetworkIntegratorCache{ST}
     V::Vector{Vector{ST}}
     F::Vector{Vector{ST}}
 
-    ps::Vector{@NamedTuple{L1::@NamedTuple{W::Matrix{ST}, b::Vector{ST}},L2::@NamedTuple{W::Matrix{ST}}}}
+    ps::Vector{@NamedTuple{
+        L1::@NamedTuple{W::Matrix{ST}, b::Vector{ST}}, L2::@NamedTuple{W::Matrix{ST}}}}
 
     # Flat [W2 | W1 | b1] view of one dimension's parameters, which is the layout the
     # hand-written ansatz and its ForwardDiff gradients take, plus the two gradient buffers the
@@ -258,18 +277,18 @@ struct AutodiffShallowNetCache{ST} <: NetworkIntegratorCache{ST}
     g_buf::Vector{ST}
     gv_buf::Vector{ST}
 
-    dqdW2c::Array{ST,3}
-    dvdW2c::Array{ST,3}
-    dqdW1c::Array{ST,3}
-    dvdW1c::Array{ST,3}
-    dqdbc::Array{ST,3}
-    dvdbc::Array{ST,3}
+    dqdW2c::Array{ST, 3}
+    dvdW2c::Array{ST, 3}
+    dqdW1c::Array{ST, 3}
+    dvdW1c::Array{ST, 3}
+    dqdbc::Array{ST, 3}
+    dvdbc::Array{ST, 3}
 
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
 
     function AutodiffShallowNetCache{ST}(ics, nx::Int, S::Int, R::Int, N::Int;
-                                         record_grid_points::Int = 41) where {ST}
+            record_grid_points::Int = 41) where {ST}
         D = length(vec(ics.q))
 
         x = zeros(ST, D * nx)
@@ -287,10 +306,11 @@ struct AutodiffShallowNetCache{ST} <: NetworkIntegratorCache{ST}
         V = create_internal_stage_vector(ST, D, R)
         F = create_internal_stage_vector(ST, D, R)
 
-        ps = [(L1=(W=zeros(ST, S, 1), b=zeros(ST, S)), L2=(W=zeros(ST, 1, S),)) for _ in 1:D]
+        ps = [(L1 = (W = zeros(ST, S, 1), b = zeros(ST, S)), L2 = (W = zeros(ST, 1, S),))
+              for _ in 1:D]
 
         ps_vec = zeros(ST, 3S)
-        g_buf  = zeros(ST, 3S)
+        g_buf = zeros(ST, 3S)
         gv_buf = zeros(ST, 3S)
 
         dqdW2c = zeros(ST, R, S, D)
@@ -336,14 +356,14 @@ function initial_trajectory!(
     local x = nlsolution(int)
 
     tem_ode = similar(int.problem, [zero(h), h], h / N,
-        (q=StateVariable(sol.q[:]), p=StateVariable(sol.p[:])))
+        (q = StateVariable(sol.q[:]), p = StateVariable(sol.p[:])))
     tem_sol = integrate(tem_ode, default_iguess_integrator(method(int)))
 
     for k in 1:D
         cache(int).network_labels[:, k] = tem_sol.q[:, k]
         cache(int).q̃[k] = tem_sol.q[:, k][end]
         cache(int).p̃[k] = tem_sol.p[:, k][end]
-        x[D*S + k] = cache(int).p̃[k]
+        x[D * S + k] = cache(int).p̃[k]
     end
 end
 
@@ -361,13 +381,13 @@ function initial_trajectory!(
     local x = nlsolution(int)
     local network_inputs = method(int).network_inputs
 
-    for i in 1:(N+1)
+    for i in 1:(N + 1)
         soltmp = (
             t = sol.t + (network_inputs[i] - 1) * h,
             q = cache(int).q̃,
             p = cache(int).p̃,
             q̇ = cache(int).ṽ,
-            ṗ = cache(int).f̃,
+            ṗ = cache(int).f̃
         )
         solutionstep!(soltmp, history, problem(int), iguess(int))
         for k in 1:D
@@ -379,11 +399,11 @@ function initial_trajectory!(
         q = cache(int).q̃,
         p = cache(int).p̃,
         q̇ = cache(int).ṽ,
-        ṗ = cache(int).f̃,
+        ṗ = cache(int).f̃
     )
     solutionstep!(soltmp, history, problem(int), iguess(int))
     for k in 1:D
-        x[D*S + k] = cache(int).p̃[k]
+        x[D * S + k] = cache(int).p̃[k]
     end
 end
 
@@ -402,7 +422,7 @@ function initial_trajectory!(
         cache(int).network_labels[:, k] .= sol.q[k]
         cache(int).q̃[k] = sol.q[k]
         cache(int).p̃[k] = sol.p[k]
-        x[D*S + k] = sol.p[k]
+        x[D * S + k] = sol.p[k]
     end
 end
 
@@ -452,7 +472,8 @@ end
 function GeometricIntegratorsBase.integrate_step!(
         sol, history, params,
         int::GeometricIntegrator{<:NetworkIntegratorMethod, <:AbstractProblemIODE})
-    solverstatus = solve_with_status!(nlsolution(int), solver(int), solverstate(int), (sol, params, int))
+    solverstatus = solve_with_status!(nlsolution(int), solver(int), solverstate(int), (
+        sol, params, int))
     check_solver_status(solverstatus, int)
     record_finer_solution!(sol, int)
     GeometricIntegratorsBase.update!(sol, params, nlsolution(int), int)
@@ -466,7 +487,7 @@ function GeometricIntegratorsBase.integrate!(
     @assert n₂ ≥ n₁
     @assert n₂ ≤ ntime(sol)
 
-    solstep = solutionstep(int, sol[n₁-1])
+    solstep = solutionstep(int, sol[n₁ - 1])
     internal_values = Vector{typeof(cache(int).stage_values)}(undef, n₂ - n₁ + 1)
 
     for n in n₁:n₂
@@ -490,7 +511,7 @@ function GeometricIntegratorsBase.integrate!(
             # Offset by n₁: the vector is sized n₂-n₁+1, so indexing by `n` would leave the
             # first n₁-1 slots `#undef` and run off the end for any restart with n₁ > 1.
             # `copy`, not `deepcopy`: `stage_values` is a plain `Matrix{ST}` of floats.
-            internal_values[n-n₁+1] = copy(cache(int).stage_values)
+            internal_values[n - n₁ + 1] = copy(cache(int).stage_values)
         end
     end
 

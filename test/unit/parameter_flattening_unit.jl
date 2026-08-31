@@ -15,7 +15,7 @@
 using NeuralNetworkParameters: NetworkParameters, flatten, unflatten, unflatten!, flatlength
 
 nested_params() = (L1 = (W = [1.0 2.0; 3.0 4.0], b = [5.0, 6.0]),
-                   L2 = (W = [7.0 8.0],))
+    L2 = (W = [7.0 8.0],))
 
 @testset "parameter flattening" begin
     @testset "flattening" begin
@@ -108,6 +108,7 @@ nested_params() = (L1 = (W = [1.0 2.0; 3.0 4.0], b = [5.0, 6.0]),
         g = ForwardDiff.gradient(w -> sum(abs2, unflatten(layout, w).L1.W), zeros(8))
 
         @test g == [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        @test ForwardDiff.gradient(w -> sum(unflatten(layout, w).L2.W), zeros(8))[7:8] == [1.0, 1.0]
+        @test ForwardDiff.gradient(w -> sum(unflatten(layout, w).L2.W), zeros(8))[7:8] ==
+              [1.0, 1.0]
     end
 end

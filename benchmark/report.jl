@@ -11,7 +11,8 @@ include(joinpath(@__DIR__, "shallownet_report.jl"))
 const RESULTS_DIR = joinpath(@__DIR__, "results")
 
 function main()
-    isdir(RESULTS_DIR) || error("no results directory at $(RESULTS_DIR); run a benchmark first")
+    isdir(RESULTS_DIR) ||
+        error("no results directory at $(RESULTS_DIR); run a benchmark first")
     csvs = filter(f -> endswith(f, ".csv"), readdir(RESULTS_DIR; join = true))
     isempty(csvs) && error("no CSV files in $(RESULTS_DIR); run a benchmark first")
     println("Aggregating $(length(csvs)) CSV file(s):")

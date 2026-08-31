@@ -16,10 +16,11 @@ using Test
 const OGA_TYPES = (Float16, TEST_TYPES...)   # `NI` comes from testsetup.jl
 
 # All fits, and all selection rules, as they are actually configured.
-oga_fits() = (WeightedQR(), IncrementalQR(), PivotedQR(), TruncatedSVD(),
-              NormalEquationsFit(), NormalEquationsFit(ridge = false))
+function oga_fits()
+    (WeightedQR(), IncrementalQR(), PivotedQR(), TruncatedSVD(),
+        NormalEquationsFit(), NormalEquationsFit(ridge = false))
+end
 oga_selections() = (RawProjection(), NormalizedProjection(), OrthogonalProjection())
-
 
 @testset "grids" begin
     @testset "bias_grid ($T)" for T in OGA_TYPES
@@ -88,7 +89,8 @@ end
             @test all(isfinite, x)
             # Both attain the achievable residual — dropping a dependent direction costs
             # nothing, since it added no reachable component in the first place.
-            @test norm(Float64.(A) * Float64.(x) - Float64.(y)) ≈ best rtol = 64 * sqrt(eps(T))
+            @test norm(Float64.(A) * Float64.(x) - Float64.(y)) ≈ best rtol = 64 *
+                                                                              sqrt(eps(T))
         end
         # Pivoted QR truncates by *column*, so a dependent column gets a zero coefficient.
         @test count(!iszero, xp) ≤ 2
@@ -139,10 +141,12 @@ end
 
     @testset "IncrementalQR reproduces WeightedQR ($T)" for T in OGA_TYPES
         nodes, weights, y = oga_testcase(T)
-        a = oga_fit(OGA(BiasGrid1d(), RawProjection(), WeightedQR()), x -> max(zero(x), x)^3,
-                    nodes, weights, y, 4; bias_interval = [-T(pi), T(pi)], dict_amount = 200)
-        b = oga_fit(OGA(BiasGrid1d(), RawProjection(), IncrementalQR()), x -> max(zero(x), x)^3,
-                    nodes, weights, y, 4; bias_interval = [-T(pi), T(pi)], dict_amount = 200)
+        a = oga_fit(
+            OGA(BiasGrid1d(), RawProjection(), WeightedQR()), x -> max(zero(x), x)^3,
+            nodes, weights, y, 4; bias_interval = [-T(pi), T(pi)], dict_amount = 200)
+        b = oga_fit(
+            OGA(BiasGrid1d(), RawProjection(), IncrementalQR()), x -> max(zero(x), x)^3,
+            nodes, weights, y, 4; bias_interval = [-T(pi), T(pi)], dict_amount = 200)
         if T === Float16
             # At half precision the two factorisations round differently enough to pick
             # different atoms from a dictionary far finer than `T` can resolve. Only the
@@ -163,11 +167,13 @@ end
         @test qr.k == 3
         Q = qr.Q[:, 1:3]
         @test Float64.(Q' * Q) ≈ I rtol = 32 * sqrt(eps(T))
-        @test Float64.(Q * qr.R[1:3, 1:3]) ≈ Float64.(hcat(cols...)) rtol = 32 * sqrt(eps(T))
+        @test Float64.(Q * qr.R[1:3, 1:3]) ≈ Float64.(hcat(cols...)) rtol = 32 *
+                                                                            sqrt(eps(T))
 
         # A column already in the span adds no rank and is refused.
         k = qr.k
-        @test NI.oga_qr_append!(qr, T[2, 2, 0, 0, 0]; min_gain = sqrt(eps(T))) ≤ sqrt(eps(T)) * T(3)
+        @test NI.oga_qr_append!(qr, T[2, 2, 0, 0, 0]; min_gain = sqrt(eps(T))) ≤
+              sqrt(eps(T)) * T(3)
         @test qr.k == k
     end
 end
@@ -196,12 +202,13 @@ end
 
         for sel in (NormalizedProjection(), OrthogonalProjection())
             r = oga_fit(OGA(BiasGrid1d(), sel, IncrementalQR()), σ, nodes, weights, y, 1;
-                        bias_interval = [-pi, pi], dict_amount = 400)
+                bias_interval = [-pi, pi], dict_amount = 400)
             @test r.atoms == [besti]
             @test r.residual ≈ best rtol = 1e-10
         end
-        raw = oga_fit(OGA(BiasGrid1d(), RawProjection(), WeightedQR()), σ, nodes, weights, y, 1;
-                      bias_interval = [-pi, pi], dict_amount = 400)
+        raw = oga_fit(
+            OGA(BiasGrid1d(), RawProjection(), WeightedQR()), σ, nodes, weights, y, 1;
+            bias_interval = [-pi, pi], dict_amount = 400)
         @test raw.residual > best        # not optimal, by design — it is the pinned legacy rule
     end
 end
@@ -211,8 +218,9 @@ end
         nodes, weights, y = oga_testcase(T)
         σ = x -> max(zero(x), x)^3
         # A dictionary far finer than `T` can resolve, so neighbouring atoms round together.
-        r = oga_fit(OGA(BiasGrid1d(), RawProjection(), WeightedQR()), σ, nodes, weights, y, 4;
-                    bias_interval = [-T(pi), T(pi)], dict_amount = 20000)
+        r = oga_fit(
+            OGA(BiasGrid1d(), RawProjection(), WeightedQR()), σ, nodes, weights, y, 4;
+            bias_interval = [-T(pi), T(pi)], dict_amount = 20000)
         @test length(unique(r.atoms)) == length(r.atoms)     # never the same atom twice
     end
 
@@ -220,7 +228,7 @@ end
         nodes, weights, y = oga_testcase(T)
         σ = x -> max(zero(x), x)^3
         r = oga_fit(OGA(BiasGrid1d(), OrthogonalProjection(), IncrementalQR()), σ,
-                    nodes, weights, y, 4; bias_interval = [-T(pi), T(pi)], dict_amount = 20000)
+            nodes, weights, y, 4; bias_interval = [-T(pi), T(pi)], dict_amount = 20000)
         # Every accepted atom contributed a genuinely new direction...
         @test all(>(zero(T)), r.gains)
         @test length(r.gains) == length(r.atoms)
@@ -238,7 +246,7 @@ end
         # `σ(b)⁴` for `b ≈ π` overflows Float16, giving atoms of infinite norm. They must be
         # skipped, not normalised by `Inf` into `NaN`.
         r = oga_fit(OGA1d(), x -> max(zero(x), x)^4, nodes, weights, y, 4;
-                    bias_interval = [-T(pi), T(pi)], dict_amount = 400)
+            bias_interval = [-T(pi), T(pi)], dict_amount = 400)
         @test all(isfinite, r.c)
         @test all(isfinite, r.W) && all(isfinite, r.b)
         @test isfinite(r.residual)
@@ -250,18 +258,21 @@ end
         # The backward-compatibility claim: the weight axis is a strict generalisation, so
         # collapsing it must recover the original dictionary exactly.
         A1 = NI.oga_atoms(BiasGrid1d(), [-T(pi), T(pi)], 20, T)
-        A2 = NI.oga_atoms(WeightBiasGrid2d(octaves = (0, 0), weight_amount = 0, signed = true),
-                          [-T(pi), T(pi)], 20, T)
+        A2 = NI.oga_atoms(
+            WeightBiasGrid2d(octaves = (0, 0), weight_amount = 0, signed = true),
+            [-T(pi), T(pi)], 20, T)
         @test eltype(A2) === T
         @test size(A1) == size(A2)
-        @test sort(collect(zip(A1[:, 1], A1[:, 2]))) == sort(collect(zip(A2[:, 1], A2[:, 2])))
+        @test sort(collect(zip(A1[:, 1], A1[:, 2]))) ==
+              sort(collect(zip(A2[:, 1], A2[:, 2])))
     end
 
     @testset "angular grid lies on its radii ($T)" for T in OGA_TYPES
         A = NI.oga_atoms(AngularGrid(radii = (1.0,), amount = 16), [-T(pi), T(pi)], 400, T)
         @test eltype(A) === T
         @test size(A, 1) == 17
-        @test all(abs(sqrt(A[i, 1]^2 + A[i, 2]^2) - one(T)) < 8 * sqrt(eps(T)) for i in axes(A, 1))
+        @test all(abs(sqrt(A[i, 1]^2 + A[i, 2]^2) - one(T)) < 8 * sqrt(eps(T))
+        for i in axes(A, 1))
     end
 
     @testset "off-grid refinement improves the greedy step it optimises ($T)" for T in OGA_TYPES
@@ -277,12 +288,14 @@ end
         # testing `S = 4` would be testing a property refinement does not have.
         for S in (1, 4)
             plain = oga_fit(OGA(BiasGrid1d(), NormalizedProjection(), IncrementalQR()),
-                            σ, nodes, weights, y, S; kw...)
-            fine = oga_fit(OGA(Refined(BiasGrid1d()), NormalizedProjection(), IncrementalQR()),
-                           σ, nodes, weights, y, S; kw...)
+                σ, nodes, weights, y, S; kw...)
+            fine = oga_fit(
+                OGA(Refined(BiasGrid1d()), NormalizedProjection(), IncrementalQR()),
+                σ, nodes, weights, y, S; kw...)
             @test all(isfinite, fine.c)
             @test all(isfinite, fine.W) && all(isfinite, fine.b)
-            S == 1 && @test Float64(fine.residual) ≤ Float64(plain.residual) + 8 * sqrt(eps(T))
+            S == 1 &&
+                @test Float64(fine.residual) ≤ Float64(plain.residual) + 8 * sqrt(eps(T))
         end
     end
 end
@@ -294,16 +307,18 @@ end
     # actually enforces time-reversal symmetry of the ansatz; with independent weights the
     # pair can drift apart. Nothing else in the suite checks the structure directly.
     @testset "$(nameof(typeof(sym))) ($T)" for sym in (MirrorPairs(), SharedMirrorPairs()),
-                                               T in OGA_TYPES
+        T in OGA_TYPES
+
         nodes, weights, y = oga_testcase(T)
         modulation = nodes .* (one(T) .- nodes)          # the t(1-t) ansatz factor
-        r = oga_fit(OGA(BiasGrid1d(), RawProjection(), WeightedQR()), x -> max(zero(x), x)^3,
-                    nodes, weights, y, 4; bias_interval = [-T(pi), T(pi)], dict_amount = 200,
-                    modulation = modulation, symmetry = sym)
+        r = oga_fit(
+            OGA(BiasGrid1d(), RawProjection(), WeightedQR()), x -> max(zero(x), x)^3,
+            nodes, weights, y, 4; bias_interval = [-T(pi), T(pi)], dict_amount = 200,
+            modulation = modulation, symmetry = sym)
 
         for k in 1:2
-            @test r.W[2k] == -r.W[2k-1]
-            @test r.b[2k] == r.W[2k-1] + r.b[2k-1]
+            @test r.W[2k] == -r.W[2k - 1]
+            @test r.b[2k] == r.W[2k - 1] + r.b[2k - 1]
         end
         if sym isa SharedMirrorPairs
             @test r.c[2] == r.c[1]
@@ -319,18 +334,17 @@ end
     # `_fill_unused!` fills pairs too, so it cannot repair it. Rejected up front rather
     # than half-honoured — otherwise the duplicate neuron reappears as a rank-deficient
     # Newton Jacobian, several call levels from the cause.
-    @testset "an odd neuron count is rejected ($(nameof(typeof(sym))))" for sym in
-                                                (MirrorPairs(), SharedMirrorPairs())
+    @testset "an odd neuron count is rejected ($(nameof(typeof(sym))))" for sym in (MirrorPairs(), SharedMirrorPairs())
         nodes, weights, y = oga_testcase(Float64)
         @test_throws ArgumentError oga_fit(OGA1d(), x -> max(zero(x), x)^3, nodes, weights,
-                                           y, 5; bias_interval = [-pi, pi],
-                                           dict_amount = 200, symmetry = sym)
+            y, 5; bias_interval = [-pi, pi],
+            dict_amount = 200, symmetry = sym)
     end
 
     @testset "an odd neuron count is fine without a symmetry" begin
         nodes, weights, y = oga_testcase(Float64)
         r = oga_fit(OGA1d(), x -> max(zero(x), x)^3, nodes, weights, y, 5;
-                    bias_interval = [-pi, pi], dict_amount = 200, symmetry = NoSymmetry())
+            bias_interval = [-pi, pi], dict_amount = 200, symmetry = NoSymmetry())
         @test length(r.W) == 5
     end
 end
@@ -343,10 +357,10 @@ end
         nodes, weights, y = oga_testcase(T)
         σ = x -> max(zero(x), x)^3
         dicts = (BiasGrid1d(), WeightBiasGrid2d(bias_amount = 40),
-                 AngularGrid(amount = 60), Refined(BiasGrid1d()))
+            AngularGrid(amount = 60), Refined(BiasGrid1d()))
         for dict in dicts, sel in oga_selections(), fit in oga_fits()
             r = oga_fit(OGA(dict, sel, fit), σ, nodes, weights, y, 4;
-                        bias_interval = [-T(pi), T(pi)], dict_amount = 60)
+                bias_interval = [-T(pi), T(pi)], dict_amount = 60)
             @test eltype(r.W) === T
             @test eltype(r.b) === T
             @test eltype(r.c) === T
@@ -360,8 +374,8 @@ end
         nodes, weights, y = oga_testcase(T)
         σ = x -> max(zero(x), x)^3
         @test (@inferred oga_fit(OGA1d(), σ, nodes, weights, y, 4;
-                                 bias_interval = [-T(pi), T(pi)],
-                                 dict_amount = 60)) isa NI.OGAResult{T}
+            bias_interval = [-T(pi), T(pi)],
+            dict_amount = 60)) isa NI.OGAResult{T}
     end
 
     @testset "an upcasting activation is rejected, not silently honoured ($T)" for T in (Float16, Float32)
@@ -370,7 +384,7 @@ end
         bad = x -> max(0.0, x)^3
         @test_throws ArgumentError NI.oga_check_precision(bad, T)
         @test_throws ArgumentError oga_fit(OGA1d(), bad, nodes, weights, y, 4;
-                                          bias_interval = [-T(pi), T(pi)], dict_amount = 60)
+            bias_interval = [-T(pi), T(pi)], dict_amount = 60)
         @test NI.oga_check_precision(x -> max(zero(x), x)^3, T) === nothing
     end
 end
@@ -383,12 +397,13 @@ end
     @testset "$T" for T in (Float64, Float32)
         nodes, weights, y = oga_testcase(T)
         r = oga_fit(OGA1d(), x -> max(zero(x), x)^3, nodes, weights, y, 4;
-                    bias_interval = [-T(pi), T(pi)], dict_amount = 400)
+            bias_interval = [-T(pi), T(pi)], dict_amount = 400)
         @test r.atoms == [802, 401, 711, 286]
         @test Float64.(r.W) == [1.0, -1.0, 1.0, -1.0]
-        @test Float64.(r.b) ≈ [pi, pi, 1.7121679962064373, 1.335176877775662] rtol = 8 * sqrt(eps(T))
+        @test Float64.(r.b) ≈ [pi, pi, 1.7121679962064373, 1.335176877775662] rtol = 8 *
+                                                                                     sqrt(eps(T))
         @test Float64.(r.c) ≈ [-0.49460912014278396, 0.5665083163888716,
-                               1.4395563049941698, -3.5558966254259077] rtol = 64 * sqrt(eps(T))
+            1.4395563049941698, -3.5558966254259077] rtol = 64 * sqrt(eps(T))
         @test Float64(r.residual) ≈ 0.0029557412009774313 rtol = 64 * sqrt(eps(T))
     end
 end

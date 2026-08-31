@@ -33,8 +33,8 @@ abstract type AbstractShallowNetBasis{T} <: NetworkBasis{T} end
 end
 
 activation(b::NetworkBasis) = b.common.activation
-backend(b::NetworkBasis)    = b.common.backend
-nbasis(b::NetworkBasis)     = b.S
+backend(b::NetworkBasis) = b.common.backend
+nbasis(b::NetworkBasis) = b.S
 
 """
     has_symbolic_derivatives(basis) -> Bool

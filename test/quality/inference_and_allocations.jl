@@ -62,10 +62,10 @@ end
 # supported version here. It is kept because the shape of it recurs: a defect that shows on one Julia
 # version and not another, in a walk two packages away, found from a budget in this file.
 const RESIDUAL_ALLOC_BUDGET = Dict(
-    "ShallowNet"                   => 17_000,
-    "ShallowNetReversible"         => 17_000,
-    "ShallowNetAutodiff"           => 78_000,
-    "ShallowNetAutodiffReversible" => 78_000,
+    "ShallowNet" => 17_000,
+    "ShallowNetReversible" => 17_000,
+    "ShallowNetAutodiff" => 78_000,
+    "ShallowNetAutodiffReversible" => 78_000
 )
 
 # The measurement has to happen inside a function taking `p` as an argument, not inline in a

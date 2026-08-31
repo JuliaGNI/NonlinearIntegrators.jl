@@ -36,13 +36,15 @@ const DICT_AMOUNT = 400
 const MAXIT = 1000
 
 const SEEDS = [
-    ("reference",     OGA1dNormalEquations()),
-    ("oga1d",         OGA1d()),
-    ("oga1d-stable",  OGA1dStable()),
+    ("reference", OGA1dNormalEquations()),
+    ("oga1d", OGA1d()),
+    ("oga1d-stable", OGA1dStable()),
     ("oga1d-refined", OGA(Refined(BiasGrid1d()), NormalizedProjection(), IncrementalQR())),
-    ("oga2d",         OGA2d(dictionary = WeightBiasGrid2d(octaves = (-3, 3), weight_amount = 6,
-                                                         bias_amount = 56))),
-    ("oga-sphere",    OGASphere(dictionary = AngularGrid(radii = (0.25, 1.0, 4.0), amount = 266))),
+    ("oga2d",
+        OGA2d(dictionary = WeightBiasGrid2d(octaves = (-3, 3), weight_amount = 6,
+            bias_amount = 56))),
+    ("oga-sphere",
+        OGASphere(dictionary = AngularGrid(radii = (0.25, 1.0, 4.0), amount = 266)))
 ]
 
 const ACTIVATIONS = [("relu3", relu_k(3)), ("gelu", gelu), ("tanh", tanh)]
@@ -63,7 +65,7 @@ function stable_regularization(::Type{T}) where {T}
 
     sub = [r for r in rows if r["T"] == string(T)]
     isempty(sub) && return (fallback[1], fallback[2],
-                            "documented default 16√eps(T) (no $T rows in the sweep)")
+        "documented default 16√eps(T) (no $T rows in the sweep)")
 
     best, bestn = 0, -1
     for m in sort(unique(Int[inum(r, "lambda_multiple") for r in sub]))
@@ -74,11 +76,14 @@ function stable_regularization(::Type{T}) where {T}
     best == 0 && return fallback
     total = count(r -> inum(r, "lambda_multiple") == best, sub)
     return (best, oga_reg_factor(T, best),
-            "harmonic-oscillator sweep ($bestn/$total converged)")
+        "harmonic-oscillator sweep ($bestn/$total converged)")
 end
 
-classify(e) = e isa SingularException ? "singular" :
-    (n = string(nameof(typeof(e))); occursin("NonlinearSolver", n) ? "diverged" : first(n, 14))
+function classify(e)
+    e isa SingularException ? "singular" :
+    (n = string(nameof(typeof(e)));
+        occursin("NonlinearSolver", n) ? "diverged" : first(n, 14))
+end
 
 # The problem's own default initial conditions, taken once in `Float64` and converted per
 # precision. Both the reference and the per-case problems must start from *these* — passing
@@ -95,7 +100,7 @@ dp_p0(::Type{T}) where {T} = T.(collect(DP_DEFAULTS.ics.p))
 function build_reference()
     try
         prob = DoublePendulum.lodeproblem(dp_q0(Float64), dp_p0(Float64);
-                                          timespan = (0.0, NSTEPS * DT), timestep = DT / 20)
+            timespan = (0.0, NSTEPS * DT), timestep = DT / 20)
         res = integrate(prob, Gauss(8))
         return Float64.(collect(res.q[:])[end])
     catch e
@@ -107,7 +112,8 @@ end
 function ham_drift(sol, params)
     try
         qs, ps = collect(sol.q[:]), collect(sol.p[:])
-        H = Float64[Float64(DoublePendulum.hamiltonian(0, q, p, params)) for (q, p) in zip(qs, ps)]
+        H = Float64[Float64(DoublePendulum.hamiltonian(0, q, p, params))
+                    for (q, p) in zip(qs, ps)]
         H0 = H[1]
         (!isfinite(H0) || H0 == 0) && return NaN
         return maximum(abs.((H .- H0) ./ H0))
@@ -118,19 +124,22 @@ end
 
 function run_case(basis, ::Type{T}, seed, λ, prob, refq) where {T}
     method = ShallowNet(basis, QuadratureRules.GaussLegendreQuadrature(T, R_QUAD);
-                                   show_status = false,
-                                   bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
-                                   initial_guess_method = seed)
+        show_status = false,
+        bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
+        initial_guess_method = seed)
     status, ref_err, drift, iters, secs = "ok", NaN, NaN, NaN, NaN
     try
         int = GeometricIntegrator(prob, method; regularization_factor = T(λ),
-                                  max_iterations = MAXIT,
-                                  f_abstol = oga_f_abstol(T))
+            max_iterations = MAXIT,
+            f_abstol = oga_f_abstol(T))
         local sol
         t0 = time()
         sol, _ = integrate(int)
         secs = time() - t0
-        try; iters = Float64(solverstate(int).iterations); catch; end
+        try
+            iters = Float64(solverstate(int).iterations)
+        catch
+        end
         qend = Float64.(collect(sol.q[:])[end])
         if !(eltype(sol.q[end]) === T)
             status = "upcast"
@@ -168,11 +177,11 @@ function main()
     for T in TYPES
         multiple, factor, why = stable_regularization(T)
         @printf("  %-8s λ = %d√eps(T) = %.3e   [%s]\n", string(T), multiple,
-                Float64(factor), why)
+            Float64(factor), why)
     end
     println("="^104)
     @printf("%-8s %-8s %-15s | %-10s %-11s %-11s %-6s %-7s\n",
-            "T", "act", "seed", "status", "ref_err", "ham_drift", "iters", "secs")
+        "T", "act", "seed", "status", "ref_err", "ham_drift", "iters", "secs")
     println("-"^104)
 
     open(csvpath, "w") do io
@@ -197,16 +206,19 @@ function main()
                 for (sname, seed) in SEEDS
                     r = run_case(basis, T, seed, λ, prob, refq)
                     @printf("%-8s %-8s %-15s | %-10s %-11s %-11s %-6s %-7s\n",
-                            string(T), aname, sname, r.status,
-                            isfinite(r.ref_err) ? @sprintf("%.3e", r.ref_err) : "—",
-                            isfinite(r.drift) ? @sprintf("%.3e", r.drift) : "—",
-                            isnan(r.iters) ? "—" : string(round(Int, r.iters)),
-                            isnan(r.secs) ? "—" : @sprintf("%.2f", r.secs))
-                    println(io, join(("double_pendulum", "double_pendulum", string(T),
-                                      csvnum(DT), string(S_NEURONS), string(R_QUAD), aname,
-                                      sname, string(multiple), csvnum(Float64(λ)), r.status,
-                                      csvnum(r.ref_err), csvnum(r.drift), csvnum(r.iters),
-                                      csvnum(r.secs)), ","))
+                        string(T), aname, sname, r.status,
+                        isfinite(r.ref_err) ? @sprintf("%.3e", r.ref_err) : "—",
+                        isfinite(r.drift) ? @sprintf("%.3e", r.drift) : "—",
+                        isnan(r.iters) ? "—" : string(round(Int, r.iters)),
+                        isnan(r.secs) ? "—" : @sprintf("%.2f", r.secs))
+                    println(io,
+                        join(
+                            ("double_pendulum", "double_pendulum", string(T),
+                                csvnum(DT), string(S_NEURONS), string(R_QUAD), aname,
+                                sname, string(multiple), csvnum(Float64(λ)), r.status,
+                                csvnum(r.ref_err), csvnum(r.drift), csvnum(r.iters),
+                                csvnum(r.secs)),
+                            ","))
                     flush(io)
                 end
             end

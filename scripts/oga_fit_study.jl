@@ -44,26 +44,26 @@ const BIAS = (-pi, pi)
 # comparison holds that count roughly fixed rather than handing the richer dictionaries a
 # larger budget.
 const DICTIONARIES = [
-    ("grid1d",   BiasGrid1d()),
-    ("grid2d",   WeightBiasGrid2d(octaves = (-3, 3), weight_amount = 6, bias_amount = 56)),
-    ("angular",  AngularGrid(radii = (0.25, 1.0, 4.0), amount = 266)),
-    ("refined",  Refined(BiasGrid1d(); iterations = 4)),
+    ("grid1d", BiasGrid1d()),
+    ("grid2d", WeightBiasGrid2d(octaves = (-3, 3), weight_amount = 6, bias_amount = 56)),
+    ("angular", AngularGrid(radii = (0.25, 1.0, 4.0), amount = 266)),
+    ("refined", Refined(BiasGrid1d(); iterations = 4))
 ]
 
 const SELECTIONS = [
-    ("raw",        RawProjection()),
+    ("raw", RawProjection()),
     ("normalized", NormalizedProjection()),
-    ("orthogonal", OrthogonalProjection()),
+    ("orthogonal", OrthogonalProjection())
 ]
 
 const FITS = [
-    ("qr",          WeightedQR()),
-    ("incqr",       IncrementalQR()),
-    ("pivqr",       PivotedQR()),
-    ("tsvd",        TruncatedSVD()),
-    ("normaleq",    NormalEquationsFit(ridge = true)),
+    ("qr", WeightedQR()),
+    ("incqr", IncrementalQR()),
+    ("pivqr", PivotedQR()),
+    ("tsvd", TruncatedSVD()),
+    ("normaleq", NormalEquationsFit(ridge = true)),
     # The reference implementation's arithmetic: Gram solve, no ridge, in a Float64 island.
-    ("normaleq+f64", NormalEquationsFit(ridge = false, island = true)),
+    ("normaleq+f64", NormalEquationsFit(ridge = false, island = true))
 ]
 
 # ---- targets ----------------------------------------------------------------
@@ -74,10 +74,10 @@ const FITS = [
 # known to struggle), a monotone exponential, and a two-frequency signal standing in for a
 # chaotic segment.
 const TARGETS = [
-    ("smooth",      t -> cos(3t)),
+    ("smooth", t -> cos(3t)),
     ("oscillatory", t -> cos(12t)),
     ("exponential", t -> exp(2t) / 4),
-    ("twofreq",     t -> 0.4cos(7t) + 0.3sin(11t + 1)),
+    ("twofreq", t -> 0.4cos(7t) + 0.3sin(11t + 1))
 ]
 
 # ---- metrics ----------------------------------------------------------------
@@ -86,10 +86,12 @@ const TARGETS = [
 # report the fit error and the conditioning. All `S` neurons are included, including any
 # zero-weight placeholders: they are part of what the Newton solve sees, so they belong in
 # the conditioning estimate.
-function seed_metrics(σ, W, b, c, nodes64::Vector{Float64}, w64::Vector{Float64}, y64::Vector{Float64})
+function seed_metrics(
+        σ, W, b, c, nodes64::Vector{Float64}, w64::Vector{Float64}, y64::Vector{Float64})
     sw = sqrt.(w64)
     Φ = Matrix{Float64}(undef, length(nodes64), length(W))
     for i in eachindex(W), j in eachindex(nodes64)
+
         Φ[j, i] = σ(Float64(W[i]) * nodes64[j] + Float64(b[i])) * sw[j]
     end
     any(!isfinite, Φ) && return (NaN, NaN, NaN)
@@ -113,8 +115,8 @@ function main()
     println("Tier A — OGA seed quality (no integrator, no Newton): $total cases")
     println("="^100)
     @printf("%-12s %-8s %-8s %-9s %-11s %-13s | %-10s %-10s %-10s %-4s %-4s\n",
-            "target", "T", "act", "dict", "selection", "fit",
-            "fit_err", "cond", "σ_min", "neu", "rej")
+        "target", "T", "act", "dict", "selection", "fit",
+        "fit_err", "cond", "σ_min", "neu", "rej")
     println("-"^100)
 
     idx = 0
@@ -122,6 +124,7 @@ function main()
         println(io, CSV_HEADER)
         flush(io)
         for (tname, f) in TARGETS, T in (Float16, Float32, Float64)
+
             nodes = T.((0:NNODES) ./ NNODES)
             weights = NI.simpson_quadrature(NNODES, T)
             nodes64 = Float64.(nodes)
@@ -139,8 +142,8 @@ function main()
                 secs = NaN
                 try
                     secs = @elapsed r = oga_fit(oga, σ, nodes, weights, y, S_NEURONS;
-                                                bias_interval = [T(BIAS[1]), T(BIAS[2])],
-                                                dict_amount = DICT_AMOUNT)
+                        bias_interval = [T(BIAS[1]), T(BIAS[2])],
+                        dict_amount = DICT_AMOUNT)
                     neurons, rejected = r.neurons, r.rejected
                     if !(all(isfinite, r.c) && all(isfinite, r.W) && all(isfinite, r.b))
                         status = "nonfinite"
@@ -153,17 +156,20 @@ function main()
                 end
 
                 @printf("%-12s %-8s %-8s %-9s %-11s %-13s | %-10s %-10s %-10s %-4s %-4s\n",
-                        tname, string(T), aname, dname, sname, fname,
-                        isfinite(err) ? @sprintf("%.3e", err) : status,
-                        isfinite(cnd) ? @sprintf("%.2e", cnd) : "—",
-                        isfinite(smin) ? @sprintf("%.2e", smin) : "—",
-                        neurons < 0 ? "—" : string(neurons),
-                        rejected < 0 ? "—" : string(rejected))
+                    tname, string(T), aname, dname, sname, fname,
+                    isfinite(err) ? @sprintf("%.3e", err) : status,
+                    isfinite(cnd) ? @sprintf("%.2e", cnd) : "—",
+                    isfinite(smin) ? @sprintf("%.2e", smin) : "—",
+                    neurons < 0 ? "—" : string(neurons),
+                    rejected < 0 ? "—" : string(rejected))
 
-                println(io, join(("fit_study", tname, string(T), aname, dname, sname, fname,
-                                  string(S_NEURONS), string(DICT_AMOUNT), status,
-                                  csvnum(err), csvnum(cnd), csvnum(smin),
-                                  string(neurons), string(rejected), csvnum(secs)), ","))
+                println(io,
+                    join(
+                        ("fit_study", tname, string(T), aname, dname, sname, fname,
+                            string(S_NEURONS), string(DICT_AMOUNT), status,
+                            csvnum(err), csvnum(cnd), csvnum(smin),
+                            string(neurons), string(rejected), csvnum(secs)),
+                        ","))
                 flush(io)
             end
         end

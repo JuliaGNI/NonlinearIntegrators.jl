@@ -16,21 +16,21 @@ for this integrator. The basis must have an even number of neurons — they come
 mirrored pairs.
 """
 struct ShallowNetReversible{T, NNODES, basisType <: Basis{T},
-                                ET <: Extrapolation,
-                                IPMT <: InitialParametersMethod} <: ShallowNetMethod
-    common        :: NetworkIntegratorCore{T, NNODES, basisType, ET, IPMT}
-    bias_interval :: SVector{2, T}
-    dict_amount   :: Int
+    ET <: Extrapolation,
+    IPMT <: InitialParametersMethod} <: ShallowNetMethod
+    common::NetworkIntegratorCore{T, NNODES, basisType, ET, IPMT}
+    bias_interval::SVector{2, T}
+    dict_amount::Int
 
     function ShallowNetReversible(basis::Basis{T}, quadrature::QuadratureRule{T};
-        extrapolation_substep      :: Int  = 10,
-        training_epochs           :: Int  = 50000,
-        show_status               :: Bool = false,
-        initial_trajectory_method :: ET   = IntegratorExtrapolation(),
-        initial_guess_method      :: IPMT = OGA1d(),
-        record_grid_points        :: Int  = 41,
-        bias_interval = [-pi, pi],
-        dict_amount   :: Int = 50000) where {T, ET, IPMT}
+            extrapolation_substep::Int = 10,
+            training_epochs::Int = 50000,
+            show_status::Bool = false,
+            initial_trajectory_method::ET = IntegratorExtrapolation(),
+            initial_guess_method::IPMT = OGA1d(),
+            record_grid_points::Int = 41,
+            bias_interval = [-pi, pi],
+            dict_amount::Int = 50000) where {T, ET, IPMT}
         # The ansatz pairs every neuron with its reflection about t = 1/2 and stores only
         # the independent half, so `S` must be even. Caught here rather than several call
         # levels down in `components!`, which now indexes with `S ÷ 2` and would silently
@@ -42,35 +42,40 @@ struct ShallowNetReversible{T, NNODES, basisType <: Basis{T},
         require_symbolic_derivatives(basis, "ShallowNetReversible")
 
         common = NetworkIntegratorCore(basis, quadrature;
-            extrapolation_substep=extrapolation_substep,
-            training_epochs=training_epochs,
-            show_status=show_status,
-            initial_trajectory_method=initial_trajectory_method,
-            initial_guess_method=initial_guess_method,
+            extrapolation_substep = extrapolation_substep,
+            training_epochs = training_epochs,
+            show_status = show_status,
+            initial_trajectory_method = initial_trajectory_method,
+            initial_guess_method = initial_guess_method,
             record_grid_points = record_grid_points)
         new{T, nnodes(quadrature), typeof(basis), ET, IPMT}(
-            common, SVector{2,T}(bias_interval), dict_amount)
+            common, SVector{2, T}(bias_interval), dict_amount)
     end
 end
 
-GeometricIntegratorsBase.issymmetric(::Union{ShallowNetReversible, Type{<:ShallowNetReversible}}) = true
+function GeometricIntegratorsBase.issymmetric(::Union{
+        ShallowNetReversible, Type{<:ShallowNetReversible}})
+    true
+end
 
 # The cache lives in `network_integrator_core.jl` and is shared with this integrator's
 # sibling; the only thing that differs is the number of unknowns per dimension, passed
 # below. `CacheType` returns `SymbolicShallowNetCache{ST}` — a *concrete* type, which it was
 # not while the basis size and sub-step count were (runtime-computed) type parameters.
 
-function GeometricIntegratorsBase.Cache{ST}(problem::AbstractProblemIODE, method::ShallowNetReversible; kwargs...) where {ST}
+function GeometricIntegratorsBase.Cache{ST}(
+        problem::AbstractProblemIODE, method::ShallowNetReversible; kwargs...) where {ST}
     local S = nbasis(method)
     SymbolicShallowNetCache{ST}(initial_conditions(problem), 2 * S + 1, S, nnodes(method),
         extrapolation_substep(method);
         record_grid_points = method.record_grid_points, kwargs...)
 end
 
-@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE, method::ShallowNetReversible) =
-    SymbolicShallowNetCache{ST}
+@inline GeometricIntegratorsBase.CacheType(ST, problem::AbstractProblemIODE,
+    method::ShallowNetReversible) = SymbolicShallowNetCache{ST}
 
-function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params, int::GeometricIntegrator{<:ShallowNetReversible}) where {ST}
+function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params,
+        int::GeometricIntegrator{<:ShallowNetReversible}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local C = cache(int, ST)
@@ -108,24 +113,24 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     # copy x to X
     for i in eachindex(X)
         for k in eachindex(X[i])
-            X[i][k] = x[D*(i-1)+k]
+            X[i][k] = x[D * (i - 1) + k]
         end
     end
 
     # copy x to p # momenta
     for k in eachindex(p)
-        p[k] = x[D*S+k]
+        p[k] = x[D * S + k]
     end
 
     for k in 1:D
         for i in 1:S
-            ps[k][2].W[i] = x[D*(i-1)+k]
+            ps[k][2].W[i] = x[D * (i - 1) + k]
         end
         for i in 1:(S ÷ 2)
-            ps[k][1].W[2i-1] = x[D*(S+1)+D*(i-1)+k]
-            ps[k][1].b[2i-1] = x[D*(S+1+S÷2)+D*(i-1)+k]
-            ps[k][1].W[2i] = -ps[k][1].W[2i-1]
-            ps[k][1].b[2i] = ps[k][1].W[2i-1] + ps[k][1].b[2i-1]
+            ps[k][1].W[2i - 1] = x[D * (S + 1) + D * (i - 1) + k]
+            ps[k][1].b[2i - 1] = x[D * (S + 1 + S ÷ 2) + D * (i - 1) + k]
+            ps[k][1].W[2i] = -ps[k][1].W[2i - 1]
+            ps[k][1].b[2i] = ps[k][1].W[2i - 1] + ps[k][1].b[2i - 1]
         end
     end
 
@@ -203,8 +208,8 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     end
 end
 
-
-function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::GeometricIntegrator{<:ShallowNetReversible}) where {ST}
+function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params,
+        int::GeometricIntegrator{<:ShallowNetReversible}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
     local q̄ = sol.q
@@ -235,7 +240,7 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
                 z += method(int).b[j] * m[j, i, k] * F[j][k] * timestep(int)
                 z += method(int).b[j] * a[j, i, k] * P[j][k]
             end
-            b[D*(i-1)+k] = (r₁[i, k] * p̃[k] - r₀[i, k] * p̄[k]) - z
+            b[D * (i - 1) + k] = (r₁[i, k] * p̃[k] - r₀[i, k] * p̄[k]) - z
         end
     end
 
@@ -245,17 +250,17 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
         for j in eachindex(X)
             y += r₀[j, k] * X[j][k]
         end
-        b[D*S+k] = q̄[k] - y
+        b[D * S + k] = q̄[k] - y
     end
 
     for i in 1:(S ÷ 2)
         for k in 1:D
             z = zero(ST)
             for j in eachindex(P, F)
-                z += timestep(int) * method(int).b[j] * F[j][k] * dqdWc[j, 2i-1, k]
-                z += method(int).b[j] * P[j][k] * dvdWc[j, 2i-1, k]
+                z += timestep(int) * method(int).b[j] * F[j][k] * dqdWc[j, 2i - 1, k]
+                z += method(int).b[j] * P[j][k] * dvdWc[j, 2i - 1, k]
             end
-            b[D*(S+1)+D*(i-1)+k] = dqdWr₁[2i-1, k] * p̃[k] - z
+            b[D * (S + 1) + D * (i - 1) + k] = dqdWr₁[2i - 1, k] * p̃[k] - z
         end
     end
 
@@ -263,10 +268,11 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
         for k in 1:D
             z = zero(ST)
             for j in eachindex(P, F)
-                z += timestep(int) * method(int).b[j] * F[j][k] * dqdbc[j, 2i-1, k]
-                z += method(int).b[j] * P[j][k] * dvdbc[j, 2i-1, k]
+                z += timestep(int) * method(int).b[j] * F[j][k] * dqdbc[j, 2i - 1, k]
+                z += method(int).b[j] * P[j][k] * dvdbc[j, 2i - 1, k]
             end
-            b[D*(S+1+S÷2)+D*(i-1)+k] = (dqdbr₁[2i-1, k] * p̃[k] - dqdbr₀[2i-1, k] * p̄[k]) - z
+            b[D * (S + 1 + S ÷ 2) + D * (i - 1) + k] = (dqdbr₁[2i - 1, k] * p̃[k] -
+                                                        dqdbr₀[2i - 1, k] * p̄[k]) - z
         end
     end
     # `@debug`, not `show_status ? println(...)`: `residual!` runs once per Newton iteration
@@ -276,14 +282,10 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params, int::Geo
     @debug "residual" b norm_b = norm(b)
 end
 
-
-
 # No `update!` override here: this integrator uses the shared DT-form `update!` in
 # `network_integrator_core.jl`, of which the override that used to sit here was a verbatim
 # copy. (The two *autodiff* integrators do override it — they recompute `p` from the
 # quadrature rather than reading it out of the cache.)
-
-
 
 function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNetReversible})
     local x = nlsolution(int)
@@ -302,20 +304,17 @@ function record_finer_solution!(sol, int::GeometricIntegrator{<:ShallowNetRevers
 
     for k in 1:D
         for i in 1:S
-            ps[k][2].W[i] = x[D*(i-1)+k]
+            ps[k][2].W[i] = x[D * (i - 1) + k]
         end
         for i in 1:(S ÷ 2)
-            ps[k][1].W[2i-1] = x[D*(S+1)+D*(i-1)+k]
-            ps[k][1].b[2i-1] = x[D*(S+1+S÷2)+D*(i-1)+k]
-            ps[k][1].W[2i] = -ps[k][1].W[2i-1]
-            ps[k][1].b[2i] = ps[k][1].W[2i-1] + ps[k][1].b[2i-1]
+            ps[k][1].W[2i - 1] = x[D * (S + 1) + D * (i - 1) + k]
+            ps[k][1].b[2i - 1] = x[D * (S + 1 + S ÷ 2) + D * (i - 1) + k]
+            ps[k][1].W[2i] = -ps[k][1].W[2i - 1]
+            ps[k][1].b[2i] = ps[k][1].W[2i - 1] + ps[k][1].b[2i - 1]
         end
         stage_values[:, k] = NN(network_inputs, ps[k])[:]
-        @debug "parameters after solving" dim = k W2 = ps[k][2].W W1 = ps[k][1].W b1 = ps[k][1].b
+        @debug "parameters after solving" dim=k W2=ps[k][2].W W1=ps[k][1].W b1=ps[k][1].b
     end
 
-    @debug "stages prediction after solving" stage_values q = sol.q p = sol.p
-
+    @debug "stages prediction after solving" stage_values q=sol.q p=sol.p
 end
-
-

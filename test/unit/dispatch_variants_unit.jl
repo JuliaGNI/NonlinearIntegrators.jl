@@ -13,8 +13,10 @@
 # bias points per weight magnitude and the atom count is a multiple of it. Kept small: this
 # asserts that the adapter, the symmetry mapping and the incremental QR compose end to end,
 # not that the seed is accurate.
-@testset "$name ShallowNet ($T)" for (seed, name) in [(OGA2d(), "OGA2d"), (OGASphere(), "OGASphere")],
-                                   T in TEST_TYPES
+@testset "$name ShallowNet ($T)" for (seed, name) in [
+        (OGA2d(), "OGA2d"), (OGASphere(), "OGASphere")],
+    T in TEST_TYPES
+
     prob = ho_problem(T; timespan = (T(0.0), T(0.2)), timestep = T(0.1))
     method = ShallowNet(
         build_shallownet_basis(T; S = 4), gauss(T, 8);
@@ -51,8 +53,8 @@ end
 # effect on the run, and anything else would mean the opt-out changed the numerics.
 @testset "symbolic = false basis ($T)" for T in TEST_TYPES
     nosym = ShallowNetBasis{T}(relu_k(3), 4; symbolic = false)
-    full  = build_shallownet_basis(T; S = 4)
-    quad  = gauss(T, 8)
+    full = build_shallownet_basis(T; S = 4)
+    quad = gauss(T, 8)
 
     @test_throws ArgumentError ShallowNet(nosym, quad)
     @test_throws ArgumentError ShallowNetReversible(nosym, quad)
@@ -80,7 +82,7 @@ end
 # differ by orders of magnitude (see `benchmark/compare_derivative_backends.jl`).
 @testset "cse/inplace code generation ($T)" for T in TEST_TYPES
     default = build_shallownet_basis(T; S = 4)
-    plain   = ShallowNetBasis{T}(relu_k(3), 4; cse = false, inplace = false)
+    plain = ShallowNetBasis{T}(relu_k(3), 4; cse = false, inplace = false)
     @test has_symbolic_derivatives(plain)
 
     input = [T(0.3)]
@@ -99,7 +101,8 @@ end
 
     # And the plain-codegen basis still drives an integrator.
     prob = ho_problem(T; timespan = (T(0.0), T(0.2)), timestep = T(0.1))
-    sol, _ = integrate(prob, ShallowNet(plain, gauss(T, 8);
+    sol, _ = integrate(prob,
+        ShallowNet(plain, gauss(T, 8);
             show_status = false, bias_interval = [-T(pi), T(pi)], dict_amount = 400);
         regularization_factor = T(1e-5), max_iterations = MAX_NEWTON_ITERATIONS)
     assert_no_upcast(sol.q, T)
@@ -114,7 +117,7 @@ function rebuild_params(v, template)
     offset = 0
     layers = ()
     for lname in keys(template)
-        layer  = template[lname]
+        layer = template[lname]
         fields = ()
         for fname in keys(layer)
             a = layer[fname]
@@ -146,20 +149,20 @@ end
 @testset "compiled derivatives vs ForwardDiff ($T)" for T in TEST_TYPES
     Random.seed!(1234)
     shallow = build_shallownet_basis(T; S = 4)
-    dense   = build_densenet_basis(T)
+    dense = build_densenet_basis(T)
 
-    @testset "$label" for (label, basis, np) in
-            (("ShallowNetBasis", shallow, 3 * shallow.S), ("DenseNetBasis", dense, dense.NP))
+    @testset "$label" for (label, basis, np) in ((
+        "ShallowNetBasis", shallow, 3 * shallow.S), ("DenseNetBasis", dense, dense.NP))
         NN = basis.NN
         ps = AbstractNeuralNetworks.params(AbstractNeuralNetworks.NeuralNetwork(NN, T))
-        θ  = NI.flatten_params(ps)
-        t  = T(0.37)
+        θ = NI.flatten_params(ps)
+        t = T(0.37)
 
         # The position and the velocity at `t`, both as functions of the flat parameter
         # vector. `v` differentiates `q` in time under whatever number type it is handed, so
         # `ForwardDiff.gradient(v, ·)` nests one dual inside the other.
         q(w, s) = NN([s], rebuild_params(w, ps))[1]
-        v(w)    = ForwardDiff.derivative(s -> q(w, s), t)
+        v(w) = ForwardDiff.derivative(s -> q(w, s), t)
 
         @test length(θ) == np
         @test eltype(θ) == T

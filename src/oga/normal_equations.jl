@@ -27,7 +27,7 @@ Defined only for `ShallowNet` — it is a comparison baseline, not a production
 seed.
 """
 function initial_params!(int::GeometricIntegrator{<:ShallowNet},
-                         initialParams::OGA1dNormalEquations, sol)
+        initialParams::OGA1dNormalEquations, sol)
     local S = nbasis(method(int))
     local D = length(cache(int).q̃)
     local quad_nodes = method(int).network_inputs
@@ -53,13 +53,12 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet},
 
     lo = Float64(bias_interval[1])
     hi = Float64(bias_interval[2])
-    B = lo:(hi - lo)/dict_amount:hi
+    B = lo:((hi - lo) / dict_amount):hi
     w_list = vcat(-1 * ones(length(B), 1), ones(length(B), 1))
     b_list = vcat(collect(B), collect(B))
     A = hcat(w_list, b_list)
     quad_nodes_mat = hcat(Float64.(quad_nodes'), ones(length(quad_nodes)))'
     gx_quad = activation.(A * quad_nodes_mat)
-
 
     for d in 1:D
         W = zeros(S, 1)        # all parameters w
@@ -67,7 +66,7 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet},
         C = zeros(S, nstages + 1)
         f_weight = network_labels[d, :] .* quad_weights
 
-        for k = 1:S
+        for k in 1:S
             #     The subproblem is key to the greedy algorithm, where the
             #     inner products |(u,g) - (f,g)| should be maximized.
             #     Part of the inner products can be computed in advance.
@@ -99,16 +98,14 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet},
             @debug "Sum of squared errors after adding neuron " k ":" errs
         end
         @debug "Finish OGA for dimension" d
-
     end
 
     for k in 1:D
         for i in 1:S
-            x[D*(i-1)+k] = ps[k][2].W[i]
-            x[D*(S+1)+D*(i-1)+k] = ps[k][1].W[i]
-            x[D*(S+1+S)+D*(i-1)+k] = ps[k][1].b[i]
+            x[D * (i - 1) + k] = ps[k][2].W[i]
+            x[D * (S + 1) + D * (i - 1) + k] = ps[k][1].W[i]
+            x[D * (S + 1 + S) + D * (i - 1) + k] = ps[k][1].b[i]
         end
     end
     @debug "Initial guess for DOF from OGA (reference, normal equations) " x
-
 end

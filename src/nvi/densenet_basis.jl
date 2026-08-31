@@ -28,23 +28,23 @@ basis = DenseNetBasis{Float64}(tanh, 8, 8)
 ```
 """
 struct DenseNetBasis{T, AT, NT, BT, SNNT, QWFT, VT, VWFT} <: AbstractDenseNetBasis{T}
-    S      :: Int
-    S₁     :: Int
-    NP     :: Int
-    common :: NetworkBasisCore{AT,NT, BT, SNNT, QWFT, VT, VWFT}
+    S::Int
+    S₁::Int
+    NP::Int
+    common::NetworkBasisCore{AT, NT, BT, SNNT, QWFT, VT, VWFT}
 
-    function DenseNetBasis{T}(activation, S₁, S; backend=CPU(),
-                              cse::Bool=true, inplace::Bool=true) where T
+    function DenseNetBasis{T}(activation, S₁, S; backend = CPU(),
+            cse::Bool = true, inplace::Bool = true) where {T}
         NN = AbstractNeuralNetworks.Chain(
             AbstractNeuralNetworks.Dense(1, S₁, activation),
             AbstractNeuralNetworks.Dense(S₁, S, activation),
-            AbstractNeuralNetworks.Dense(S, 1, identity, use_bias=false))
+            AbstractNeuralNetworks.Dense(S, 1, identity, use_bias = false))
         NP = parameterlength(NN)
 
-        SNN, dqdθ_built, V_built, dvdθ_built =
-            build_network_derivatives(NN; cse = cse, inplace = inplace)
+        SNN, dqdθ_built, V_built, dvdθ_built = build_network_derivatives(NN; cse = cse, inplace = inplace)
 
-        core = NetworkBasisCore(activation, NN, backend, SNN, dqdθ_built, V_built, dvdθ_built)
+        core = NetworkBasisCore(
+            activation, NN, backend, SNN, dqdθ_built, V_built, dvdθ_built)
         new{T, typeof(activation), typeof(NN), typeof(backend), typeof(SNN),
             typeof(dqdθ_built), typeof(V_built), typeof(dvdθ_built)}(S, S₁, NP, core)
     end
