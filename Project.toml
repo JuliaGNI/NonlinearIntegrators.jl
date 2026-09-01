@@ -1,6 +1,6 @@
 name = "NonlinearIntegrators"
 uuid = "4ad56de4-0342-4c02-9694-ab2f23251d8c"
-version = "0.4.3"
+version = "0.5.0"
 authors = ["Michael Kraus <michael.kraus@ipp.mpg.de> and contributors"]
 
 [deps]
@@ -21,6 +21,18 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 SymbolicNeuralNetworks = "aed23131-dcd0-47ca-8090-d21e605652e3"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+
+[weakdeps]
+# `Makie` and not `CairoMakie`: the extension is written against the abstract plotting interface,
+# so the *backend* stays the caller's choice, and loading any of them -- CairoMakie for a paper,
+# GLMakie for a look -- triggers the extension, since each re-exports `Makie`. Four of the five
+# plotting extensions in this ecosystem do it this way (`GeometricProblems`,
+# `ChargedParticleDynamics`, `ElectromagneticFields`, `PoincareInvariants`); `PoissonBrackets`
+# weak-depends on `CairoMakie` directly and is the outlier, not the pattern.
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+
+[extensions]
+NonlinearIntegratorsPlots = "Makie"
 
 [compat]
 # 0.8.0 takes a whole set of parameters as a `NetworkParameters` and renames `ArrayNamedTuple` to
@@ -43,6 +55,11 @@ GeometricIntegratorsBase = "0.6.3"
 GeometricOptimizers = "0.7"
 GeometricSolutions = "0.6"
 LinearAlgebra = "1"
+# Only the current series, unlike `GeometricProblems`' `"0.21, 0.22, 0.23, 0.24"`. Nothing here
+# needs an older Makie -- the extension is new, so there is no installed base to keep resolvable --
+# and every name it uses (`Figure`, `Axis`, `Legend`, `scatterlines!`, `vspan!`, `AxisAspect`) has
+# moved at least once across those four breaking releases.
+Makie = "0.24"
 # 0.3.0 removes `ParameterSet`, the `Union{NetworkParameters, NamedTuple}` the rest of this
 # ecosystem dispatched on. The call sites here name only `NetworkParameters`, `params`, `flatten`,
 # `unflatten` and `unflatten!`, none of which changed, so this is not a bound about what loads.

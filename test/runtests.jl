@@ -43,6 +43,13 @@ include("testsetup.jl")
         include("quality/aqua_jet.jl")
     end
 
+    # The plotting API. After `quality` and before `integration` because loading CairoMakie —
+    # which is what activates the `Makie` weakdep, and with it the extension — is a large
+    # precompile that nothing earlier in the suite needs.
+    @testset "plots" begin
+        include("plots_tests.jl")
+    end
+
     @testset "integration" begin
         include("integration/shallownet_accuracy.jl")
     end
