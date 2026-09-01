@@ -76,6 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scripts/results/` is retired; its contents moved to `runs/` (the CSVs) and `results/` (the
   reports and figures), which is where the studies now write.
 
+- **`Plots` is gone from `scripts/Project.toml`; CairoMakie is the only plotting backend in the
+  repository.** Its last user was `scripts/vise_plot.jl`, which loaded Plots *alongside* the
+  CairoMakie the rest of that file already used — so a bare `plot` was ambiguous between the two
+  and could not resolve at all, which is part of why the file did not run. Its handful of Plots
+  calls, all in the symbolic-regression section, are now `lines` and a small `compare_discovered`
+  helper that draws a discovered expression against the component it was fitted to.
+
 ### Measured
 
 **The OGA fit study's numbers have moved slightly since the archived CSV was written**, and this is

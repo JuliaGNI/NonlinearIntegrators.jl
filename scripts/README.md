@@ -237,5 +237,6 @@ current entry point.
 | `test_stability_analysis.jl` | a symbolic stability analysis, 506 lines |
 | `result_summary_table.jl` | post-processing of a large S/R/k/h/λ grid into tables |
 
-Converting the two `Plots`-based files to CairoMakie is what would let `Plots` leave
-`scripts/Project.toml`; it is standing work.
+**Nothing here uses Plots.jl any more**, and `Plots` is gone from `scripts/Project.toml`.
+CairoMakie is the one backend. The last user was `vise_plot.jl`, which loaded Plots *alongside*
+CairoMakie — so a bare `plot` was ambiguous between the two and could not resolve at all.
