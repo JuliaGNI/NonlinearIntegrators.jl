@@ -166,7 +166,11 @@ end
 const CSV_HEADER = "study,problem,T,dt,S,R,activation,seed,lambda_multiple,lambda,status," *
                    "ref_err,ham_drift,iterations,secs"
 
-function main()
+function main(args)
+    names, _ = parse_arguments(args)
+    isempty(names) || throw(ArgumentError(
+        "this study takes no positional arguments, got $(join(names, ", "))"))
+
     mkpath(RUNS_DIR[])
     csvpath = joinpath(RUNS_DIR[], "oga_double_pendulum.csv")
     refq = build_reference()
@@ -229,4 +233,4 @@ function main()
     write_sweep_report(csvpath, "oga_double_pendulum")
 end
 
-main()
+main(ARGS)
