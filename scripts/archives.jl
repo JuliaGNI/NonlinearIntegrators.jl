@@ -128,6 +128,48 @@ end
 archive_path(stem) = joinpath(RUNS_DIR[], stem * ".jld2")
 
 """
+    normalise_schema!(data) -> data
+
+Bring an archive written by an older revision up to the keys the renderer reads.
+
+Kept here, at the point of reading, rather than in the plotting extension: which spellings an
+archive has had is a property of this directory's history, and the extension should see one
+schema. The alternative — teaching the figure code every key an archive has ever used — spreads
+that history across two repositories.
+
+  - `figure_window` → `windows`. One run drawn over several intervals was one mechanism with two
+    names, a scalar for the global fits and a vector for the network runs.
+"""
+function normalise_schema!(data)
+    if haskey(data, "figure_window") && !haskey(data, "windows")
+        data["windows"] = [data["figure_window"]]
+    end
+    return data
+end
+
+"""
+    archive_kind(data) -> String or nothing
+
+What shape of figure an archive draws: its `"kind"` if it has one, otherwise inferred from which
+series it carries, and `nothing` if it carries neither shape.
+
+The inference is not a fallback for sloppiness — it is what keeps the archive directory readable
+across revisions of the writer. `"kind"` was added after these runs already existed on disk, and
+requiring it strictly would mean re-running forty-five minutes of solves to redraw a figure from
+an archive that already holds every number the figure needs. That is exactly the cost the split
+between `runs/` and `results/` exists to avoid.
+
+A convergence run carries error series against a step ladder; a solution run carries a
+trajectory. Nothing carries both, so the shape is unambiguous.
+"""
+function archive_kind(data)
+    haskey(data, "kind") && return data["kind"]
+    haskey(data, "timesteps") && haskey(data, "errors") && return "convergence"
+    haskey(data, "t") && haskey(data, "q") && haskey(data, "p") && return "solution"
+    return nothing
+end
+
+"""
     store_run!(stem, data) -> String
 
 Write one run's archive and return its path.
@@ -166,8 +208,18 @@ directory is the record of what exists.
 """
 function load_runs()
     isdir(RUNS_DIR[]) || return Dict{String, Any}[]
-    [load(joinpath(RUNS_DIR[], file))
-     for file in sort(filter(endswith(".jld2"), readdir(RUNS_DIR[])))]
+    runs = Dict{String, Any}[]
+    for file in sort(filter(endswith(".jld2"), readdir(RUNS_DIR[])))
+        data = load(joinpath(RUNS_DIR[], file))
+        # The filename *is* the stem, by construction in `store_run!`. Filling it in when it is
+        # absent is what lets a directory of archives written before `"stem"` existed still be
+        # read: a run directory accumulates across revisions of the registry, and the older files
+        # are not corrupt, only older.
+        get!(data, "stem", chop(file; tail = length(".jld2")))
+        normalise_schema!(data)
+        push!(runs, data)
+    end
+    runs
 end
 
 """

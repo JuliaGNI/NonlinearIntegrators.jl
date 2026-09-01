@@ -57,11 +57,35 @@ function main(args)
                    filter(d -> any(s -> occursin(s, d["stem"]), stems), runs)
         isempty(selected) && return report("no archive matched", join(stems, ", "))
 
+        # An archive this renderer cannot draw is reported and skipped, not fatal. A run directory
+        # accumulates across revisions of the registry, and it demonstrably holds files written
+        # before `"kind"` existed; letting one of those abort the run costs every other figure and
+        # says nothing useful about the one at fault. Same reasoning as the per-run guard in
+        # `run_nvi.jl`: one failure must not take the other forty-eight with it.
+        skipped = String[]
         for data in selected
-            banner(data["stem"])
-            for (stem, fig) in NIP.figures(data)
-                emit(fig, stem)
+            stem = data["stem"]
+            kind = archive_kind(data)
+            if kind === nothing
+                push!(skipped, stem)
+                continue
             end
+            data["kind"] = kind
+            banner(stem)
+            try
+                for (name, fig) in NIP.figures(data)
+                    emit(fig, name)
+                end
+            catch exception
+                exception isa InterruptException && rethrow()
+                push!(skipped, stem)
+                report("FAILED", "$(nameof(typeof(exception)))")
+            end
+        end
+
+        isempty(skipped) || begin
+            banner("$(length(skipped)) archive(s) not drawn")
+            foreach(s -> println("    ", s), skipped)
         end
     end
 
