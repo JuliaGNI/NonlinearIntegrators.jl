@@ -143,8 +143,8 @@ const CSV_HEADER = "study,problem,T,dt,S,R,activation,seed,lambda_multiple,lambd
                    "ref_err,iterations,secs"
 
 function run_stage(name::AbstractString, seeds, activations)
-    mkpath(RESULTS_DIR)
-    csvpath = joinpath(RESULTS_DIR, "$(name).csv")
+    mkpath(RUNS_DIR[])
+    csvpath = joinpath(RUNS_DIR[], "$(name).csv")
 
     total = length(TYPES) * length(activations) * length(seeds) * (1 + 6)
     println("="^104)

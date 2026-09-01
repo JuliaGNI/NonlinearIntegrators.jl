@@ -86,6 +86,51 @@ import GeometricProblems.Diagnostics as GPD
         @test t[end] ≈ h * nsteps
     end
 
+    @testset "figure naming" begin
+        # The names asserted here are the ones a talk deck and a paper already `\\includegraphics`,
+        # so these are not examples of the scheme — they are the scheme's current output, and a
+        # change that improves a name still breaks a document until that document is edited too.
+        @test figure_stem("harmonic-oscillator", "vise", 1.0) ==
+              "harmonic-oscillator-vise-h1.0"
+        @test figure_stem("perturbed-pendulum", "vise", 5.0) ==
+              "perturbed-pendulum-vise-h5.0"
+        @test figure_stem("harmonic-oscillator", network_label(4, 8, "relu3"), 2.0) ==
+              "harmonic-oscillator-S4R8Q16relu3-h2.0"
+        @test figure_stem("harmonic-oscillator", network_label(4, 4, "relu3"), 4.0) ==
+              "harmonic-oscillator-S4R4Q8relu3-h4.0"
+        @test figure_stem("perturbed-pendulum", network_label(6, 10, "tanh"), 10.0) ==
+              "perturbed-pendulum-S6R10Q20tanh-h10.0"
+        @test figure_stem("double-pendulum", network_label(8, 8, "tanh"), 0.5) ==
+              "double-pendulum-S8R8Q16tanh-h0.5"
+        @test figure_stem("henon-heiles", network_label(6, 10, "tanh"), 5.0) ==
+              "henon-heiles-S6R10Q20tanh-h5.0"
+        @test figure_stem("harmonic-oscillator",
+            network_label(5, 24, "tanh"; S₁ = 5), 5.0) ==
+              "harmonic-oscillator-Dense5x5R24Q48tanh-h5.0"
+
+        @test study_stem("harmonic-oscillator", "convergence", "nvi") ==
+              "harmonic-oscillator-convergence-nvi"
+        @test study_stem("perturbed-pendulum", "convergence", "vise") ==
+              "perturbed-pendulum-convergence-vise"
+        @test study_stem("perturbed-pendulum", "fourier", "T1000") ==
+              "perturbed-pendulum-fourier-T1000"
+        @test study_stem("henon-heiles", "fourier", "T300") == "henon-heiles-fourier-T300"
+
+        @test window_stem("perturbed-pendulum-fourier-T1000", 200) ==
+              "perturbed-pendulum-fourier-T1000-t200"
+        # A final time arrives as a Float64 and must not print as one, or the name carries a
+        # spurious `.0` that nothing else in the scheme has.
+        @test window_stem("harmonic-oscillator-S6R6Q12tanh-h5.0", 2000.0) ==
+              "harmonic-oscillator-S6R6Q12tanh-h5.0-t2000"
+
+        # `Q` is a label, `R` a constructor argument, and `Q = 2R` always because the quadrature is
+        # Gauss. Asserting it is what keeps a legend from claiming `Q16` at `R = 10`, which is the
+        # mislabelling one published figure actually carried.
+        @test network_label(6, 10, "tanh") == "S6R10Q20tanh"
+        @test galerkin_label(8) == "CGVI(8)"
+        @test galerkin_label(2) == "CGVI(2)"
+    end
+
     @testset "continuous_solution rejects what it cannot do" begin
         @test_throws ArgumentError continuous_solution(Matrix{Float64}[], h)
         @test_throws ArgumentError continuous_solution([zeros(1, 1)], h)
@@ -94,6 +139,56 @@ import GeometricProblems.Diagnostics as GPD
         @test_throws ArgumentError continuous_solution(
             [internal_values[1], zeros(7, 1)], h)
         @test_throws ArgumentError continuous_solution((sol,), h)
+    end
+
+    @testset "relative_invariant_error from a solution" begin
+        ham = HarmonicOscillator.hamiltonian
+        err = relative_invariant_error(sol, ham, prob.parameters)
+
+        # One value per stored step, including `t₀` — where it is exactly zero by construction.
+        @test length(err) == NI.ntime(sol) + 1
+        @test err[1] == 0
+        @test all(isfinite, err)
+        @test all(≥(0), err)
+
+        # The same thing the vector method computes, only with the series gathered for you. This
+        # is the composition four scripts wrote out by hand.
+        H = [ham(sol.t[n], sol.q[n], sol.p[n], prob.parameters) for n in 0:NI.ntime(sol)]
+        @test err == relative_invariant_error(H)
+    end
+
+    @testset "coarse_grid_error" begin
+        # The exact solution on a ten-times-finer grid, rather than a high-order solve: it is the
+        # reference `coarse_grid_error` is designed to be handed, and using the analytic one keeps
+        # this test measuring the error reduction instead of another integrator.
+        substeps = 10
+        ref = HarmonicOscillator.exact_solution(
+            HarmonicOscillator.podeproblem([0.5], [0.0];
+            timespan = (0.0, h * nsteps), timestep = h / substeps,
+            parameters = params))
+        @test NI.ntime(ref) == NI.ntime(sol) * substeps
+
+        err = coarse_grid_error(sol, ref, substeps)
+        @test isfinite(err)
+        @test err ≥ 0
+        # The VISE ansatz spans the exact solution, so this run sits at the solver's residual
+        # floor rather than at a discretisation error.
+        @test err < 1e-8
+
+        # ...and a second-order method at the same step does not. The ordering is the claim; the
+        # magnitudes are the method's business.
+        imp_err = coarse_grid_error(integrate(prob, ImplicitMidpoint()), ref, substeps)
+        @test imp_err > err
+        @test isfinite(imp_err)
+
+        # A solution against itself is exact, and the all-zero-reference guard returns 0 rather
+        # than 0/0.
+        @test coarse_grid_error(sol, sol, 1) == 0.0
+
+        # The subsampling is the whole reason this exists instead of `relative_maximum_error`, so
+        # a reference that is not `substeps` times finer is an error and not a silent stride.
+        @test_throws ArgumentError coarse_grid_error(sol, ref, 7)
+        @test_throws ArgumentError coarse_grid_error(sol, ref, 1)
     end
 
     @testset "plot functions return a Figure" begin

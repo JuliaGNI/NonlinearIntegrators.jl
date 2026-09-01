@@ -5,7 +5,7 @@ using Makie
 # `TimeSeries` (its recipe), which would otherwise clash with `GeometricSolutions.TimeSeries`.
 using GeometricSolutions: GeometricSolution
 
-import NonlinearIntegrators: Trajectory, dimension
+import NonlinearIntegrators: Trajectory, dimension, window_stem
 # The stubs live in the `Diagnostics` submodule rather than at the package's top level, because
 # `plot_solution` and `plot_convergence` are names `GeometricProblems` already exports — see the
 # `Diagnostics` docstring in `src/plots.jl`. The methods below are therefore defined as
@@ -525,6 +525,171 @@ function Diagnostics.plot_convergence(timesteps, errors;
 
     Legend(fig[1, 2], ax; framevisible = false)
     return fig
+end
+
+# ---- figures from an archive --------------------------------------------------
+#
+# The layer above the two plot functions: given one run's archive, build every figure that run
+# earns, and name each one. This is what makes a renderer a dispatcher — glob the run directory,
+# hand each archive over, save what comes back — rather than a second registry of which experiment
+# produces which picture, kept in step with the first by hand.
+#
+# It takes a plain `AbstractDict` of the flat keys `scripts/archives.jl` documents. Deliberately not
+# JLD2, not a problem registry, not a filesystem path: this extension composes figures out of
+# vectors and knows nothing about how they were stored or which study produced them.
+
+# `upto` truncates every series to `t ≤ upto`, the error panel included, so each figure of a
+# windowed set is internally consistent. Applied to the whole figure and not just the traces: an
+# earlier version narrowed only `q` and `p`, which made the trace panels and the error panel
+# disagree and then needed a second time axis to say so.
+#
+# `components` is a vector of one series per degree of freedom, so it is indexed per component and
+# never by the time indices — which is the one way to get this wrong.
+_keep(t, upto) = upto === nothing ? eachindex(t) : findall(≤(upto), t)
+_cut(components, idx) = [series[idx] for series in components]
+
+function _primary(data; upto = nothing)
+    idx = _keep(data["t"], upto)
+    cidx = _keep(data["continuous_t"], upto)
+    Trajectory(data["label"], data["t"][idx], _cut(data["q"], idx), _cut(data["p"], idx);
+        continuous_t = data["continuous_t"][cidx],
+        continuous_q = _cut(data["continuous_q"], cidx),
+        invariant_error = data["hamiltonian_error"][idx])
+end
+
+function _reference(data; upto = nothing)
+    # `exact` where the problem has a closed-form solution, the high-order solve otherwise. Both are
+    # drawn as the black dashed reference because that is the role they play; the distinction belongs
+    # in the legend, not in the styling.
+    #
+    # The substep factor comes from the archive rather than from a constant, because it is not the
+    # same everywhere — one run uses `h/20` where the rest use `h/40` — and a label naming the wrong
+    # grid is worse than no label.
+    exact = haskey(data, "exact_t")
+    prefix = exact ? "exact" : "reference"
+    label = exact ? "Exact solution" :
+            "Reference (Gauss(8), h/$(get(data, "reference_substeps", "?")))"
+    idx = _keep(data["$(prefix)_t"], upto)
+    Trajectory(label, data["$(prefix)_t"][idx],
+        _cut(data["$(prefix)_q"], idx), _cut(data["$(prefix)_p"], idx))
+end
+
+function _comparisons(data; upto = nothing)
+    # Sorted, so the colour a given comparison gets does not depend on dictionary iteration order —
+    # the same integrator has to keep its colour across every figure of a set.
+    map(sort(collect(get(data, "comparisons", Dict{String, Any}())); by = first)) do (
+        label, c)
+        idx = _keep(c["t"], upto)
+        err = get(c, "hamiltonian_error", nothing)
+        Trajectory(label, c["t"][idx], _cut(c["q"], idx), _cut(c["p"], idx);
+            invariant_error = err === nothing ? nothing : err[idx])
+    end
+end
+
+# `Δt` appears only when the run has one. A global fit over a whole window steps nothing, so its
+# archive carries no `"timestep"` and a `Δt` in its title would name a quantity the method does not
+# have. That absence is the whole reason these runs can share this function instead of needing a
+# near-copy of it with one clause removed.
+function _solution_title(data, shown)
+    step = haskey(data, "timestep") ? "Δt = $(data["timestep"]), " : ""
+    "$(data["problem_label"]) — $(data["label"]), $(step)t ∈ [0, $(Int(shown))]"
+end
+
+function _solution_figure(data; upto = nothing)
+    shown = upto === nothing ? data["final_time"] : upto
+    Diagnostics.plot_solution(_primary(data; upto = upto);
+        reference = _reference(data; upto = upto),
+        comparisons = _comparisons(data; upto = upto),
+        timespan = (0.0, shown),
+        title = _solution_title(data, shown))
+end
+
+# Colours for a convergence figure, and the reason they are not left to the default cycle: the
+# largest of these families has ten series and `Makie.wong_colors()` has seven, so the cycle wraps
+# and a solid blue lands beside a dashed blue — which reads as "related" in the one figure whose
+# entire point is that the two families are not.
+#
+# The dashed series are the *reference* family, so they get a greyscale ramp, which says that
+# without a legend and leaves the whole colour cycle for what the figure is actually about.
+const REFERENCE_GREYS = (:black, :grey35, :grey55, :grey70)
+
+function _convergence_colours(linestyles)
+    solid = 0
+    dashed = 0
+    map(linestyles) do style
+        if style === :solid
+            solid += 1
+            Makie.wong_colors()[mod1(solid, length(Makie.wong_colors()))]
+        else
+            dashed += 1
+            REFERENCE_GREYS[mod1(dashed, length(REFERENCE_GREYS))]
+        end
+    end
+end
+
+function _convergence_figure(data)
+    styles = haskey(data, "linestyles") ? Symbol.(data["linestyles"]) : nothing
+
+    # A series that failed at every step contributes no line, and so no legend entry — it would
+    # simply be absent from the figure with nothing to say it had been tried. Named in the title
+    # instead, which is the difference between an omission and a result.
+    absent = [l
+              for (l, e) in zip(data["labels"], data["errors"])
+              if !any(x -> isfinite(x) && x > 0, e)]
+    title = data["title"] *
+            (isempty(absent) ? "" : "\nno solve completed for: " * join(absent, ", "))
+
+    Diagnostics.plot_convergence(data["timesteps"], data["errors"];
+        labels = data["labels"],
+        linestyles = styles,
+        colors = styles === nothing ? nothing : _convergence_colours(styles),
+        reference_orders = Tuple(get(data, "reference_orders", (2, 4, 6))),
+        title = title)
+end
+
+"""
+    figures(data) -> Vector{Pair{String, Figure}}
+
+Every figure one archived run earns, each paired with the stem it should be saved under.
+
+`data` is a run's archive as a plain dictionary — see the schema in `scripts/archives.jl`. Two of
+its keys drive this: `"kind"`, which selects the shape of figure, and `"stem"`, which names it.
+
+# Kinds
+
+  - `"solution"` — the traces of one integrator against a reference and any comparisons, through
+    [`plot_solution`](@ref). A run whose `"windows"` is non-empty additionally yields one figure per
+    window, over `t ∈ [0, window]`, named `<stem>-t<window>`.
+  - `"convergence"` — several error series against the time step, through
+    [`plot_convergence`](@ref), with the reference slopes the study recorded in
+    `"reference_orders"`.
+
+# Why the caller does the saving
+
+This returns figures; it does not write them. Keeping every `save` in one place in the calling
+script is what lets a figure be restyled without re-running a solve, and it keeps this extension
+free of any opinion about where output goes.
+"""
+function Diagnostics.figures(data::AbstractDict)
+    haskey(data, "kind") ||
+        throw(ArgumentError("the archive has no \"kind\"; cannot tell what to draw."))
+    haskey(data, "stem") ||
+        throw(ArgumentError("the archive has no \"stem\"; cannot tell what to call the figure."))
+    stem = data["stem"]
+    kind = data["kind"]
+
+    if kind == "convergence"
+        return [stem => _convergence_figure(data)]
+    elseif kind == "solution"
+        out = [stem => _solution_figure(data)]
+        for upto in get(data, "windows", Float64[])
+            push!(out, window_stem(stem, upto) => _solution_figure(data; upto = upto))
+        end
+        return out
+    else
+        throw(ArgumentError("unknown archive kind \"$(kind)\"; " *
+                            "this extension draws \"solution\" and \"convergence\"."))
+    end
 end
 
 end

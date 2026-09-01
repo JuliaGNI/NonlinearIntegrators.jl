@@ -95,11 +95,15 @@ package does not duplicate any of it:
 
     ```julia
     using NonlinearIntegrators: relative_invariant_error
-    H = [hamiltonian(sol.t[n], sol.q[n], sol.p[n], prob.parameters) for n in 0:ntime(sol)]
-    ΔH = relative_invariant_error(H)
+    ΔH = relative_invariant_error(sol, hamiltonian, prob.parameters)
     ```
 
-The `NonlinearIntegratorsPlots` extension adds the two figures those cannot make. It loads with any
+    The three-argument form gathers the series itself. The vector method is still there for an
+    invariant you have already evaluated.
+
+The `NonlinearIntegratorsPlots` extension adds the two figures those cannot make, plus
+`Diagnostics.figures`, which turns one archived run into every figure it earns — the entry point a
+script that renders a directory of runs uses. It loads with any
 Makie backend, and is reached through the `NonlinearIntegrators.Diagnostics` submodule rather than
 the package's top level, because `plot_solution` is a name every `GeometricProblems` problem
 submodule already exports and `plot_convergence` one that its own `Diagnostics` does.

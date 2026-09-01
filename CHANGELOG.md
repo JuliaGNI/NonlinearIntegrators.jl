@@ -7,6 +7,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The experiment suite lives in `scripts/`.** The registry, five drivers that solve and archive,
+  and one renderer — `experiments.jl`, `archives.jl`, `basis_fits.jl`, `run_vise.jl`, `run_nvi.jl`,
+  `run_fourier.jl`, `run_convergence.jl`, `run_oga_seeds.jl`, `figures.jl`. It was written against
+  this package but kept in a talk directory, where nothing else could reach it and where its
+  `Project.toml` pointed back here through a `[sources]` path. **It arrived without adding a single
+  dependency**; `scripts/README.md` is the description.
+
+- **`Diagnostics.figures(data)`** — the composition layer above `plot_solution` and
+  `plot_convergence`. Given one run's archive as a plain dictionary, it returns every figure that
+  run earns as `stem => Figure` pairs, dispatching on the archive's `"kind"`. That is what lets a
+  renderer be a loop over a directory rather than a second registry of which experiment produces
+  which picture, kept in step with the first by hand. It returns figures and does not write them.
+
+- **Figure naming is part of the package**: `figure_stem`, `window_stem`, `study_stem`,
+  `galerkin_label`, `network_label` in `src/plots.jl`. Callers who archive a run and then plot it
+  need the extension and the script to agree on its name, and these were previously two definitions
+  that could drift — `network_label`'s format alone existed in four inline copies. `Q = 2R` always,
+  which is asserted, because a published figure was once legended `S6R10Q16tanh` at `R = 10`.
+
+- **`coarse_grid_error(sol, ref_sol, substeps)`** — the relative maximum error against a reference
+  on a finer grid, compared at the macro steps the two share. Use it instead of
+  `GeometricSolutions.relative_maximum_error` for an oscillator: that one normalises **per step**,
+  and the divisor vanishes at every zero crossing, so a bounded absolute error is reported as an
+  arbitrarily large relative one. Measured on the harmonic oscillator at `h = 1` over `t ∈ [0, 200]`,
+  implicit midpoint came out at `1.05e+02` — a phase error sampled next to a zero crossing, not a
+  diverged solution.
+
+- **`relative_invariant_error(sol, invariant, parameters)`** — the three-argument form, gathering the
+  series from a solution before reducing it. The composition four scripts wrote out by hand.
+
+- **`scripts/compare_runs.jl`** — compares two directories of archives numerically and exits
+  non-zero on a difference above solver tolerance. The check for any change that is supposed to be a
+  refactoring. It reports keys present on only one side separately, because a run that silently
+  stopped writing a series is the one failure an archive comparison exists to catch and the one it
+  cannot express as a number.
+
+### Changed
+
+- **Output goes to `runs/` (data) and `results/` (figures), at the repository root**, and every
+  driver takes `--runs-dir` and `--results-dir`. Previously each script derived its output path from
+  `@__DIR__` as a `const`, which is what forced a caller who wanted the figures elsewhere to copy
+  the script. `scripts/results/` is gone; the OGA sweeps' CSVs are data and now sit in `runs/` with
+  their reports and figures in `results/`. This is the tree-wide convention in `Packages/CLAUDE.md`.
+
+- **One argument parser for every driver, and it rejects what it does not know.** The six parsers it
+  replaces disagreed about an unrecognised argument: three threw a bare `MethodError` from indexing
+  a `findfirst` that had returned `nothing`, `run_convergence` pushed the flag onto its list of
+  problem names and then, matching nothing, fell back to running the entire twenty-minute sweep, and
+  `figures` rendered nothing, printed `done` and exited 0. A mistyped flag now names the valid
+  arguments.
+
+- `scripts/vise_study.jl` is folded into `run_vise.jl`, which archives the runs *and* prints the
+  summary table. `Infiltrator`, `Distributed` and `Test` leave `scripts/Project.toml` with the files
+  that used them.
+
+### Removed
+
+- **Five network drivers that had not run in a long time**: `run_shallownet.jl`,
+  `test_shallownet_autodiff.jl`, `test_shallownet_reversible.jl`,
+  `test_shallownet_autodiff_reversible.jl`, `test_densenet.jl`. Not "superseded" — *broken*, and
+  verified so before deletion: `run_shallownet.jl` used a `k_relu` whose loop was commented out, so
+  every one of its nine iterations threw `UndefVarError` into a bare `catch`;
+  `test_shallownet_autodiff.jl` commented out `R_list`, `S_list` and `k_list` and then used all
+  three at top level; two more wrote into directories that do not exist.
+
+  **Nothing replaces them, because nothing needs to.** The four shallow-net variants are compared
+  by `benchmark/compare_derivative_backends.jl`, which sweeps exactly those four; `DenseNet` at
+  three time steps is `run_nvi.jl`, whose archives were checked against the old ones and are
+  identical; and the `S`/`R`/`k`/λ sweep on the harmonic oscillator is `oga_sweep.jl`. Writing a
+  sixth driver would have been a third tool for a job already done twice.
+
+- `scripts/find_optimal_results.jl`, which scanned a `parallel_results/` directory that does not
+  exist; `scripts/runtests.jl`, an empty stub distinct from the real `test/runtests.jl`; and
+  `scripts/parallel_run.sh`, a mostly-commented driver for the scripts above.
+
+### Notes
+
+**`scripts/test_vise.jl` and `scripts/vise_plot.jl` were *not* deleted**, and the 0.5.0 entry below
+saying that what they held "is in the new one" is **wrong**. Both were re-read before the deletion
+they were queued for:
+
+- `vise_plot.jl` carries the `SRRegressor` symbolic-regression pipeline that **discovered** the VISE
+  ansätze. It is the provenance of every ansatz in `experiments.jl` and there is no other record. It
+  cannot run — it needs `MLJ` and `SymbolicRegression`, which are deliberately not in
+  `scripts/Project.toml`, and it loads archives from an absolute path on another machine — but that
+  makes it a document, not a dead file.
+- `test_vise.jl` is mostly commented, but its last sixty lines are a live **six-degree-of-freedom
+  Toda lattice** VISE run with six discovered ansätze and their initial weight vectors, an
+  experiment that is in no registry.
+
+Both are listed under "Retained files" in `scripts/README.md` with what each records.
+
 ### Fixed
 
 - **The error panel of `plot_solution` is a curve again for a series at round-off.** 0.5.0 masked
@@ -127,6 +221,12 @@ code.
   from an absolute path on another machine, and mixed CairoMakie, Plots, MLJ and SymbolicRegression
   to draw them. What they held that was worth keeping — the ansätze, the initial weight vectors,
   the solver settings — is in the new one, which runs.
+
+  **This last sentence is not true, and both files are still here.** Re-read before the deletion it
+  implied, `vise_plot.jl` turned out to carry the symbolic-regression pipeline that *discovered* the
+  ansätze, and `test_vise.jl` a live six-degree-of-freedom Toda lattice run that is in no registry.
+  See the `[Unreleased]` notes above. `vise_study.jl` itself has since been folded into
+  `run_vise.jl`.
 - `docs/src/vise/vise.md`: the Plots.jl example, and its link to a `../figures/HHh2ref.svg` that
   does not exist, replaced by the extension.
 

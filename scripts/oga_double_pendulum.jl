@@ -60,7 +60,7 @@ Falls back to the documented `16√eps(T)` default when the sweep has not been r
 """
 function stable_regularization(::Type{T}) where {T}
     fallback = (16, oga_reg_factor(T, 16), "documented default 16√eps(T)")
-    rows = read_oga_csv(joinpath(RESULTS_DIR, "oga_sweep_relu.csv"))
+    rows = read_oga_csv(joinpath(RUNS_DIR[], "oga_sweep_relu.csv"))
     isempty(rows) && return fallback
 
     sub = [r for r in rows if r["T"] == string(T)]
@@ -167,8 +167,8 @@ const CSV_HEADER = "study,problem,T,dt,S,R,activation,seed,lambda_multiple,lambd
                    "ref_err,ham_drift,iterations,secs"
 
 function main()
-    mkpath(RESULTS_DIR)
-    csvpath = joinpath(RESULTS_DIR, "oga_double_pendulum.csv")
+    mkpath(RUNS_DIR[])
+    csvpath = joinpath(RUNS_DIR[], "oga_double_pendulum.csv")
     refq = build_reference()
 
     total = length(TYPES) * length(ACTIVATIONS) * length(SEEDS)

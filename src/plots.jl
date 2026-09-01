@@ -5,6 +5,73 @@
 # backend is loaded — the convention across this ecosystem (`GeometricProblems`,
 # `ChargedParticleDynamics`, `ElectromagneticFields`, `PoincareInvariants`, `PoissonBrackets`).
 # The docstrings of the implementations live in the extension, beside them.
+#
+# What is here is everything about a figure that does not need Makie: how it is named, how its
+# series are assembled, and the error reductions its axes show. Naming in particular has to be
+# reachable from both sides — the extension names a figure, a script finds that figure's archive —
+# so it lives here rather than in either.
+
+# ---- naming ------------------------------------------------------------------
+
+"""
+    figure_stem(problem, method, timestep) -> String
+
+`<problem>-<method>-h<timestep>`, the one naming scheme for a figure or an archive of a single run.
+
+Sorting a directory of these groups every method of a problem together, and every step of a
+method. `method` is the integrator as it appears in the legend: `vise`, `S4R8Q16relu3`, `CGVI(8)`.
+"""
+figure_stem(problem, method, timestep) = "$(problem)-$(method)-h$(timestep)"
+
+"""
+    window_stem(stem, upto) -> String
+
+`<stem>-t<upto>`, for one of several figures of the *same* run showing different time intervals.
+
+The `-t` is what distinguishes a final time from a step count or a step size: a bare
+`…-nvi-500` reads as either.
+"""
+window_stem(stem, upto) = "$(stem)-t$(Int(upto))"
+
+"""
+    study_stem(problem, study, variant) -> String
+
+`<problem>-<study>-<variant>`, for a figure that is a *sweep* rather than one run — a convergence
+ladder, a seed comparison.
+
+There is no single time step to put in the `-h…` slot, so it does not get one; filling that slot
+with the variant name instead would read as a step size (`…-convergence-htanh`).
+"""
+study_stem(problem, study, variant) = "$(problem)-$(study)-$(variant)"
+
+"""
+    galerkin_label(R) -> String
+
+The polynomial Galerkin variational integrator as it appears in a legend: `CGVI(R)`, with `R` the
+number of Gauss–Legendre quadrature nodes.
+
+Not the `PpRrQu` of the papers — that notation carries three numbers of which two are determined
+by the third (`p = R - 1` basis nodes, `u = 2R` quadrature order for a Gauss rule), so it invites
+exactly the mislabelling that produced a figure legended `S6R10Q16tanh` at `R = 10`, i.e. `Q20`.
+`CGVI(R)` names the constructor argument and nothing else.
+"""
+galerkin_label(R::Int) = "CGVI($(R))"
+
+"""
+    network_label(S, R, activation; S₁ = nothing) -> String
+
+A network integrator as it appears in a legend: `SsRrQuσ` for a shallow net, `DenseS₁xSRrQuσ` for
+a dense one, with `u = 2R` throughout because the quadrature is Gauss.
+
+`S₁` is the first hidden width and giving it selects the dense form. A dense net has two hidden
+layers, so its width is `S₁×S` and one number cannot say what it was run with — the historical
+`NVI_Dense…` figures legended themselves `R4Q8tanh` with no width at all, which is why nothing
+afterwards could reconstruct them.
+"""
+function network_label(S::Int, R::Int, activation::AbstractString; S₁ = nothing)
+    S₁ === nothing ? "S$(S)R$(R)Q$(2R)$(activation)" :
+    "Dense$(S₁)x$(S)R$(R)Q$(2R)$(activation)"
+end
 
 """
     continuous_solution(internal_values, timestep; dof = 1, t₀ = 0)
@@ -100,6 +167,59 @@ is otherwise a silent `Inf` in the middle of a logarithmic axis.
 function relative_invariant_error(values::AbstractVector)
     I₀ = first(values)
     iszero(I₀) ? abs.(values .- I₀) : abs.((values .- I₀) ./ I₀)
+end
+
+"""
+    relative_invariant_error(sol, invariant, parameters) -> Vector
+
+`|(I - I₀) / I₀|` over the stored steps of a solution, for an `invariant` called as
+`invariant(t, q, p, parameters)`.
+
+The four-argument call is what a `lodeproblem` built by `EulerLagrange` needs: it carries
+`NullInvariants` and has no `:h` key to look up, so the Hamiltonian has to be passed in. Wanted as
+a number, and not only as an axis, so that a driver can assert on it and write it into an archive.
+"""
+function relative_invariant_error(sol, invariant, parameters)
+    relative_invariant_error([invariant(sol.t[n], sol.q[n], sol.p[n], parameters)
+                              for n in 0:ntime(sol)])
+end
+
+"""
+    coarse_grid_error(sol, ref_sol, substeps) -> Float64
+
+The relative maximum error of `sol` against a reference computed on a grid `substeps` times finer,
+compared at the macro steps the two grids share:
+
+    max_{n,d} |q_{n,d} - ref_{n,d}|  /  max_{n,d} |ref_{n,d}|
+
+`GeometricSolutions.relative_maximum_error` is not used, for two reasons.
+
+It asserts that the two series have the same axes, and the whole point of the reference is that it
+does not. Subsampling at `n * substeps` fixes that exactly — those are the same instants, not an
+interpolation.
+
+The second reason is the normalisation, and it is a deliberate difference rather than a
+convenience. `relative_maximum_error` divides **per step**, by `max_d |ref_n|`, which is right when
+every component stays away from zero. Oscillators do not: the reference passes through zero twice a
+period, and there the divisor does too, so a bounded absolute error is reported as an arbitrarily
+large relative one. Measured on the harmonic oscillator at `h = 1` over `t ∈ [0, 200]`, implicit
+midpoint came out at `1.05e+02` — not a diverged solution, just a phase error sampled next to a
+zero crossing. Normalising by the maximum over the **whole** reference gives the error relative to
+the amplitude of the motion.
+"""
+function coarse_grid_error(sol, ref_sol, substeps::Int)
+    ntime(ref_sol) == ntime(sol) * substeps ||
+        throw(ArgumentError("the reference has $(ntime(ref_sol)) steps, which is not " *
+                            "$(substeps)× the solution's $(ntime(sol))."))
+    worst = 0.0
+    scale = 0.0
+    for n in 0:ntime(sol)
+        reference = ref_sol.q[n * substeps]
+        worst = max(worst, maximum(abs, sol.q[n] .- reference))
+        scale = max(scale, maximum(abs, reference))
+    end
+    # An all-zero reference matched exactly is 0, not 0/0.
+    return iszero(worst) ? 0.0 : worst / scale
 end
 
 """
@@ -235,7 +355,8 @@ The number of degrees of freedom the trajectory carries.
 """
 dimension(traj::Trajectory) = length(traj.q)
 
-export continuous_solution, relative_invariant_error, Trajectory
+export continuous_solution, relative_invariant_error, coarse_grid_error, Trajectory
+export figure_stem, window_stem, study_stem, galerkin_label, network_label
 
 """
     NonlinearIntegrators.Diagnostics
@@ -260,7 +381,7 @@ names are nobody else's.
 """
 module Diagnostics
 
-export plot_theme, plot_solution, plot_convergence
+export plot_theme, plot_solution, plot_convergence, figures
 
 """
     plot_theme()
@@ -312,5 +433,19 @@ Implemented in the `NonlinearIntegratorsPlots` extension.
 For one series against one expected order, use `GeometricProblems.Diagnostics.plot_convergence`.
 """
 function plot_convergence end
+
+"""
+    figures(data) -> Vector{Pair{String, Figure}}
+
+Every figure one archived run earns, each paired with the stem it should be saved under. `data` is
+the run's archive as a plain dictionary; its `"kind"` selects the shape of figure and its `"stem"`
+names it. Implemented in the `NonlinearIntegratorsPlots` extension.
+
+The composition layer above [`plot_solution`](@ref) and [`plot_convergence`](@ref), so that a
+script which renders a directory of runs is a loop over files rather than a second registry of
+which experiment produces which picture. It returns figures and does not write them: keeping every
+`save` in the calling script is what lets a figure be restyled without re-running a solve.
+"""
+function figures end
 
 end
