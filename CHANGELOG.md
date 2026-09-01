@@ -73,6 +73,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   summary table. `Infiltrator`, `Distributed` and `Test` leave `scripts/Project.toml` with the files
   that used them.
 
+- `scripts/results/` is retired; its contents moved to `runs/` (the CSVs) and `results/` (the
+  reports and figures), which is where the studies now write.
+
+### Measured
+
+**The OGA fit study's numbers have moved slightly since the archived CSV was written**, and this is
+recorded rather than quietly overwritten. Re-running it against the current dependency set,
+**197 of 6049 rows differ — every one of them `Float16` with the `normaleq` fit, and only in
+`fit_err`.** Condition numbers and smallest singular values are identical throughout, as is every
+other precision and fit.
+
+That is the squared-condition-number path at half precision: κ(Φ)² ≈ 4.7e17 on those rows, which is
+the regime the OGA documentation already describes as unreliable, so last-digit movement there is
+the expected behaviour rather than a regression. **The one number the documentation quotes from
+this cell still holds**: the median `Float16` / angular / normalised / `normaleq` fit error is
+`2.1036e-01` archived against `2.1032e-01` fresh, both `2.10e-01` to the three significant figures
+`docs/src/oga/studies.md` states. Nothing in `src/` changed here — the studies' own edits were to
+their output directory and argument parsing — so the most likely cause is a dependency bump between
+the two runs.
+
 ### Removed
 
 - **Five network drivers that had not run in a long time**: `run_shallownet.jl`,
