@@ -45,6 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stopped writing a series is the one failure an archive comparison exists to catch and the one it
   cannot express as a number.
 
+- **An archive directory stays readable across revisions of the writer.** `figures.jl` renders a
+  directory it did not write, and that directory accumulates: `archive_kind` infers the shape of
+  figure from which series an archive carries when it has no `"kind"`, `load_runs` fills in a
+  `"stem"` from the filename, and `normalise_schema!` maps the older `figure_window` onto
+  `windows`. Without this, redrawing a figure from an archive that already holds every number the
+  figure needs would have meant re-running the solves — which is the exact cost the split between
+  `runs/` and `results/` exists to avoid. An archive that is genuinely unreadable is named and
+  skipped rather than aborting the run: one stale file must not cost the other sixty-one figures.
+
 ### Changed
 
 - **Output goes to `runs/` (data) and `results/` (figures), at the repository root**, and every
