@@ -3,9 +3,34 @@
 Exploratory drivers and studies. Unlike `benchmark/`, nothing here is run by the docs build
 or by CI — these are for investigating one question at a time.
 
-The `oga_*.jl` files are the Orthogonal Greedy Algorithm studies; the rest are older manual
-drivers for individual integrators (`run_*.jl`, `test_*.jl`) and post-processing helpers.
-Everything writes into `results/`, which is git-ignored.
+The `oga_*.jl` files are the Orthogonal Greedy Algorithm studies; `vise_study.jl` is the VISE
+driver; the rest are older manual drivers for individual integrators (`run_*.jl`, `test_*.jl`) and
+post-processing helpers. Everything writes into `results/`, which is git-ignored.
+
+## `vise_study.jl`
+
+VISE against the linear variational integrators it is the nonlinear counterpart of — `CGVI` at the
+same quadrature order, implicit midpoint, and a `Gauss(8)` reference — on the harmonic oscillator,
+the perturbed pendulum and Hénon–Heiles. Prints a table, writes nothing.
+
+```sh
+julia --project=scripts scripts/vise_study.jl
+julia --project=scripts scripts/vise_study.jl harmonic-oscillator
+```
+
+It replaces two files. `test_vise.jl` was 893 lines of which 854 were commented out: it held the
+ansätze and the initial weight vectors, which is why it was kept, but it had not been runnable for
+a long time. `vise_plot.jl` was 1257 lines that loaded `.jld2` archives from an absolute path on
+another machine, and mixed CairoMakie, Plots, MLJ and SymbolicRegression to draw them. The figures
+both were reaching for are now `NonlinearIntegrators.Diagnostics.plot_solution`, in the
+`NonlinearIntegratorsPlots` extension — see `docs/src/vise/vise.md`.
+
+The harmonic-oscillator row is a check rather than a measurement: its ansatz spans the exact
+solution, so anything above the solver's residual floor there is a regression. The Hénon–Heiles
+row is included precisely because it does *not* work — a three-term ansatz per coordinate does not
+span that trajectory, and the relative error is O(1) well before the end of the run. The original
+sweep recorded the same thing (`HenonHeiles_hams_err = 0.94` over `T = 200`), so this is the ansatz
+being too small rather than a solver regression, and the row is there to keep that visible.
 
 ## OGA seed variants
 
