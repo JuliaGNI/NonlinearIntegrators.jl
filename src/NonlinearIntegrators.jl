@@ -128,10 +128,12 @@ include("vise/vise.jl")
 include("vise/vise_basis.jl")
 export VISE, VISEBasis
 
-# The plotting API. `continuous_solution` is implemented in `src/` rather than in the extension
-# because it is data assembly and not plotting — every caller of a network or symbolic integrator
-# needs it, whether or not it goes on to draw anything. The four `plot_*` stubs get their methods
-# in `ext/NonlinearIntegratorsPlots.jl`, which loads together with `Makie`.
+# The plotting API. The data layer — `continuous_solution`, `Trajectory`, the error reductions —
+# and the figure naming scheme are implemented in `src/` rather than in the extension because
+# neither is plotting: every caller of a network or symbolic integrator needs them, whether or not
+# it goes on to draw anything, and the naming has to be reachable from both the extension that
+# names a figure and the script that finds that figure's archive. The three `plot_*` stubs get
+# their methods in `ext/NonlinearIntegratorsPlots.jl`, which loads together with `Makie`.
 include("plots.jl")
 
 # The linear reference integrator this package used to carry, `CGVINodal` — continuous
