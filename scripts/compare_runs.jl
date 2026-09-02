@@ -27,7 +27,12 @@ function worst_difference(a::AbstractArray, b::AbstractArray)
     worst = 0.0
     for (x, y) in zip(a, b)
         (x isa Number && y isa Number) || continue
-        (isfinite(x) && isfinite(y)) || (x === y || return Inf; continue)
+        # A non-finite pair has no relative difference to take. Two identical ones — both `NaN`,
+        # both the same infinity — are still agreement; anything else is a change.
+        if !(isfinite(x) && isfinite(y))
+            x === y || return Inf
+            continue
+        end
         scale = max(abs(x), abs(y))
         d = scale < 1e-12 ? abs(x - y) : abs(x - y) / scale
         worst = max(worst, d)
@@ -82,6 +87,9 @@ function main(args)
         "give the reference run directory as the first argument"))
     reference_dir = popfirst!(stems)
     isdir(reference_dir) || throw(ArgumentError("no such directory: $(reference_dir)"))
+
+    isdir(RUNS_DIR[]) || throw(ArgumentError(
+        "no run directory at $(RUNS_DIR[]); run a driver first, or point `--runs-dir` at one"))
 
     banner("Comparing $(RUNS_DIR[])\n       against $(reference_dir)")
 

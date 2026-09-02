@@ -122,6 +122,15 @@ import GeometricProblems.Diagnostics as GPD
         # spurious `.0` that nothing else in the scheme has.
         @test window_stem("harmonic-oscillator-S6R6Q12tanh-h5.0", 2000.0) ==
               "harmonic-oscillator-S6R6Q12tanh-h5.0-t2000"
+        # ...and a window that is *not* a whole number of time units keeps its digits. `Int(upto)`
+        # raised `InexactError` here instead, which is a name taking down the figure it names.
+        @test window_stem("harmonic-oscillator-vise-h1.0", 2.5) ==
+              "harmonic-oscillator-vise-h1.0-t2.5"
+
+        @test number_label(2000.0) == "2000"
+        @test number_label(2000) == "2000"
+        @test number_label(0.03125) == "0.03125"
+        @test number_label(0.5) == "0.5"
 
         # `Q` is a label, `R` a constructor argument, and `Q = 2R` always because the quadrature is
         # Gauss. Asserting it is what keeps a legend from claiming `Q16` at `R = 10`, which is the
@@ -320,5 +329,88 @@ import GeometricProblems.Diagnostics as GPD
             reference_orders = ()) isa Figure
 
         @test_throws ArgumentError NIP.plot_convergence(hs, errs; labels = ["one label"])
+    end
+
+    @testset "figures from an archive" begin
+        # Dictionaries and not `.jld2` files, because that is what `figures` takes: it composes
+        # figures out of the archive's flat keys and knows nothing about how they were stored or
+        # which study produced them. So this covers the renderer's whole contract without a solve.
+        t = collect(0.0:1.0:4.0)
+        series(f) = [f.(t)]
+        solution = Dict{String, Any}(
+            "kind" => "solution",
+            "stem" => "harmonic-oscillator-vise-h1.0",
+            "label" => "VISE",
+            "problem_label" => "Harmonic oscillator",
+            "timestep" => 1.0,
+            "final_time" => 4.0,
+            "dimension" => 1,
+            "t" => t,
+            "q" => series(sin),
+            "p" => series(cos),
+            "continuous_t" => t,
+            "continuous_q" => series(sin),
+            "hamiltonian_error" => [0.0, 1e-12, 2e-12, 1e-12, 3e-12],
+            "reference_t" => t,
+            "reference_q" => series(sin),
+            "reference_p" => series(cos),
+            "reference_substeps" => 40,
+            "comparisons" => Dict{String, Any}(
+                "Implicit midpoint" => Dict{String, Any}(
+                "t" => t, "q" => series(sin), "p" => series(cos),
+                "hamiltonian_error" => fill(1e-8, length(t)))))
+
+        drawn = NIP.figures(solution)
+        @test first.(drawn) == ["harmonic-oscillator-vise-h1.0"]
+        @test last(only(drawn)) isa Figure
+
+        # `windows` is the one-run-over-several-intervals case: a figure per window on top of the
+        # whole-run one, each named by `window_stem`. The fractional window is the regression
+        # guard — naming it used to raise `InexactError`, and so did the title.
+        windowed = merge(solution, Dict{String, Any}("windows" => [2.0, 2.5]))
+        figs = NIP.figures(windowed)
+        @test first.(figs) == ["harmonic-oscillator-vise-h1.0",
+            "harmonic-oscillator-vise-h1.0-t2",
+            "harmonic-oscillator-vise-h1.0-t2.5"]
+        @test all(pair -> last(pair) isa Figure, figs)
+
+        # A global fit steps nothing, so its archive has no `"timestep"` and its title carries no
+        # `Δt`. That absence is what lets these share one figure function with the stepped runs.
+        stepless = copy(solution)
+        delete!(stepless, "timestep")
+        @test last(only(NIP.figures(stepless))) isa Figure
+
+        # Where the problem has a closed-form solution the archive carries `exact_*` instead, and
+        # that is the series drawn as the reference.
+        exact = merge(solution,
+            Dict{String, Any}("exact_t" => t, "exact_q" => series(sin),
+                "exact_p" => series(cos)))
+        @test last(only(NIP.figures(exact))) isa Figure
+
+        convergence = Dict{String, Any}(
+            "kind" => "convergence",
+            "stem" => "harmonic-oscillator-convergence-nvi",
+            "title" => "Neural against polynomial Galerkin",
+            "timesteps" => [0.25, 0.5, 1.0],
+            "labels" => ["S4R8Q16relu3", "CGVI(2)"],
+            "linestyles" => ["solid", "dash"],
+            "errors" => [[1e-6, 4e-6, 1.6e-5], [1e-3, 4e-3, 1.6e-2]],
+            "reference_orders" => [2, 4])
+        @test first.(NIP.figures(convergence)) == ["harmonic-oscillator-convergence-nvi"]
+        @test last(only(NIP.figures(convergence))) isa Figure
+
+        # A configuration that failed at every step contributes no line, so it is named in the
+        # title — the difference between an omission and a result.
+        absent = merge(convergence,
+            Dict{String, Any}("errors" => [[NaN, NaN, NaN], [1e-3, 4e-3, 1.6e-2]]))
+        @test last(only(NIP.figures(absent))) isa Figure
+
+        # The two schema keys are what make a run directory readable without a registry, so
+        # neither is optional, and a kind this extension does not draw is refused rather than
+        # guessed at.
+        @test_throws ArgumentError NIP.figures(Dict{String, Any}("stem" => "x"))
+        @test_throws ArgumentError NIP.figures(Dict{String, Any}("kind" => "solution"))
+        @test_throws ArgumentError NIP.figures(
+            Dict{String, Any}("kind" => "phase-portrait", "stem" => "x"))
     end
 end

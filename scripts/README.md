@@ -46,7 +46,7 @@ missing figure stays distinguishable from a failed run.
 | `archives.jl` | where output goes, the archive schema and its reader/writer, the option parser, reporting. Deps: JLD2 and Printf. `include`d by everything; nothing runs at top level. |
 | `experiments.jl` | the registry — problems, ansätze, initial weights, quadrature orders, configurations, per-family solver options — and the diagnostics that need `GeometricIntegrators`. Also `include`d, also inert. |
 | `basis_fits.jl` | separable trigonometric least squares, an allocation-free periodogram, `odd_harmonic_fit`, `lattice_fit`. Used by `run_fourier.jl`. |
-| `run_vise.jl` | the symbolic-ansatz integrator, 3 problems × 4 time steps, plus a summary table |
+| `run_vise.jl` | the symbolic-ansatz integrator, 11 runs over 3 problems — `h ∈ {1, 2, 5}` for each, and `h = 10` for the two where it works — plus a summary table |
 | `run_nvi.jl` | the network integrators — shallow and dense — at every time step |
 | `run_fourier.jl` | global Fourier and lattice ansätze fitted to a whole trajectory; no time step |
 | `run_convergence.jl` | Hamiltonian error against time step: 2 problems × 3 integrator families |

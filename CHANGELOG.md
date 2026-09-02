@@ -5,9 +5,103 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased] — targeting 0.5.0
+
+The package can plot its own integrators, and the experiment suite that drives them lives in this
+repository. It had no `ext/` directory and no `[weakdeps]` at all until now, so every figure ever
+made from a `VISE` or `ShallowNet` run was made by a script carrying its own Makie code — and those
+scripts sat in a talk directory, all carrying much the same code.
 
 ### Added
+
+- **`ext/NonlinearIntegratorsPlots.jl`, this package's first extension**, on a `Makie` weakdep.
+  **Two** plot functions and a theme, in a `NonlinearIntegrators.Diagnostics` submodule:
+
+  | | |
+  |:--|:--|
+  | `plot_solution` | *several* integrators of one problem in one figure — `q(t)`, `p(t)` and the relative Hamiltonian error, with the **continuous** solution between the discrete steps drawn through them |
+  | `plot_convergence` | *several* error series against the time step, with a reference slope per order |
+  | `plot_theme()` | the shared Makie theme, for the caller to `set_theme!` |
+
+  Two and not more, because two is what `GeometricProblems` is missing. A phase portrait, a
+  trajectory or a set of traces are the per-problem recipes there; one method's error against its
+  expected order is that package's own `plot_convergence`. Reimplementing either here would be a
+  second thing to keep right. What is left is the pair those cannot express — no `GeometricProblems`
+  recipe takes more than one solution, none knows about `integrate`'s second return value, and its
+  `plot_convergence` draws one series against one slope, which cannot show a neural family against a
+  polynomial one.
+
+  **The one exception, found by the test written to assert the opposite.**
+  `GeometricProblems.Diagnostics.plot_energy_error` and `plot_invariant_error` cannot compute the
+  energy of a *partitioned or implicit* solution, which is every solution this package produces, so
+  the invariant error is **not** reused — `plot_solution` computes it from `q` and `p` itself, and
+  `relative_invariant_error` is exported for callers who want the number.
+
+  `_invariant_error` branches on `sol isa Union{SolutionPODE, SolutionPDAE}` to decide whether to
+  pass `p`, and that test is `false` for a `GeometricSolution` of a `LODEProblem` even though
+  `SolutionPODE`'s definition names `LODEProblem`: the alias binds `probType` both as a parameter
+  and in its `where` clause, so the constraint does not apply as it reads. Verified —
+  `sol isa SolutionPODE` is `false` while `typeof(sol.problem) <: LODEProblem` is `true`. The
+  `q`-only branch is always taken and a Hamiltonian expecting `(t, q, p, params)` is called with
+  three arguments; on the harmonic oscillator that reaches the three-argument method, which expects
+  `q = [q, v]`, and raises `BoundsError`. A problem whose three-argument Hamiltonian happened to
+  accept a one-dof `q` would return a **silently wrong** energy instead.
+
+  Measured on GeometricProblems 0.8.3 / GeometricSolutions 0.6.5, and held by a `@test_broken` plus
+  an assertion pinning the cause, so a fix upstream flips the test rather than passing unnoticed.
+
+  A second, independent trap in the same place, which would still bite after that is fixed: a
+  `lodeproblem` built by `EulerLagrange` carries `NullInvariants`, so there is no `:h` key and the
+  Hamiltonian has to be passed as `energy = <function>`.
+
+  Each function returns a Makie `Figure` and none saves one, as everywhere else in this ecosystem.
+  `Makie` and not `CairoMakie` is the weakdep, so the backend stays the caller's choice. The
+  extension sets **no** font size, colour or line width of its own: sizes come from the ambient
+  theme, series colours from `Makie.wong_colors()`.
+
+  **A submodule rather than more exports**, which is the one place this departs from the shape of
+  `GeometricProblems`' per-problem plot functions. `plot_solution` is a name *every*
+  `GeometricProblems` problem submodule exports and `plot_convergence` one that its `Diagnostics`
+  does, so exporting them from this package's top level makes both ambiguous in any scope that also
+  wrote `using GeometricProblems.HarmonicOscillator` — which is what a script integrating a problem
+  naturally writes, and what this package's own `test/testsetup.jl` does. So they sit behind
+  `NonlinearIntegrators.Diagnostics`, exactly as `GeometricProblems.Diagnostics` does, and the top
+  level stays clear. The submodule gets its own `@autodocs` block in the manual, because
+  `@autodocs` does not descend into a submodule while Documenter's `checkdocs` does — without it
+  the docs build fails with `:missing_docs`, and a `@ref` to `plot_solution` with
+  `:cross_references`.
+
+- **`plot_theme()`**, the shared Makie theme of this ecosystem — larger fonts and thicker lines than
+  the Makie defaults. Kept identical to the copy in `GeometricExamples/src/common.jl` and the
+  publication companion packages, and asserted field by field in the tests, because a theme that
+  has quietly drifted is the kind of difference nobody notices until two figures sit side by side.
+  A function and not a `const`, because a `Theme` is a Makie type and `src/plots.jl` is loaded
+  whether or not Makie is.
+
+- **`continuous_solution(internal_values, timestep; dof, t₀)`**, exported. The continuous solution
+  *between* the discrete steps, as a `(t, q)` pair.
+
+  This is the post-processing every integrator here needs and none provided, and it had been
+  written out by hand at least six times — three copies in one talk's figure scripts, two in
+  `scripts/`, one in the docs — each as `vcat(hcat(internal_sol...)[2:end, :]...)` against a
+  hand-written `h/40:h/40:TT`. Both halves of that are traps. Row 1 of every step is the step's
+  *left* endpoint, so concatenating the records whole duplicates each interior step boundary; and
+  the `40` is `record_grid_points - 1`, a method keyword, so every one of those copies was silently
+  wrong for any method not built with the default 41.
+
+- **`Trajectory`**, exported, and `relative_invariant_error`. What a figure needs about one run and
+  nothing else, as plain vectors — so a result archived for later plotting does not pin the version
+  of `GeometricSolutions` that wrote it into the archive, and so a comparison curve that never was
+  a solution (a closed-form expression, a digitised reference) is expressible without pretending to
+  be one. `Trajectory(label, sol; internal_values, hamiltonian, parameters)` builds one from a
+  solution; the plot functions accept solutions and `"label" => solution` pairs wherever they
+  accept a `Trajectory`, and convert.
+
+- `test/plots_tests.jl`, with `CairoMakie` in `test/Project.toml`. The `plot_*` tests are smoke
+  tests, as in `GeometricProblems`; `continuous_solution` and `Diagnostics.figures` get real
+  assertions instead — the first including `record_grid_points = 21`, the case a re-hardcoded 41
+  fails, and the second driven by archive dictionaries built in the test, so the renderer's whole
+  contract is covered without a solve.
 
 - **The experiment suite lives in `scripts/`.** The registry, five drivers that solve and archive,
   and one renderer — `experiments.jl`, `archives.jl`, `basis_fits.jl`, `run_vise.jl`, `run_nvi.jl`,
@@ -69,9 +163,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `figures` rendered nothing, printed `done` and exited 0. A mistyped flag now names the valid
   arguments.
 
-- `scripts/vise_study.jl` is folded into `run_vise.jl`, which archives the runs *and* prints the
-  summary table. `Infiltrator`, `Distributed` and `Test` leave `scripts/Project.toml` with the files
-  that used them.
+- **A driver that skipped something exits non-zero, and says why.** `run_nvi.jl` and `figures.jl`
+  guard each run and each archive so that one failure does not cost the other forty-eight — but
+  they used to report only the exception's *type* and exit 0 regardless. `KeyError` alone does not
+  name the key, and a renderer that drew nothing while exiting 0 is the failure of the bullet above
+  one layer down. Both now print the exception's own message and exit 1 if
+  anything was skipped; `figures.jl` also treats a stem that matches no archive as the mistyped
+  argument it is.
+
+- The VISE driver is **`scripts/run_vise.jl`**, which archives the runs *and* prints the summary
+  table. `Infiltrator`, `Distributed` and `Test` leave `scripts/Project.toml` with the files that
+  used them.
 
 - `scripts/results/` is retired; its contents moved to `runs/` (the CSVs) and `results/` (the
   reports and figures), which is where the studies now write.
@@ -82,6 +184,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and could not resolve at all, which is part of why the file did not run. Its handful of Plots
   calls, all in the symbolic-regression section, are now `lines` and a small `compare_discovered`
   helper that draws a discovered expression against the component it was fitted to.
+
+- `docs/src/vise/vise.md`: the Plots.jl example, and its link to a `../figures/HHh2ref.svg` that
+  does not exist, replaced by the extension.
+
+- **A time in a name or a title is formatted, not converted.** `number_label` replaces the `Int(x)`
+  that six call sites used — `window_stem`, the figure title, and the three drivers that name a
+  final time. `Int` does not truncate a non-integral argument, it raises `InexactError`, so
+  `--final-time 12.5` took `run_convergence.jl` down *after* its sweep had run. A window or a final
+  time that is not a whole number of time units now names its figure as `…-t2.5`.
 
 ### Measured
 
@@ -120,154 +231,6 @@ the two runs.
   exist; `scripts/runtests.jl`, an empty stub distinct from the real `test/runtests.jl`; and
   `scripts/parallel_run.sh`, a mostly-commented driver for the scripts above.
 
-### Notes
-
-**`scripts/test_vise.jl` and `scripts/vise_plot.jl` were *not* deleted**, and the 0.5.0 entry below
-saying that what they held "is in the new one" is **wrong**. Both were re-read before the deletion
-they were queued for:
-
-- `vise_plot.jl` carries the `SRRegressor` symbolic-regression pipeline that **discovered** the VISE
-  ansätze. It is the provenance of every ansatz in `experiments.jl` and there is no other record. It
-  cannot run — it needs `MLJ` and `SymbolicRegression`, which are deliberately not in
-  `scripts/Project.toml`, and it loads archives from an absolute path on another machine — but that
-  makes it a document, not a dead file.
-- `test_vise.jl` is mostly commented, but its last sixty lines are a live **six-degree-of-freedom
-  Toda lattice** VISE run with six discovered ansätze and their initial weight vectors, an
-  experiment that is in no registry.
-
-Both are listed under "Retained files" in `scripts/README.md` with what each records.
-
-### Fixed
-
-- **The error panel of `plot_solution` is a curve again for a series at round-off.** 0.5.0 masked
-  every value a logarithmic axis cannot take with `NaN` and passed the full time vector; `NaN`
-  breaks the polyline through it, so each masked point cut the line in two. That is invisible while
-  only `t₀` is zero — which is what the figures of that release had — and wrong as soon as the
-  invariant is conserved to machine precision, because `H(tₙ) - H₀` is then exactly `0` at a good
-  fraction of the samples. Measured on the global Fourier fit of the perturbed pendulum: 22 of 101
-  samples exactly zero, and an error panel of disconnected fragments and five isolated dots.
-
-  `log_safe` is replaced by `log_points`, which drops the unplottable point from the **time** vector
-  as well and so bridges it. Nothing shifts left — the property masking was chosen for — because
-  every surviving point keeps its own time. A series with no plottable point at all is now left out
-  entirely rather than drawn empty, as `plot_convergence` already left out a configuration that
-  failed at every step.
-
-  Every archived series here is finite, so this only ever bridges an exact zero. A run whose
-  invariant blows up mid-way would now be bridged rather than broken; there is no such archive to
-  say what that should look like, and inventing the distinction before one exists would be guessing.
-
-## [0.5.0] - 2026-08-31
-
-The package can plot its own integrators. It had no `ext/` directory and no `[weakdeps]` at all
-until now, so every figure ever made from a `VISE` or `ShallowNet` run was made by a script
-carrying its own Makie code — and there are a lot of those scripts, all carrying much the same
-code.
-
-### Added
-
-- **`ext/NonlinearIntegratorsPlots.jl`, this package's first extension**, on a `Makie` weakdep.
-  **Two** plot functions and a theme, in a `NonlinearIntegrators.Diagnostics` submodule:
-
-  | | |
-  |:--|:--|
-  | `plot_solution` | *several* integrators of one problem in one figure — `q(t)`, `p(t)` and the relative Hamiltonian error, with the **continuous** solution between the discrete steps drawn through them |
-  | `plot_convergence` | *several* error series against the time step, with a reference slope per order |
-  | `plot_theme()` | the shared Makie theme, for the caller to `set_theme!` |
-
-  Two and not more, because two is what `GeometricProblems` is missing. A phase portrait, a
-  trajectory or a set of traces are the per-problem recipes there; one method's error against its
-  expected order is that package's own `plot_convergence`. Reimplementing either here would be a
-  second thing to keep right. What is left is the pair those cannot express — no `GeometricProblems`
-  recipe takes more than one solution, none knows about `integrate`'s second return value, and its
-  `plot_convergence` draws one series against one slope, which cannot show a neural family against a
-  polynomial one.
-
-  **The one exception, found by the test written to assert the opposite.**
-  `GeometricProblems.Diagnostics.plot_energy_error` and `plot_invariant_error` cannot compute the
-  energy of a *partitioned or implicit* solution, which is every solution this package produces, so
-  the invariant error is **not** reused — `plot_solution` computes it from `q` and `p` itself, and
-  `relative_invariant_error` is exported for callers who want the number.
-
-  `_invariant_error` branches on `sol isa Union{SolutionPODE, SolutionPDAE}` to decide whether to
-  pass `p`, and that test is `false` for a `GeometricSolution` of a `LODEProblem` even though
-  `SolutionPODE`'s definition names `LODEProblem`: the alias binds `probType` both as a parameter
-  and in its `where` clause, so the constraint does not apply as it reads. Verified —
-  `sol isa SolutionPODE` is `false` while `typeof(sol.problem) <: LODEProblem` is `true`. The
-  `q`-only branch is always taken and a Hamiltonian expecting `(t, q, p, params)` is called with
-  three arguments; on the harmonic oscillator that reaches the three-argument method, which expects
-  `q = [q, v]`, and raises `BoundsError`. A problem whose three-argument Hamiltonian happened to
-  accept a one-dof `q` would return a **silently wrong** energy instead.
-
-  Measured on GeometricProblems 0.8.3 / GeometricSolutions 0.6.5, and held by a `@test_broken` plus
-  an assertion pinning the cause, so a fix upstream flips the test rather than passing unnoticed.
-
-  A second, independent trap in the same place, which would still bite after that is fixed: a
-  `lodeproblem` built by `EulerLagrange` carries `NullInvariants`, so there is no `:h` key and the
-  Hamiltonian has to be passed as `energy = <function>`.
-
-  Each function returns a Makie `Figure` and none saves one, as everywhere else in this ecosystem.
-  `Makie` and not `CairoMakie` is the weakdep, so the backend stays the caller's choice. The
-  extension sets **no** font size, colour or line width of its own: sizes come from the ambient
-  theme, series colours from `Makie.wong_colors()`.
-
-  **A submodule rather than more exports**, which is the one place this departs from the shape of
-  `GeometricProblems`' per-problem plot functions. `plot_solution` is a name *every*
-  `GeometricProblems` problem submodule exports and `plot_convergence` one that its `Diagnostics`
-  does, so exporting them from this package's top level makes both ambiguous in any scope that also
-  wrote `using GeometricProblems.HarmonicOscillator` — which is what a script integrating a problem
-  naturally writes, and what this package's own `test/testsetup.jl` does. So they sit behind
-  `NonlinearIntegrators.Diagnostics`, exactly as `GeometricProblems.Diagnostics` does, and the top
-  level stays clear.
-
-- **`plot_theme()`**, the shared Makie theme of this ecosystem — larger fonts and thicker lines than
-  the Makie defaults. Kept identical to the copy in `GeometricExamples/src/common.jl` and the
-  publication companion packages, and asserted field by field in the tests, because a theme that
-  has quietly drifted is the kind of difference nobody notices until two figures sit side by side.
-  A function and not a `const`, because a `Theme` is a Makie type and `src/plots.jl` is loaded
-  whether or not Makie is.
-
-- **`continuous_solution(internal_values, timestep; dof, t₀)`**, exported. The continuous solution
-  *between* the discrete steps, as a `(t, q)` pair.
-
-  This is the post-processing every integrator here needs and none provided, and it had been
-  written out by hand at least six times — three copies in one talk's figure scripts, two in
-  `scripts/`, one in the docs — each as `vcat(hcat(internal_sol...)[2:end, :]...)` against a
-  hand-written `h/40:h/40:TT`. Both halves of that are traps. Row 1 of every step is the step's
-  *left* endpoint, so concatenating the records whole duplicates each interior step boundary; and
-  the `40` is `record_grid_points - 1`, a method keyword, so every one of those copies was silently
-  wrong for any method not built with the default 41.
-
-- **`Trajectory`**, exported, and `relative_invariant_error`. What a figure needs about one run and
-  nothing else, as plain vectors — so a result archived for later plotting does not pin the version
-  of `GeometricSolutions` that wrote it into the archive, and so a comparison curve that never was
-  a solution (a closed-form expression, a digitised reference) is expressible without pretending to
-  be one. `Trajectory(label, sol; internal_values, hamiltonian, parameters)` builds one from a
-  solution; the plot functions accept solutions and `"label" => solution` pairs wherever they
-  accept a `Trajectory`, and convert.
-
-- `test/plots_tests.jl`, with `CairoMakie` in `test/Project.toml`. The `plot_*` tests are smoke
-  tests, as in `GeometricProblems`; `continuous_solution` gets real assertions instead, including
-  against `record_grid_points = 21` — the case a re-hardcoded 41 fails.
-
-### Changed
-
-- `scripts/test_vise.jl` and `scripts/vise_plot.jl` → **`scripts/vise_study.jl`**. The first was
-  893 lines of which 854 were commented out; the second 1257 lines that loaded `.jld2` archives
-  from an absolute path on another machine, and mixed CairoMakie, Plots, MLJ and SymbolicRegression
-  to draw them. What they held that was worth keeping — the ansätze, the initial weight vectors,
-  the solver settings — is in the new one, which runs.
-
-  **This last sentence is not true, and both files are still here.** Re-read before the deletion it
-  implied, `vise_plot.jl` turned out to carry the symbolic-regression pipeline that *discovered* the
-  ansätze, and `test_vise.jl` a live six-degree-of-freedom Toda lattice run that is in no registry.
-  See the `[Unreleased]` notes above. `vise_study.jl` itself has since been folded into
-  `run_vise.jl`.
-- `docs/src/vise/vise.md`: the Plots.jl example, and its link to a `../figures/HHh2ref.svg` that
-  does not exist, replaced by the extension.
-
-### Removed
-
 - `benchmark/Manifest.toml`. It dev-pathed this package to
   `/Users/mkraus/Datashare/Julia/NonlinearIntegrators`, which does not exist, and pinned version
   0.4.0 against a repository at 0.4.3, so `Pkg.instantiate` there could only fail.
@@ -282,38 +245,72 @@ For one degree of freedom the panels are **stacked** in a single full-width colu
 axis; for `D > 1` they are a `D`×2 grid of equal-width columns with the error panel spanning
 underneath.
 
-`plot_solution` also takes `trace_timespan`, which restricts the `q` and `p` panels while leaving
-the error panel on the whole run. A run of a hundred oscillations is a solid block of ink at any
-figure width, and what the traces are there to show — that the ansatz tracks the reference — is
-settled in the first few periods, while the error panel is the one that needs the full range.
+`plot_solution` takes `timespan`, the interval **every** panel spans, and it is set explicitly on
+all of them rather than left to Makie: without it each axis autoscales to its own data and the
+traces and the error panel disagree, most visibly where the error panel's first point is dropped
+from a logarithmic axis and its axis therefore starts one step in. Sharing one axis is also what lets a
+single time label at the bottom serve the whole column. Narrowing the traces alone was tried and
+abandoned — it needed a second time axis to say what it had done.
 
 ### Notes
 
-Several things found while writing this, recorded because they are the kind of thing that gets
-rediscovered:
+**`scripts/test_vise.jl` and `scripts/vise_plot.jl` were *not* deleted**, though they were queued
+for it on the strength of a claim that what they held was in the new driver. That claim was wrong.
+Both were re-read before the deletion:
+
+- `vise_plot.jl` carries the `SRRegressor` symbolic-regression pipeline that **discovered** the VISE
+  ansätze. It is the provenance of every ansatz in `experiments.jl` and there is no other record. It
+  cannot run — it needs `MLJ` and `SymbolicRegression`, which are deliberately not in
+  `scripts/Project.toml`, and it loads archives from an absolute path on another machine — but that
+  makes it a document, not a dead file.
+- `test_vise.jl` is mostly commented, but its last sixty lines are a live **six-degree-of-freedom
+  Toda lattice** VISE run with six discovered ansätze and their initial weight vectors, an
+  experiment that is in no registry.
+
+Both are listed under "Retained files" in `scripts/README.md` with what each records.
+
+Several other things found while writing this, recorded because they are the kind of thing that
+gets rediscovered:
+
+- **A logarithmic error axis needs its unplottable points dropped from *both* vectors.** Every
+  invariant-error series starts with an exact `0` — `(H(t₀) - H₀)/H₀` is zero by construction — and
+  one `log10(0)` drags the axis limits to `-Inf`, whereupon Makie falls back to a default decade
+  range and the panel renders **empty**, with nothing to say why. The first render of these figures
+  did exactly that: three series with real values near `1e-8`, on an axis running `1e0` to `1e3`.
+
+  Masking with `NaN` fixes the limits and breaks the curve instead, because `NaN` cuts the polyline
+  at every masked point. That is invisible while only `t₀` is zero and wrong as soon as the
+  invariant is conserved to machine precision: measured on the global Fourier fit of the perturbed
+  pendulum, 22 of 101 samples are exactly zero, and the panel came out as disconnected fragments
+  and five isolated dots. So `log_points` drops the point from the **time** vector as well, which
+  bridges the gap while every surviving point keeps its own time, and a series with no plottable
+  point at all is left out entirely — as `plot_convergence` already leaves out a configuration that
+  failed at every step. Every archived series here is finite, so this only ever bridges an exact
+  zero; a run whose invariant blew up mid-way would be bridged rather than broken, and there is no
+  such archive to say what that should look like.
 
 - **`Legend` and `Label` report their width to the layout.** In a single-column figure the column is
   then sized to whichever of them is widest, and the axes shrink to match: measured on a
   three-panel figure, a 50-character title held the axes to **386 pt of a 900 pt page** — 43%,
   centred, the rest white. `tellwidth = false` on both is what makes the panels full width. Worth
   knowing because the symptom looks like a figure-size problem and is not.
+
 - **A dense comparison must be a line, not markers.** `plot_solution` draws a comparison as scatter
   markers, which is right for one computed at the same step as the primary — and wrong for one on a
   much finer grid: a midpoint solve at `h/20` over 40 time units is 1600 markers, which buries the
   panel. The rule is "more than twice as many points as the primary has steps", which separates the
   two cases without a keyword nobody would remember to set.
 
-- **A logarithmic error axis needs its zeros masked, not dropped.** Every invariant-error series
-  starts with an exact `0` — `(H(t₀) - H₀)/H₀` is zero by construction — and one `log10(0)` drags
-  the axis limits to `-Inf`, whereupon Makie falls back to a default decade range and the panel
-  renders **empty**, with nothing to say why. The first render of the figures this was written for
-  did exactly that: three series with real values near `1e-8`, on an axis running `1e0` to `1e3`.
-  `log_safe` masks to `NaN`, which Makie skips, and masking rather than deleting keeps each series
-  aligned with its own time vector.
+- **The NVI stagnation is measured through the Hamiltonian error alone.** `run_nvi.jl` silences the
+  per-step stall warnings — at 1000 steps they bury the output — and the solver's residual goes
+  with them: it is not archived, because that would mean reading the solver status back out of
+  `integrate`. `max |ΔH/H₀|` is what the runs record, and it is what the figures are about.
+
 - `scripts/oga_report.jl` and `benchmark/shallownet_report.jl` still carry their own palettes and
   their own font sizes, and neither uses `plot_theme()`. They plot a different subject — labelled
   heatmaps and benchmark sweeps, where the palette is doing work the theme cannot — so converging
-  them is real work rather than a side effect of this release, and **it has not been done**.
+  them is real work rather than a side effect of this one, and **it has not been done**.
+
 - `plot_theme()` is a fifth hand-kept copy of that theme (`GeometricExamples` and three publication
   companion packages hold the others). Somewhere to put it once would be better; there is no
   package in the dependency graph of all five that it could go in.

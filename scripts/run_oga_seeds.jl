@@ -129,7 +129,9 @@ function main(args)
         # order — so the study says so, rather than the renderer having to know.
         "reference_orders" => Int[],
         "configuration" => label,
-        "title" => "OGA seed variants — $(label), harmonic oscillator, T = $(Int(final_time))",
+        "title" =>
+            "OGA seed variants — $(label), harmonic oscillator, " *
+            "T = $(number_label(final_time))",
         "problem" => CONFIG.problem,
         "S" => CONFIG.S,
         "R" => CONFIG.R,

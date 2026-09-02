@@ -18,8 +18,12 @@
 # **These solves are not expected to converge**, and the run does not treat that as a failure. The
 # nonlinear solver stalls with a residual around 1e-4, which is the stagnation the talk's appendix
 # frame describes as an open problem — the neural variational integrators stagnate near 1e-3 in the
-# Hamiltonian error while the polynomial Galerkin integrators converge at their nominal order. The
-# maximum residual reached is printed and archived so the claim is measured rather than repeated.
+# Hamiltonian error while the polynomial Galerkin integrators converge at their nominal order.
+#
+# What is measured here is that Hamiltonian error: `max |ΔH/H₀|` is printed and archived, so the
+# claim about the *figures* is measured rather than repeated. The solver's own residual is **not**
+# captured — it exists only in the per-step warnings, which are silenced below. Archiving it would
+# mean reading the solver status back out of `integrate`, and nothing here does that yet.
 
 include(joinpath(@__DIR__, "experiments.jl"))
 
@@ -44,8 +48,9 @@ function run_nvi(run::NVIRun)
     method = build_nvi_method(run)
 
     # The stalled-solve warnings are the expected outcome here, one per time step, and at 1000
-    # steps they bury the output entirely. Silenced deliberately, with the residual reported
-    # instead — see the note at the top of this file.
+    # steps they bury the output entirely. Silenced deliberately, and with them the only record of
+    # the residual — the Hamiltonian error below is what this run measures. See the note at the top
+    # of this file.
     t_start = time()
     sol, internal_values = Logging.with_logger(Logging.NullLogger()) do
         integrate(prob, method; NVI_SOLVER_OPTIONS...)
@@ -80,7 +85,8 @@ function run_nvi(run::NVIRun)
                 "hamiltonian_error" => relative_invariant_error(csol, hamiltonian, params))
         catch exception
             exception isa InterruptException && rethrow()
-            report("comparison $(label)", "skipped — $(nameof(typeof(exception)))")
+            report("comparison $(label)",
+                "skipped — $(nameof(typeof(exception))): $(failure_message(exception))")
         end
     end
 
@@ -171,8 +177,10 @@ end
 function main(args)
     stems, _ = parse_arguments(args)
     runs = isempty(stems) ? NVI_RUNS : map(nvi_run, stems)
-    # One failing configuration must not cost the other eighteen. Reported with its exception type
-    # and counted, so a run that vanished is visible in the summary rather than only in the log.
+    # One failing configuration must not cost the other eighteen. Reported with its exception and
+    # counted, so a run that vanished is visible in the summary rather than only in the log — and
+    # the script exits non-zero, because a sweep that archived nothing must not look like one that
+    # archived everything.
     failed = String[]
     for run in runs
         try
@@ -180,7 +188,8 @@ function main(args)
         catch exception
             exception isa InterruptException && rethrow()
             push!(failed, nvi_stem(run))
-            banner("$(nvi_stem(run)) FAILED — $(nameof(typeof(exception)))")
+            banner("$(nvi_stem(run)) FAILED — $(nameof(typeof(exception))): " *
+                   failure_message(exception))
         end
     end
 
@@ -188,7 +197,9 @@ function main(args)
         banner("$(length(failed)) of $(length(runs)) runs failed")
         foreach(f -> println("  ", f), failed)
     end
-    banner("done")
+    return isempty(failed)
 end
 
-main(ARGS)
+ok = main(ARGS)
+banner("done")
+ok || exit(1)

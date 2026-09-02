@@ -1,7 +1,10 @@
 # The shared layer under every driver in this directory: where output goes, how a run is archived,
 # how arguments are parsed, and how progress is printed.
 #
-# Nothing here executes at top level, so it is safe to `include` from several files in one session.
+# No *work* happens at top level, so a driver can `include` this and pay only the load. The two
+# output-directory `Ref`s do execute, though, so including it twice in one session — a REPL that
+# loads two drivers — redefines them and resets a `--runs-dir` already set. Each driver includes it
+# once, directly or through `experiments.jl`, which is the only path that runs it as a script.
 #
 # It is separate from `experiments.jl` because of what it *depends on*, not because of its size.
 # `figures.jl` needs the archive layer and nothing else; `experiments.jl` pulls in Symbolics,
@@ -229,6 +232,10 @@ A `GeometricSolution` reduced to plain vectors, which is what an archive should 
 solution object itself would tie the file to the version of GeometricSolutions that wrote it.
 """
 function solution_data(sol, D)
+    # Qualified, unlike the bare `ntime` a driver writes: this file loads JLD2, Printf and
+    # NonlinearIntegrators only, and NonlinearIntegrators `import`s `ntime` from GeometricBase
+    # rather than exporting it. A driver has the bare name because `experiments.jl` beside it
+    # does `using GeometricSolutions`, which does export it.
     idx = 0:NonlinearIntegrators.ntime(sol)
     t = [sol.t[n] for n in idx]
     q = [[sol.q[n][d] for n in idx] for d in 1:D]
@@ -243,6 +250,22 @@ report(label, value) = @printf("  %-46s %s\n", label, value)
 report_error(label, value) = @printf("  %-46s %.3e\n", label, value)
 
 banner(text) = println("\n", text, "\n", repeat("-", length(text)))
+
+"""
+    failure_message(exception) -> String
+
+An exception as one line of report output: its own message, first line only and capped.
+
+The type alone is not enough. `SingularException` says what happened, but `KeyError`,
+`ArgumentError` and `InexactError` carry the key, the argument and the value — and those are how an
+archive written by an older revision of the registry fails to draw, so a bare `FAILED KeyError`
+names neither the file's problem nor the fix. First line and capped because a `MethodError` prints
+its whole candidate list, which does not belong in a skip report.
+"""
+function failure_message(exception)
+    text = first(split(sprint(showerror, exception), '\n'))
+    length(text) > 160 ? first(text, 160) * "…" : text
+end
 
 """
     report_path(label, path)

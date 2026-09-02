@@ -203,6 +203,8 @@ end
 
 function main(args)
     names, _ = parse_arguments(args)
+    length(names) ≤ 1 || throw(ArgumentError(
+        "this script takes one mode at most, got $(join(names, ", "))"))
     mode = isempty(names) ? "all" : first(names)
     mode in ("all", "relu", "smooth") ||
         error("unknown mode $(repr(mode)); use \"all\", \"relu\" or \"smooth\"")

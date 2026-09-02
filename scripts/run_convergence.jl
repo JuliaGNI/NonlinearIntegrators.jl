@@ -182,7 +182,9 @@ function run_cell(problem::ConvergenceProblem, integrator::String, steps, final_
         "problem" => problem.name,
         "problem_label" => problem.label,
         "integrator" => integrator,
-        "title" => "$(CELL_TITLES[integrator]) — $(problem.label), T = $(Int(final_time))",
+        "title" =>
+            "$(CELL_TITLES[integrator]) — $(problem.label), " *
+            "T = $(number_label(final_time))",
         "final_time" => final_time,
         "timesteps" => collect(steps),
         "labels" => [s.label for s in series],

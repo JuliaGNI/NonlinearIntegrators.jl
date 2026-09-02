@@ -88,7 +88,7 @@ end
 # ---- one run -----------------------------------------------------------------
 
 function run_fourier(run::FourierRun)
-    banner("$(run.problem_label) — $(run.label), T = $(Int(run.final_time))")
+    banner("$(run.problem_label) — $(run.label), T = $(number_label(run.final_time))")
 
     prob = run.problem((0.0, run.final_time), run.sample_step)
     params = prob.parameters
@@ -178,7 +178,7 @@ function run_fourier(run::FourierRun)
     # one mechanism, and it had two names for no reason.
     data["windows"] = run.final_time > 400 ? [run.final_time / 5] : Float64[]
 
-    stem = study_stem(run.name, "fourier", "T$(Int(run.final_time))")
+    stem = study_stem(run.name, "fourier", "T$(number_label(run.final_time))")
     report_path("archive", store_run!(stem, data))
     return data
 end

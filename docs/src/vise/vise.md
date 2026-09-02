@@ -91,7 +91,8 @@ package does not duplicate any of it:
     in `test/plots_tests.jl` so that a fix upstream is noticed here.
 
     Until then, take the relative Hamiltonian error from the third panel of
-    [`plot_solution`](@ref), which computes it from `q` *and* `p`, or compute it directly:
+    [`Diagnostics.plot_solution`](@ref NonlinearIntegrators.Diagnostics.plot_solution), which
+    computes it from `q` *and* `p`, or compute it directly:
 
     ```julia
     using NonlinearIntegrators: relative_invariant_error

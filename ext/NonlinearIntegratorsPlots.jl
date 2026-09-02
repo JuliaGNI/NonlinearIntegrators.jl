@@ -5,7 +5,7 @@ using Makie
 # `TimeSeries` (its recipe), which would otherwise clash with `GeometricSolutions.TimeSeries`.
 using GeometricSolutions: GeometricSolution
 
-import NonlinearIntegrators: Trajectory, dimension, window_stem
+import NonlinearIntegrators: Trajectory, dimension, window_stem, number_label
 # The stubs live in the `Diagnostics` submodule rather than at the package's top level, because
 # `plot_solution` and `plot_convergence` are names `GeometricProblems` already exports — see the
 # `Diagnostics` docstring in `src/plots.jl`. The methods below are therefore defined as
@@ -124,10 +124,6 @@ function log_points(times, values)
     (collect(times)[keep], [float(v) for v in values][keep])
 end
 
-# A step size as a tick label: the value itself, trimmed of the trailing zero an integer-valued
-# `Float64` prints. `0.03125` stays `0.03125`, `4.0` becomes `4`.
-_steplabel(h) = isinteger(h) ? string(Int(h)) : string(h)
-
 function _relabel(traj::Trajectory, label::AbstractString)
     traj.label == label && return traj
     Trajectory(label, traj.t, traj.q, traj.p;
@@ -197,7 +193,8 @@ one solution in it — an invariant error, a drift, a phase portrait, a set of t
     to the extent of `primary`, which is the problem's own timespan. Set explicitly on all panels
     rather than left to Makie, so that the trace panels and the error panel share one axis exactly —
     without it each autoscales to its own data and they disagree, most visibly where the error
-    panel's first point is masked off a logarithmic axis and its axis therefore starts one step in.
+    panel's first point is dropped from a logarithmic axis and its axis therefore starts one step
+    in.
     Sharing the axis is also what lets a single time label at the bottom serve the whole column.
   - `title = ""`: a heading across the whole figure. The panels are labelled but not titled, so
     without it a figure taken out of its directory does not say which run it is.
@@ -492,7 +489,7 @@ function Diagnostics.plot_convergence(timesteps, errors;
         xscale = log10, yscale = log10)
 
     ticks = sort(unique(reduce(vcat, [collect(steps_of(i)) for i in eachindex(errors)])))
-    ax.xticks = (ticks, [_steplabel(h) for h in ticks])
+    ax.xticks = (ticks, [number_label(h) for h in ticks])
     ax.xticklabelrotation = π / 4
 
     for i in eachindex(errors)
@@ -592,7 +589,7 @@ end
 # near-copy of it with one clause removed.
 function _solution_title(data, shown)
     step = haskey(data, "timestep") ? "Δt = $(data["timestep"]), " : ""
-    "$(data["problem_label"]) — $(data["label"]), $(step)t ∈ [0, $(Int(shown))]"
+    "$(data["problem_label"]) — $(data["label"]), $(step)t ∈ [0, $(number_label(shown))]"
 end
 
 function _solution_figure(data; upto = nothing)

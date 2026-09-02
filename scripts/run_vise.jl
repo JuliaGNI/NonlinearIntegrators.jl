@@ -175,6 +175,10 @@ end
 
 function main(args)
     names, _ = parse_arguments(args)
+    # A third positional would be silently ignored, and this script exists to be called from a
+    # regeneration recipe — the same reason the shared parser rejects an unrecognised flag.
+    length(names) ≤ 2 || throw(ArgumentError(
+        "this script takes a problem name and a time step at most, got $(join(names, ", "))"))
     experiments = isempty(names) ? VISE_PROBLEMS : (vise_problem(names[1]),)
 
     rows = NamedTuple[]

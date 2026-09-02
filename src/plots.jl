@@ -24,6 +24,19 @@ method. `method` is the integrator as it appears in the legend: `vise`, `S4R8Q16
 figure_stem(problem, method, timestep) = "$(problem)-$(method)-h$(timestep)"
 
 """
+    number_label(x) -> String
+
+A number as it belongs in a name or on an axis: the value itself, without the trailing zero an
+integer-valued `Float64` prints. `2000.0` becomes `2000`, `0.03125` stays `0.03125`.
+
+Not `Int(x)`, which is what six call sites here used to do. `Int` does not *truncate* a
+non-integral argument, it raises `InexactError` — so a window or a final time that was not a whole
+number of time units took the figure name, the figure title or the archive down with it, and in
+`run_convergence.jl` it did so **after** the sweep it was naming had run.
+"""
+number_label(x::Real) = isinteger(x) ? string(Integer(x)) : string(x)
+
+"""
     window_stem(stem, upto) -> String
 
 `<stem>-t<upto>`, for one of several figures of the *same* run showing different time intervals.
@@ -31,7 +44,7 @@ figure_stem(problem, method, timestep) = "$(problem)-$(method)-h$(timestep)"
 The `-t` is what distinguishes a final time from a step count or a step size: a bare
 `…-nvi-500` reads as either.
 """
-window_stem(stem, upto) = "$(stem)-t$(Int(upto))"
+window_stem(stem, upto) = "$(stem)-t$(number_label(upto))"
 
 """
     study_stem(problem, study, variant) -> String
@@ -356,7 +369,7 @@ The number of degrees of freedom the trajectory carries.
 dimension(traj::Trajectory) = length(traj.q)
 
 export continuous_solution, relative_invariant_error, coarse_grid_error, Trajectory
-export figure_stem, window_stem, study_stem, galerkin_label, network_label
+export figure_stem, window_stem, study_stem, galerkin_label, network_label, number_label
 
 """
     NonlinearIntegrators.Diagnostics

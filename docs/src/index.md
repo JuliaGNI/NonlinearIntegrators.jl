@@ -62,6 +62,21 @@ sol, _ = integrate(prob, method;
 Modules = [NonlinearIntegrators]
 ```
 
+### Plotting
+
+The figure functions live in the `Diagnostics` submodule rather than at the top level, because
+`plot_solution` and `plot_convergence` are names `GeometricProblems` already exports — see the
+`NonlinearIntegrators.Diagnostics` docstring below. They need a second block: `@autodocs` does not
+descend into a submodule, while `checkdocs` does, so without this the submodule's docstrings are
+checked and undocumented and `makedocs` fails with `:missing_docs`.
+
+The methods behind these are in the `NonlinearIntegratorsPlots` extension, and `docs/Project.toml`
+carries no Makie backend, so what is rendered here is the interface each one promises.
+
+```@autodocs
+Modules = [NonlinearIntegrators.Diagnostics]
+```
+
 ```@meta
 CurrentModule = NonlinearIntegrators
 ```

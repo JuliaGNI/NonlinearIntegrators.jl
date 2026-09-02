@@ -51,17 +51,31 @@ function main(args)
     # defaults.
     with_theme(NIP.plot_theme()) do
         runs = load_runs()
-        isempty(runs) && return report("no archives in", RUNS_DIR[])
+        if isempty(runs)
+            # An empty run directory is a state, not a failure: the drivers have not been run yet.
+            report("no archives in", RUNS_DIR[])
+            return true
+        end
 
         selected = isempty(stems) ? runs :
                    filter(d -> any(s -> occursin(s, d["stem"]), stems), runs)
-        isempty(selected) && return report("no archive matched", join(stems, ", "))
+        if isempty(selected)
+            # A stem that matches nothing is a mistyped argument, and it gets the same treatment
+            # as an unrecognised flag rather than an exit 0 that reads as "there was nothing to do".
+            report("no archive matched", join(stems, ", "))
+            return false
+        end
 
         # An archive this renderer cannot draw is reported and skipped, not fatal. A run directory
         # accumulates across revisions of the registry, and it demonstrably holds files written
         # before `"kind"` existed; letting one of those abort the run costs every other figure and
         # says nothing useful about the one at fault. Same reasoning as the per-run guard in
         # `run_nvi.jl`: one failure must not take the other forty-eight with it.
+        #
+        # Skipping is not the same as succeeding, though, so the exception's own message is printed
+        # and `main` exits non-zero. A renderer that failed on *every* archive and still printed
+        # `done` and exited 0 is the shape a regeneration recipe cannot detect — the same failure
+        # the shared argument parser exists to remove.
         skipped = String[]
         for data in selected
             stem = data["stem"]
@@ -79,7 +93,8 @@ function main(args)
             catch exception
                 exception isa InterruptException && rethrow()
                 push!(skipped, stem)
-                report("FAILED", "$(nameof(typeof(exception)))")
+                report("FAILED", "$(nameof(typeof(exception))): " *
+                                 failure_message(exception))
             end
         end
 
@@ -87,9 +102,10 @@ function main(args)
             banner("$(length(skipped)) archive(s) not drawn")
             foreach(s -> println("    ", s), skipped)
         end
+        return isempty(skipped)
     end
-
-    banner("done")
 end
 
-main(ARGS)
+ok = main(ARGS)
+banner("done")
+ok || exit(1)
