@@ -143,8 +143,8 @@ const CSV_HEADER = "study,problem,T,dt,S,R,activation,seed,lambda_multiple,lambd
                    "ref_err,iterations,secs"
 
 function run_stage(name::AbstractString, seeds, activations)
-    mkpath(RUNS_DIR[])
-    csvpath = joinpath(RUNS_DIR[], "$(name).csv")
+    mkpath(RESULTS_DIR)
+    csvpath = joinpath(RESULTS_DIR, "$(name).csv")
 
     total = length(TYPES) * length(activations) * length(seeds) * (1 + 6)
     println("="^104)
@@ -201,15 +201,14 @@ function run_stage(name::AbstractString, seeds, activations)
     return csvpath
 end
 
-function main(args)
-    names, _ = parse_arguments(args)
-    mode = isempty(names) ? "all" : first(names)
-    mode in ("all", "relu", "smooth") ||
-        error("unknown mode $(repr(mode)); use \"all\", \"relu\" or \"smooth\"")
+function main()
+    mode = isempty(ARGS) ? "all" : ARGS[1]
     mode in ("all", "relu") &&
         run_stage("oga_sweep_relu", SEEDS_1D, OGA_ACTIVATIONS_RELU)
     mode in ("all", "smooth") &&
         run_stage("oga_sweep_smooth", SEEDS_2D, OGA_ACTIVATIONS_SMOOTH)
+    mode in ("all", "relu", "smooth") ||
+        error("unknown mode $(repr(mode)); use \"all\", \"relu\" or \"smooth\"")
 end
 
-main(ARGS)
+main()

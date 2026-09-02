@@ -105,13 +105,9 @@ end
 const CSV_HEADER = "study,target,T,activation,dictionary,selection,fit,S,dict_amount," *
                    "status,fit_err,cond,sigma_min,neurons,rejected,secs"
 
-function main(args)
-    names, _ = parse_arguments(args)
-    isempty(names) || throw(ArgumentError(
-        "this study takes no positional arguments, got $(join(names, ", "))"))
-
-    mkpath(RUNS_DIR[])
-    csvpath = joinpath(RUNS_DIR[], "oga_fit_study.csv")
+function main()
+    mkpath(RESULTS_DIR)
+    csvpath = joinpath(RESULTS_DIR, "oga_fit_study.csv")
 
     total = length(TARGETS) * 3 * length(OGA_ACTIVATIONS_ALL) *
             length(DICTIONARIES) * length(SELECTIONS) * length(FITS)
@@ -184,4 +180,4 @@ function main(args)
     return csvpath
 end
 
-main(ARGS)
+main()

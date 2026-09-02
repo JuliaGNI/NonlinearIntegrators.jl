@@ -1,13 +1,3 @@
-# How the VISE ansätze were found: a symbolic regression over one component of a solution, and the
-# figures that were used to judge the results.
-#
-# **This is a record, not a driver.** It is kept because it is the only account of where the
-# ansätze and initial weights in `experiments.jl` came from — nothing else in any repository
-# derives them. It does not run as it stands: it loads archives from an absolute path on a machine
-# this is not, and `SymbolicRegression` and `MLJ` are deliberately absent from
-# `scripts/Project.toml` rather than carried as two heavy dependencies for a file nobody executes.
-# Read it; do not expect `julia scripts/vise_plot.jl` to work.
-
 using CairoMakie
 using JLD2
 
@@ -18,29 +8,10 @@ using CompactBasisFunctions
 
 using SymbolicRegression
 using MLJ
+using GeometricIntegrators
+using GeometricProblems
+using Plots
 using SymbolicUtils
-
-# Was Plots.jl, alongside the CairoMakie the rest of this file already used — so a bare `plot` was
-# ambiguous between the two and could not resolve at all. One backend, and it is the tree's:
-# CairoMakie.
-"""
-    compare_discovered(t, discovered, data; label) -> Figure
-
-A discovered expression against the component it was fitted to, on one axis.
-
-What the symbolic regression returns is an expression; the question this answers is whether it
-tracks the data over the window it was fitted on, which is a question about a picture rather than
-a number. `t` and `discovered` arrive as the `N×1` matrices `SRRegressor` is fed, so they are
-flattened here rather than at every call site.
-"""
-function compare_discovered(t, discovered, data; label = "Discovered")
-    fig = Figure()
-    ax = Axis(fig[1, 1]; xlabel = "t", ylabel = "q")
-    lines!(ax, vec(t), vec(discovered); label = label)
-    lines!(ax, vec(t), vec(data); label = "Solution", linestyle = :dash)
-    axislegend(ax)
-    return fig
-end
 
 HarmonicOscillator_h1 = load("/Users/zeyuanli/Desktop/untitled folder 2/HO/Backtracking2_R8_h1.00_iter1000_fabs4.44e-16_fsuc4.44e-16_TT200.jld2")
 HarmonicOscillator_h2 = load("/Users/zeyuanli/Desktop/untitled folder 2/HO/Backtracking2_R16_h2.00_iter1000_fabs1.78e-15_fsuc1.78e-15_TT200.jld2")
@@ -1185,7 +1156,7 @@ record_results = load("/Users/zeyuanli/Desktop/untitled folder 2/Backtracking2_R
 YY1 = reshape(collect(sol.q[:, 6])[1:100], :, 1)
 # YY3 = reshape(collect(sol.q[:, 3]), :, 1)
 X = reshape(collect(sol.t)[1:100], :, 1)
-lines(vec(X), vec(YY1); axis = (; xlabel = "t", ylabel = "q₆"))
+plot(YY1, label = "q1")
 
 # animate the first index (q₁) over time and save as a gif
 # anim = @animate for i in 1:length(sol.t)-10
@@ -1206,12 +1177,12 @@ fit!(mach)
 r = report(mach)
 r.equations[r.best_idx]
 
-lines(collect(imp_sol.t), collect(imp_sol.q[:, 1]);
-    axis = (; xlabel = "t", ylabel = "q₁"))
+plot(collect(imp_sol.t), collect(imp_sol.q[:, 1]), label = "q1")
 
 # q1 discovered equation:
 plot_f(x1) = (cos(0.7854 * (0.10225 + x1)) * -0.25275) + 0.71809
-compare_discovered(X, plot_f.(X), collect(sol.q[:, 1])[1:100]; label = "Discovered q1")
+plot(X, plot_f.(X), label = "Discovered q1")
+plot!(X, reshape(collect(sol.q[:, 1])[1:100], :, 1))
 
 # q2 discovered equation:
 function plot_f(x1)
@@ -1220,21 +1191,21 @@ function plot_f(x1)
       (-0.05196883935607318 * (x1 * cos(x1)))))
 end
 plot_f(x1) = (cos((x1 + -0.16028) / -0.68201) * 0.025339) + 0.72871
-# `sol.q[:, 2]` is taken over 50 steps against `X`'s 100 — the shorter series is what the fit was
-# judged on, and the mismatch is preserved rather than quietly padded.
-compare_discovered(X[1:50], plot_f.(X[1:50]), collect(sol.q[:, 2])[1:50];
-    label = "Discovered q2")
+plot(X, plot_f.(X), label = "Discovered q2")
+plot!(X, reshape(collect(sol.q[:, 2])[1:50], :, 1))
 
 # q3 discovered equation:
 plot_f(x1) = 0.74607 - ((cos(-0.65807 - (-0.15913 * x1)) * -0.27609) * cos(x1 / 1.2536))
-compare_discovered(X, plot_f.(X), collect(sol.q[:, 3])[1:100]; label = "Discovered q3")
+plot(X, plot_f.(X), label = "Discovered q3")
+plot!(X, reshape(collect(sol.q[:, 3])[1:100], :, 1))
 
 #q4 discovered equation:
 function plot_f(x₁)
     ((((0.073415 * cos(x₁ / -0.77546)) - cos(x₁ * 0.8083)) * -0.25817) - -0.76175) -
     0.041198
 end
-compare_discovered(X, plot_f.(X), collect(sol.q[:, 4])[1:100]; label = "Discovered q4")
+plot(X, plot_f.(X), label = "Discovered q4")
+plot!(X, reshape(collect(sol.q[:, 4])[1:100], :, 1))
 
 #q5 discovered equation:
 function plot_f(x₁)
@@ -1242,7 +1213,8 @@ function plot_f(x₁)
     (((-1.5715 + cos(-0.41176)) + (x₁ - cos((x₁ / 0.46104) / 1.2723))) *
      (0.0022377 * cos(-0.50813 * x₁)))
 end
-compare_discovered(X, plot_f.(X), collect(sol.q[:, 5])[1:100]; label = "Discovered q5")
+plot(X, plot_f.(X), label = "Discovered q5")
+plot!(X, reshape(collect(sol.q[:, 5])[1:100], :, 1))
 
 #q6 discovered equation:
 X = reshape(collect(sol.t)[1:1000], :, 1)
@@ -1250,7 +1222,8 @@ function plot_f(x₁)
     (cos(-0.2401) + -0.22056) -
     (cos(x₁ / -1.2461) * (0.25121 - (cos(-0.77484 * x₁) * -0.03474)))
 end
-compare_discovered(X, plot_f.(X), collect(sol.q[:, 6])[1:1000]; label = "Discovered q6")
+plot(X, plot_f.(X), label = "Discovered q6")
+plot!(X, reshape(collect(sol.q[:, 6])[1:1000], :, 1))
 
 # Outer Solar System LODE problem solution plot
 TT = 200000.0
@@ -1259,8 +1232,7 @@ HHP_lode = GeometricProblems.OuterSolarSystem.lodeproblem(timespan = (0, TT), ti
 HHP_sol = integrate(HHP_lode, ImplicitMidpoint())
 
 N_length = 200000
-lines(collect(HHP_sol.t)[1:N_length], collect(HHP_sol.q[:, 1])[1:N_length];
-    axis = (; xlabel = "t", ylabel = "q₁"))
+plot(collect(HHP_sol.q[:, 1])[1:N_length], label = "q1")
 X = reshape(collect(HHP_sol.t)[1:N_length], :, 1)
 YY1 = 1000 .* reshape(collect(HHP_sol.q[:, 1])[1:N_length], :, 1)
 
@@ -1281,5 +1253,5 @@ function plot_f(x₁)
     (-0.0057824 - (cos(-5.1303e-05 * ((x₁ + 1.2805) * (x₁ * -0.00012295))) *
       (-7.5606e-06 * (cos(x₁ * (4.4595e-05 * x₁)) - (0.43088 - x₁))))) / 1.0013
 end
-compare_discovered(X, plot_f.(X), collect(HHP_sol.q[:, 1])[1:N_length];
-    label = "Discovered q1")
+plot(X, plot_f.(X), label = "Discovered q1")
+plot!(X, reshape(collect(HHP_sol.q[:, 1])[1:N_length], :, 1))

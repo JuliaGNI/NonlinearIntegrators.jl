@@ -128,14 +128,6 @@ include("vise/vise.jl")
 include("vise/vise_basis.jl")
 export VISE, VISEBasis
 
-# The plotting API. The data layer — `continuous_solution`, `Trajectory`, the error reductions —
-# and the figure naming scheme are implemented in `src/` rather than in the extension because
-# neither is plotting: every caller of a network or symbolic integrator needs them, whether or not
-# it goes on to draw anything, and the naming has to be reachable from both the extension that
-# names a figure and the script that finds that figure's archive. The three `plot_*` stubs get
-# their methods in `ext/NonlinearIntegratorsPlots.jl`, which loads together with `Makie`.
-include("plots.jl")
-
 # The linear reference integrator this package used to carry, `CGVINodal` — continuous
 # Galerkin on a nodal basis — now lives in GeometricIntegrators alongside `CGVI`, which is where
 # a linear variational integrator belongs (JuliaGNI/GeometricIntegrators.jl#219). Reach it as
