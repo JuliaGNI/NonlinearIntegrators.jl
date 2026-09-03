@@ -101,8 +101,8 @@ end
 # ---- archives ----------------------------------------------------------------
 #
 # One JLD2 file per run, under `runs/`. The keys are flat and named for what they hold rather than
-# for the variable that happened to hold it — the archives this replaces used keys like
-# `HO_PR_sol_q` and a stored typo `hamltonian`, and no two problems agreed on a scheme.
+# for the variable that happened to hold it, and one scheme covers every problem — a reader needs
+# no per-problem knowledge to know what an archive contains.
 #
 # Two keys carry the schema itself:
 #

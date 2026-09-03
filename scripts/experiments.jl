@@ -12,24 +12,22 @@
 #
 # ---- why this file exists ----------------------------------------------------
 #
-# The scripts this replaces were three copies of one file (harmonic oscillator, perturbed
-# pendulum, Hénon–Heiles), each containing three copies of one 30-line block (h = 1, 2, 5), and
-# none of them ran a simulation: they loaded `.jld2` archives produced elsewhere by code that no
-# longer exists. Everything that actually varies between the nine VISE runs is a row of
-# `VISE_PROBLEMS` and `VISE_STEPS` below, and everything that varies between the NVI runs is a
-# row of `NVI_RUNS`.
+# One registry, so that a run is a row rather than a file. Everything that varies between the nine
+# VISE runs is a row of `VISE_PROBLEMS` and `VISE_STEPS` below, and everything that varies between
+# the NVI runs is a row of `NVI_RUNS`. A driver then iterates the registry, which is what keeps
+# adding a problem or a step from meaning another copy of a 30-line solve block.
 #
 # ---- provenance of the parameters -------------------------------------------
 #
-# The ansätze, initial weights and quadrature orders were recovered from three places, since no
-# single surviving file had all of them. **This file is now the only record of them**: the two it
-# was reconstructed from have been deleted, and the third was never in a repository.
+# The ansätze, initial weights and quadrature orders are drawn from three places, since no single
+# file holds all of them. One of the three is in no repository, so for what that one contributes
+# this file is the only record.
 #
-#   * `scripts/test_vise.jl` (deleted) — the original driver, 96 % commented out. The ansätze, the
-#     `init_w` vectors, and the `Backtracking`/`iter1000`/`fabs`/`fsuc` solver settings that the
-#     archive filenames encode.
-#   * `tem_file.jl` in the talk directory these scripts came from — which comparison integrators
-#     each panel carried, and the `Gauss(8)` reference at `h/40`.
+#   * `scripts/test_vise.jl` — the original driver, 96 % commented out. The ansätze, the `init_w`
+#     vectors, and the `Backtracking`/`iter1000`/`fabs`/`fsuc` solver settings that the archive
+#     filenames encode.
+#   * `tem_file.jl` in the talk directory these scripts came from, which is tracked nowhere —
+#     which comparison integrators each panel carried, and the `Gauss(8)` reference at `h/40`.
 #   * the archive filenames themselves, `Backtracking2_R<n>_h<h>_iter1000_fabs<a>_fsuc<s>_TT200`
 #     — the per-step quadrature order `R`, which varies with `h` and is not recorded anywhere
 #     else. This is why `VISEProblem.quadrature` is a `Dict` from time step to `R` and errors on a
@@ -40,10 +38,9 @@
 
 include(joinpath(@__DIR__, "archives.jl"))
 
-# `relu_k` — type-generic `max(zero(x), x)^k`, never `max(0.0, x)`, which is how three historical
-# inline copies of it silently upcast a `Float32` run. Included rather than repeated: the copy here
-# used to be justified by not wanting to reach "across a repository boundary", and now that these
-# scripts live in the package beside `oga_activations.jl` there is no boundary to reach across.
+# `relu_k` — type-generic `max(zero(x), x)^k`, never `max(0.0, x)`, which silently upcasts a
+# `Float32` run. Included from `oga_activations.jl` rather than repeated here: these scripts sit in
+# the package beside it, so there is no repository boundary to avoid reaching across.
 include(joinpath(@__DIR__, "oga_activations.jl"))
 
 using GeometricIntegrators
@@ -642,9 +639,9 @@ const CONVERGENCE_INTEGRATORS = ("cgvi", "nvi", "vise")
 # ---- diagnostics -------------------------------------------------------------
 #
 # Two of these are the package's own, in `src/plots.jl`, because they are not specific to any
-# experiment and each existed here in a second copy:
+# experiment:
 #
-#   `relative_invariant_error(sol, hamiltonian, parameters)`  — was `relative_hamiltonian_error`
+#   `relative_invariant_error(sol, hamiltonian, parameters)`
 #   `coarse_grid_error(sol, ref_sol, substeps)`               — normalises by the maximum over the
 #       *whole* reference rather than per step, which is what keeps an oscillator's zero crossings
 #       from reporting a bounded absolute error as an arbitrarily large relative one.

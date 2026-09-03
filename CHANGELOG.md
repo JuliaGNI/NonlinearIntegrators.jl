@@ -148,6 +148,15 @@ scripts sat in a talk directory, all carrying much the same code.
   `runs/` and `results/` exists to avoid. An archive that is genuinely unreadable is named and
   skipped rather than aborting the run: one stale file must not cost the other sixty-one figures.
 
+- **The shared layer under `scripts/` is tested** — `test/scripts_archives_tests.jl`, a `scripts`
+  testset. It covers `parse_arguments` (the split, the rejection of an unknown option, and of an
+  option with no value), `option_steps`, `option_final_time`, `archive_kind` (explicit `"kind"`
+  beating inference, both inferred shapes, and a partial shape inferring nothing),
+  `normalise_schema!` and `failure_message`. These are the functions a driver only exercises
+  *after* its solves have been paid for, and the parser's strictness is the one gate between a
+  mistyped flag and a twenty-minute sweep that runs the wrong thing. `test/Project.toml` gains
+  JLD2, which is what `scripts/archives.jl` loads.
+
 ### Changed
 
 - **Output goes to `runs/` (data) and `results/` (figures), at the repository root**, and every
@@ -194,6 +203,25 @@ scripts sat in a talk directory, all carrying much the same code.
   `--final-time 12.5` took `run_convergence.jl` down *after* its sweep had run. A window or a final
   time that is not a whole number of time units now names its figure as `…-t2.5`.
 
+  `number_label` is **total over the reals**: a value above `typemax(Int64)` keeps its float
+  spelling rather than raising the very exception the function exists to remove. Unreachable from
+  any registry value, but a naming helper that can throw is not one.
+
+- **A driver that achieved nothing now says so in its exit status.** `run_convergence.jl` and
+  `run_oga_seeds.jl` print a failed cell's exception *message* rather than only its type, and exit
+  non-zero when a study produced no finite result at all. Individual cells that break are still
+  archived as `NaN` and drawn as holes — that is deliberate, and a diverging seed is what the OGA
+  seed study is *for* — but a sweep in which every cell threw used to write an all-`NaN` archive
+  and exit 0, which is indistinguishable from one that worked. `figures.jl` and `run_nvi.jl`
+  already did both of these; this is the same treatment for the two drivers that did not.
+
+- **`docs/make.jl` instantiates the `benchmark/` environment before running it.** The
+  `Documentation` job resolves `docs/` only, so the benchmark figure regeneration died with
+  `Package NonlinearIntegrators … does not seem to be installed` before the manual was ever built —
+  which is why nothing in CI has checked this package's documentation since `976c084`. `[sources]`
+  in `benchmark/Project.toml` points at this repository, so the instantiation resolves the working
+  tree rather than a registered version.
+
 ### Measured
 
 **The OGA fit study's numbers have moved slightly since the archived CSV was written**, and this is
@@ -210,6 +238,11 @@ this cell still holds**: the median `Float16` / angular / normalised / `normaleq
 `docs/src/oga/studies.md` states. Nothing in `src/` changed here — the studies' own edits were to
 their output directory and argument parsing — so the most likely cause is a dependency bump between
 the two runs.
+
+`docs/src/oga/studies.md` now carries this as a note beside the number it quotes. The CHANGELOG is
+the record of what moved, but a reader who consults `2.10e-01` reads the manual, not this file, and
+the archived CSV the comparison was made against is untracked (`*.csv` in `.gitignore`) and so
+exists on one machine only.
 
 ### Removed
 
@@ -268,6 +301,12 @@ Both were re-read before the deletion:
   experiment that is in no registry.
 
 Both are listed under "Retained files" in `scripts/README.md` with what each records.
+
+The reversal had been recorded here and in `scripts/README.md` but not everywhere it was asserted:
+`scripts/experiments.jl`'s provenance note still called `test_vise.jl` deleted and claimed to be
+the only surviving record of the ansätze and initial weights. It now names where each of the three
+sources is, and only `tem_file.jl` — which was never in a repository — is one this file is the sole
+record of.
 
 Several other things found while writing this, recorded because they are the kind of thing that
 gets rediscovered:

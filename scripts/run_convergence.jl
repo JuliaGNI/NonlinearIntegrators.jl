@@ -50,7 +50,8 @@ integrators, not of the solver, and a `GeometricIntegrators` method has nowhere 
 `NaN` rather than a rethrown error: a study over eight step sizes and ten configurations will have
 entries that genuinely break, and losing the rest to the first one is worse than plotting a curve
 with a hole in it. The extension drops non-finite entries, and the failure is printed here with its
-exception type, so it is visible rather than silent.
+exception type *and* its message, so it is visible rather than silent. A study in which every cell
+breaks is caught in `main` instead, which exits non-zero rather than archiving an empty curve.
 """
 function max_hamiltonian_error(build_method, problem_fn, hamiltonian, timestep, final_time;
         options = NamedTuple())
@@ -63,7 +64,8 @@ function max_hamiltonian_error(build_method, problem_fn, hamiltonian, timestep, 
         return maximum(relative_invariant_error(sol, hamiltonian, prob.parameters))
     catch exception
         exception isa InterruptException && rethrow()
-        @printf("      failed: %s\n", typeof(exception))
+        @printf("      failed: %s: %s\n", nameof(typeof(exception)),
+            failure_message(exception))
         return NaN
     end
 end
@@ -175,9 +177,9 @@ function run_cell(problem::ConvergenceProblem, integrator::String, steps, final_
         # `h²`, `h⁴`, `h⁶` — the orders the polynomial family actually has. A continuous Galerkin
         # variational integrator on `R` Gauss nodes is of order `2R - 2`, and measured between every
         # pair of successive steps on both problems, `CGVI(2)`, `CGVI(3)` and `CGVI(4)` come out at
-        # `2.00`, `4.00` and `6.00` to three digits. The `h³` guide the original figures carried
-        # matched none of the three. Stored rather than passed at render time, so the guides belong
-        # to the study and not to whoever draws it.
+        # `2.00`, `4.00` and `6.00` to three digits — an `h³` guide matches none of the three.
+        # Stored rather than passed at render time, so the guides belong to the study and not to
+        # whoever draws it.
         "reference_orders" => [2, 4, 6],
         "problem" => problem.name,
         "problem_label" => problem.label,
@@ -223,12 +225,25 @@ function main(args)
     # comparable.
     report("final time", final_time)
 
+    # A cell that threw is archived as `NaN` and drawn as a hole in the curve, deliberately — see
+    # [`max_hamiltonian_error`](@ref). A study in which *every* cell threw is a different thing: it
+    # archives a curve with no points on it, and reporting success for that makes a sweep that
+    # achieved nothing indistinguishable from one that worked.
+    empty_studies = String[]
     for problem in problems, integrator in integrators
 
-        run_cell(problem, integrator, steps, final_time)
+        data = run_cell(problem, integrator, steps, final_time)
+        any(any(isfinite, errors) for errors in data["errors"]) ||
+            push!(empty_studies, study_stem(problem.name, "convergence", integrator))
     end
 
-    banner("done")
+    isempty(empty_studies) || begin
+        banner("$(length(empty_studies)) study(ies) produced no finite error")
+        foreach(s -> println("  ", s), empty_studies)
+    end
+    return isempty(empty_studies)
 end
 
-main(ARGS)
+ok = main(ARGS)
+banner("done")
+ok || exit(1)

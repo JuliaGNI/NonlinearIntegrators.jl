@@ -29,12 +29,15 @@ figure_stem(problem, method, timestep) = "$(problem)-$(method)-h$(timestep)"
 A number as it belongs in a name or on an axis: the value itself, without the trailing zero an
 integer-valued `Float64` prints. `2000.0` becomes `2000`, `0.03125` stays `0.03125`.
 
-Not `Int(x)`, which is what six call sites here used to do. `Int` does not *truncate* a
-non-integral argument, it raises `InexactError` — so a window or a final time that was not a whole
-number of time units took the figure name, the figure title or the archive down with it, and in
-`run_convergence.jl` it did so **after** the sweep it was naming had run.
+Total over the reals, which is the point of it. A non-integral value keeps its own spelling rather
+than raising, so a window or a final time that is not a whole number of time units cannot take a
+figure name, a figure title or an archive down with it; a value too large for `Int64` keeps its
+float spelling for the same reason.
 """
-number_label(x::Real) = isinteger(x) ? string(Integer(x)) : string(x)
+function number_label(x::Real)
+    representable = isinteger(x) && typemin(Int64) ≤ x ≤ typemax(Int64)
+    return representable ? string(Integer(x)) : string(x)
+end
 
 """
     window_stem(stem, upto) -> String
@@ -77,9 +80,8 @@ A network integrator as it appears in a legend: `SsRrQuσ` for a shallow net, `D
 a dense one, with `u = 2R` throughout because the quadrature is Gauss.
 
 `S₁` is the first hidden width and giving it selects the dense form. A dense net has two hidden
-layers, so its width is `S₁×S` and one number cannot say what it was run with — the historical
-`NVI_Dense…` figures legended themselves `R4Q8tanh` with no width at all, which is why nothing
-afterwards could reconstruct them.
+layers, so its width is `S₁×S` and one number cannot say what it was run with: a legend naming
+only `R`, the quadrature order and the activation does not identify the network behind it.
 """
 function network_label(S::Int, R::Int, activation::AbstractString; S₁ = nothing)
     S₁ === nothing ? "S$(S)R$(R)Q$(2R)$(activation)" :
@@ -109,8 +111,7 @@ and turning that into something plottable takes knowing two things the array doe
 
 # Implementation
 
-Two things are easy to get wrong here, and were, in each of the six scripts that used to do it by
-hand.
+Two properties of the recorded array are easy to get wrong.
 
 **Row 1 of every step is the *left* endpoint.** `record_finer_solution!` evaluates the ansatz on
 `range(0, 1, record_grid_points)` mapped onto `[tₙ₋₁, tₙ]`, so the first row of step `n` is the

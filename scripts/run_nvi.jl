@@ -164,9 +164,9 @@ function run_nvi(run::NVIRun)
     return data
 end
 
-# The list of valid stems, which is what a caller who mistyped one needs. It used to be printed by
-# a check *after* the lookup — and the lookup indexed `NVI_RUNS` with the `nothing` that `findfirst`
-# returns, so the throw happened a line early and the message was never reached.
+# The list of valid stems, which is what a caller who mistyped one needs. The `nothing` that
+# `findfirst` returns is tested before `NVI_RUNS` is indexed with it, so the mistyped stem gets
+# that message rather than a `MethodError` from the indexing.
 function nvi_run(stem)
     index = findfirst(r -> nvi_stem(r) == stem, NVI_RUNS)
     index === nothing && throw(ArgumentError(

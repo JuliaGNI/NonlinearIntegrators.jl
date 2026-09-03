@@ -72,7 +72,8 @@ function run_seed(name, seed_constructor, steps, final_time)
             push!(errors, NaN)
             push!(reference_errors, NaN)
             push!(seconds, time() - t_start)
-            @printf("    h = %-6g  failed: %s\n", h, typeof(exception))
+            @printf("    h = %-6g  failed: %s: %s\n", h, nameof(typeof(exception)),
+                failure_message(exception))
         end
     end
 
@@ -147,7 +148,13 @@ function main(args)
     stem = study_stem(CONFIG.problem, "oga-seeds", CONFIG.name)
     report_path("archive", store_run!(stem, data))
 
-    banner("done")
+    # A seed variant that diverges is this study's subject rather than its failure: the archive
+    # records it as `NaN`, the figure drops it, and the `failures` line above is the result. A run
+    # in which *no* variant produced a single finite error answered nothing, and that is the one
+    # case the exit status reports.
+    return any(any(isfinite, variant) for variant in errors)
 end
 
-main(ARGS)
+ok = main(ARGS)
+banner("done")
+ok || exit(1)

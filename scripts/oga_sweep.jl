@@ -109,7 +109,10 @@ function run_case(basis, ::Type{T}, seed, λ, params, prob, refq) where {T}
         # Enough to catch a run that stalls, which is what the status below uses it for.
         try
             iters = Float64(solverstate(int).iterations)
-        catch
+        catch exception
+            # `iters` stays `NaN`: not every solver state carries an iteration count, and no row
+            # of this sweep depends on it. An interrupt is still an interrupt, though.
+            exception isa InterruptException && rethrow()
         end
         qend = collect(sol.q[:, 1])[end]
         # The precision invariant: a run started at `T` must still be at `T` at the end. A

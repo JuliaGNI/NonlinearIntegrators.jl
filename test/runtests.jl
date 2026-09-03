@@ -36,6 +36,12 @@ include("testsetup.jl")
         include("unit/vise_unit.jl")
     end
 
+    # The shared layer under `scripts/`. Pure functions over strings and dictionaries — no solve,
+    # no archive written — so it costs a load and nothing else.
+    @testset "scripts" begin
+        include("scripts_archives_tests.jl")
+    end
+
     # Inference and allocation regression gates, plus Aqua/JET. Last, because they are the
     # slowest to compile and the least informative when something more basic is broken.
     @testset "quality" begin

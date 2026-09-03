@@ -167,8 +167,7 @@ width beneath.
 
 Stacked and not side by side, which is a legibility decision and not a preference. These runs go to
 `t = 1000` at a period of order one, so a panel gets a hundred oscillations; at a third of the
-figure width that is a solid block of ink, and at the full width it is a trajectory. It is also
-what the figures this replaces did.
+figure width that is a solid block of ink, and at the full width it is a trajectory.
 
 This is the one solution plot `GeometricProblems` cannot make: its per-problem recipes each take a
 single solution, and none of them knows about `integrate`'s second return value. For anything with
@@ -449,7 +448,7 @@ have to be on the same axes at once.
     order. Measured on both problems here, between every pair of successive steps, the observed
     orders are `2.00`, `4.00` and `6.00` to three digits. An `h³` guide matches nothing in such a
     figure.
-  - `xlabel`, `ylabel`, `title`: axis labels. The figures this replaces carried none at all.
+  - `xlabel`, `ylabel`, `title`: axis labels.
   - `latex = true`, `figsize = nothing` — 2:1, as every figure here.
 
 The `h` axis is ticked at the step sizes actually run, not at the decades Makie would choose: a

@@ -14,9 +14,8 @@
 #
 # Nor is any figure *built* here. That is `NonlinearIntegrators.Diagnostics.figures`, in the
 # `NonlinearIntegratorsPlots` extension, which turns one archive into the `stem => Figure` pairs it
-# earns; this file only decides which archives to read and where to write the results. The six
-# scripts this replaces carried some 450 lines of copy-pasted Makie between them, three near
-# identical times over.
+# earns; this file only decides which archives to read and where to write the results. Keeping the
+# Makie in one place is what stops a per-driver copy of it from drifting.
 #
 # It includes `archives.jl` and **not** `experiments.jl`. Drawing PDFs out of plain vectors needs
 # neither the ansätze nor the solvers, and including the registry made this script load Symbolics,
