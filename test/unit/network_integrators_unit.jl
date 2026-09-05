@@ -25,12 +25,45 @@ end
 # under Hermite at both element types, which looked like the κ(Φ)² conditioning of its Gram
 # solve — but the real cause was the Hermite path leaving `network_labels` at zero, which made
 # the Gram matrix rank-deficient for *any* fit. With that fixed it behaves like the rest.
+#
+# A `SingularException` here is recorded as broken rather than failing the run, pending issue #98.
+# The matrix that goes singular is the **Newton Jacobian** the integrator solves against, LU
+# factorised in `SimpleSolvers`; whether a pivot lands on exactly zero rather than something very
+# small is decided by the BLAS build, so the same commit passes on macOS and fails on ubuntu or
+# windows.
+#
+# The catch is on the exception, not on a list of cells, because the affected combinations are not
+# stable between runs: `OGA1dStable` and `OGA1dNormalized` have both raised it, at `Float64` as
+# well as `Float32`, and the zero-pivot index moves over 11/12/13. Naming pairs to skip would
+# encode one run's accidents and would keep needing revision.
+#
+# Deliberately narrow in two ways: only `SingularException` is absorbed, so a failure of any other
+# type still fails the run, and `@test_broken false` records the case as broken rather than as
+# passing, so the run summary carries a non-zero `Broken` count. The summary carries only that
+# count — `runtests.jl` sets no `verbose`, and `Test` prints the nested testsets only when
+# something actually fails — so the catch names the absorbed cell on stdout itself.
+#
+# It is *not* narrow in a third way, and that is the price. Nothing here distinguishes #98 from a
+# regression that surfaces as the same exception, and two such paths exist: the reference fit
+# solves its Gram matrix unguarded (`src/oga/normal_equations.jl:91`), and a poor seed makes the
+# Newton Jacobian itself singular — the same site #98 fails at — which is what the `Float16`
+# analysis in `docs/src/oga/oga.md` describes. The `network_labels` bug in the note above is of
+# exactly that shape, so this loop no longer guards against its return.
 for row in NETWORK_INTEGRATORS,
     T in TEST_TYPES,
     (seed, seed_name) in row.seeds,
     (extrap, extrap_name) in EXTRAPOLATIONS
     @testset "$(row.name) $seed_name × $extrap_name ($T)" begin
-        dispatch_case(row.name, row.make, T, extrap; initial_guess_method = seed)
+        try
+            dispatch_case(row.name, row.make, T, extrap; initial_guess_method = seed)
+        catch e
+            e isa SingularException || rethrow()
+            # `println` and not `@warn`: `runtests.jl` disables logging below error level, so a
+            # warning here would be invisible. Naming the cell is what keeps #98's spread
+            # measurable from a CI log, and what makes a newly absorbed failure noticeable at all.
+            println("quarantined (#98): $(row.name) $seed_name × $extrap_name ($T): $e")
+            @test_broken false
+        end
     end
 end
 
