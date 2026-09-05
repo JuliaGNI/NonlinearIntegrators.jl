@@ -23,7 +23,11 @@ using CairoMakie
 using Printf
 using Statistics: median
 
-const RESULTS_DIR = joinpath(@__DIR__, "results")
+# `RUNS_DIR` and `RESULTS_DIR` come from here rather than being derived from `@__DIR__` again: the
+# sweeps' CSVs are data and belong beside the archives in `runs/`, the reports and figures built
+# from them belong in `results/`, and both have to follow `--runs-dir`/`--results-dir` like every
+# other output in this directory.
+include(joinpath(@__DIR__, "archives.jl"))
 
 # Categorical slots, in fixed assignment order: blue, orange, aqua.
 const OGA_SERIES = ("#2a78d6", "#eb6834", "#1baf7a")
@@ -164,6 +168,9 @@ fit accurate and the design matrix away from rank deficiency, per precision.
 function write_fit_study_report(csvpath::AbstractString)
     rows = read_oga_csv(csvpath)
     isempty(rows) && (@warn "no rows in $csvpath"; return (nothing, String[]))
+    # The reports regenerate from a CSV alone, so this may run against a `results/` that no sweep
+    # in this session has created.
+    mkpath(RESULTS_DIR[])
 
     Ts = levels(rows, "T")
     dicts = levels(rows, "dictionary")
@@ -214,12 +221,13 @@ function write_fit_study_report(csvpath::AbstractString)
                 xticklabelrotation = pi / 4)
             labelled_heatmap!(ax, panels[(ti, di)]; fmt = fmt, lo = lo, hi = hi)
         end
-        png = joinpath(RESULTS_DIR, "oga_fit_study_" * replace(metric, " " => "_") * ".png")
+        png = joinpath(RESULTS_DIR[], "oga_fit_study_" * replace(metric, " " => "_") *
+                                      ".png")
         save(png, fig)
         push!(pngs, png)
     end
 
-    mdpath = joinpath(RESULTS_DIR, "oga_fit_study.md")
+    mdpath = joinpath(RESULTS_DIR[], "oga_fit_study.md")
     open(mdpath, "w") do io
         println(io, "# OGA seed-quality study (Tier A)\n")
         println(io, "Greedy fit only — no integrator, no Newton solve. `fit_err` is the ")
@@ -319,6 +327,7 @@ precision, regularization factor and activation.
 function write_sweep_report(csvpaths, name::AbstractString)
     rows = read_oga_csv(csvpaths isa AbstractString ? [csvpaths] : csvpaths)
     isempty(rows) && (@warn "no rows for $name"; return (nothing, String[]))
+    mkpath(RESULTS_DIR[])
 
     Ts = levels(rows, "T")
     seeds = levels(rows, "seed")
@@ -349,7 +358,7 @@ function write_sweep_report(csvpaths, name::AbstractString)
             xticklabelrotation = pi / 6)
         labelled_heatmap!(ax, M; fmt = fmt_pct, lo = 0.0, hi = 1.0)
     end
-    png = joinpath(RESULTS_DIR, "$(name)_success.png")
+    png = joinpath(RESULTS_DIR[], "$(name)_success.png")
     save(png, fig)
     push!(pngs, png)
 
@@ -405,11 +414,11 @@ function write_sweep_report(csvpaths, name::AbstractString)
         [LineElement(color = precision_colour(T), linewidth = 2) for T in Ts],
         collect(Ts); orientation = :horizontal, framevisible = false,
         labelcolor = OGA_INK_MUTED, labelsize = 10)
-    png2 = joinpath(RESULTS_DIR, "$(name)_accuracy.png")
+    png2 = joinpath(RESULTS_DIR[], "$(name)_accuracy.png")
     save(png2, fig2)
     push!(pngs, png2)
 
-    mdpath = joinpath(RESULTS_DIR, "$(name).md")
+    mdpath = joinpath(RESULTS_DIR[], "$(name).md")
     open(mdpath, "w") do io
         println(io, "# $name\n")
         println(io, "$(length(rows)) end-to-end runs. Converged: ", count(oga_ok, rows),

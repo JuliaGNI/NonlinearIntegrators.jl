@@ -109,7 +109,10 @@ function run_case(basis, ::Type{T}, seed, λ, params, prob, refq) where {T}
         # Enough to catch a run that stalls, which is what the status below uses it for.
         try
             iters = Float64(solverstate(int).iterations)
-        catch
+        catch exception
+            # `iters` stays `NaN`: not every solver state carries an iteration count, and no row
+            # of this sweep depends on it. An interrupt is still an interrupt, though.
+            exception isa InterruptException && rethrow()
         end
         qend = collect(sol.q[:, 1])[end]
         # The precision invariant: a run started at `T` must still be at `T` at the end. A
@@ -143,8 +146,8 @@ const CSV_HEADER = "study,problem,T,dt,S,R,activation,seed,lambda_multiple,lambd
                    "ref_err,iterations,secs"
 
 function run_stage(name::AbstractString, seeds, activations)
-    mkpath(RESULTS_DIR)
-    csvpath = joinpath(RESULTS_DIR, "$(name).csv")
+    mkpath(RUNS_DIR[])
+    csvpath = joinpath(RUNS_DIR[], "$(name).csv")
 
     total = length(TYPES) * length(activations) * length(seeds) * (1 + 6)
     println("="^104)
@@ -201,14 +204,17 @@ function run_stage(name::AbstractString, seeds, activations)
     return csvpath
 end
 
-function main()
-    mode = isempty(ARGS) ? "all" : ARGS[1]
+function main(args)
+    names, _ = parse_arguments(args)
+    length(names) ≤ 1 || throw(ArgumentError(
+        "this script takes one mode at most, got $(join(names, ", "))"))
+    mode = isempty(names) ? "all" : first(names)
+    mode in ("all", "relu", "smooth") ||
+        error("unknown mode $(repr(mode)); use \"all\", \"relu\" or \"smooth\"")
     mode in ("all", "relu") &&
         run_stage("oga_sweep_relu", SEEDS_1D, OGA_ACTIVATIONS_RELU)
     mode in ("all", "smooth") &&
         run_stage("oga_sweep_smooth", SEEDS_2D, OGA_ACTIVATIONS_SMOOTH)
-    mode in ("all", "relu", "smooth") ||
-        error("unknown mode $(repr(mode)); use \"all\", \"relu\" or \"smooth\"")
 end
 
-main()
+main(ARGS)
