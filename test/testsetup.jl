@@ -133,10 +133,13 @@ assert_no_upcast(q, ::Type{T}) where {T} = @test eltype(q[end]) == T
 # non-finite). Half precision usually reaches the latter, since `oga_solve` guarantees the
 # seed itself is finite at every precision.
 #
-# Used only by the `Float16` regression test, which asserts a failure there is one of these
-# rather than a new class. `TEST_TYPES` stops at `Float32`, where these problems are well
-# conditioned on every platform, so every other integration calls `integrate` directly and a
-# give-up is a real failure.
+# Used by the `Float16` regression test, which asserts a failure there is one of these rather than
+# a new class.
+#
+# `Float32` and `Float64` are not uniformly well conditioned either: the extrapolation cross
+# product in `unit/network_integrators_unit.jl` raises `SingularException` from the Newton Jacobian
+# on some BLAS builds and not others, which is issue #98. That loop absorbs exactly that exception.
+# Every other integration calls `integrate` directly, where a give-up is a real failure.
 const SOLVER_GAVE_UP = Union{SingularException, NonlinearSolverException}
 
 # `initial_trajectory_method` selects which `initial_trajectory!` method runs; `iguess` is the
