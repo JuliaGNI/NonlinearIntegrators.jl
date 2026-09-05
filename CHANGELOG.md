@@ -1355,9 +1355,17 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   records `@test_broken`, rather than skipping a named list of cells that one run happened to
   produce. **This is a deliberate loss of assertion strength**, taken because those matrix entries
   are required status checks and an intermittent failure in them left no pull request able to
-  satisfy branch protection on its own merits. The catch is narrow in both directions: any other
-  exception still propagates and fails the run, and a quarantined case is reported as broken rather
-  than passing. Remove it when #98 is fixed.
+  satisfy branch protection on its own merits. Any other exception still propagates and fails the
+  run, a quarantined case is reported as broken rather than passing, and the catch prints the cell
+  it absorbed so the spread stays measurable from a CI log.
+
+  **What it does not do is distinguish #98 from a regression that raises the same exception**, and
+  that is the real price rather than the lost assertion. A poor seed makes the Newton Jacobian
+  singular at the very site #98 fails at (`docs/src/oga/oga.md`), and the reference fit solves its
+  Gram matrix unguarded (`src/oga/normal_equations.jl`), so no filter on origin would separate the
+  two classes. The `network_labels` defect fixed in [0.4.1] — which left the Gram matrix
+  rank-deficient for any fit, and which this loop is what caught — would now be recorded broken
+  instead of failing. Remove the catch when #98 is fixed.
 
 ### Dead code and documentation
 

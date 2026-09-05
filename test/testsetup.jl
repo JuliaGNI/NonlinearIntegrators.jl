@@ -138,8 +138,9 @@ assert_no_upcast(q, ::Type{T}) where {T} = @test eltype(q[end]) == T
 #
 # `Float32` and `Float64` are not uniformly well conditioned either: the extrapolation cross
 # product in `unit/network_integrators_unit.jl` raises `SingularException` from the Newton Jacobian
-# on some BLAS builds and not others, which is issue #98. That loop absorbs exactly that exception.
-# Every other integration calls `integrate` directly, where a give-up is a real failure.
+# on some BLAS builds and not others, which is issue #98. That loop absorbs any `SingularException`,
+# which is wider than #98 alone — see the note there. Every other integration calls `integrate`
+# directly, where a give-up is a real failure.
 const SOLVER_GAVE_UP = Union{SingularException, NonlinearSolverException}
 
 # `initial_trajectory_method` selects which `initial_trajectory!` method runs; `iguess` is the
