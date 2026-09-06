@@ -143,6 +143,15 @@ while the *same* Gram solve with the `Float64` island restored (`normaleq+f64`) 
 buying robustness of the squared-condition-number solve, exactly as the analysis predicts, and
 nothing else.
 
+!!! note "The `Float16`/`normaleq` numbers are stable only to the figures quoted"
+    These are the only cells of the study that do not reproduce exactly across dependency sets.
+    Re-running Tier A moved `fit_err` in 197 of 6049 rows, every one of them `Float16` with the
+    `normaleq` fit and no other column: at ``\kappa(\Phi)^2 \approx 4.7\times10^{17}`` the
+    working-precision Gram solve is past the point where the last digits mean anything, which is
+    the regime [Precision](@ref) describes. The median above moved from `2.1036e-01` to
+    `2.1032e-01` — the same `2.10e-01` to the three significant figures stated. Read these cells
+    at the precision they are quoted at, not beyond it.
+
 Two patterns in the best-variant-per-cell table:
 
 - `orthogonal` selection wins the large majority of cells, at every precision;

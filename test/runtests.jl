@@ -36,11 +36,24 @@ include("testsetup.jl")
         include("unit/vise_unit.jl")
     end
 
+    # The shared layer under `scripts/`. Pure functions over strings and dictionaries — no solve,
+    # no archive written — so it costs a load and nothing else.
+    @testset "scripts" begin
+        include("scripts_archives_tests.jl")
+    end
+
     # Inference and allocation regression gates, plus Aqua/JET. Last, because they are the
     # slowest to compile and the least informative when something more basic is broken.
     @testset "quality" begin
         include("quality/inference_and_allocations.jl")
         include("quality/aqua_jet.jl")
+    end
+
+    # The plotting API. After `quality` and before `integration` because loading CairoMakie —
+    # which is what activates the `Makie` weakdep, and with it the extension — is a large
+    # precompile that nothing earlier in the suite needs.
+    @testset "plots" begin
+        include("plots_tests.jl")
     end
 
     @testset "integration" begin
