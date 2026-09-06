@@ -37,18 +37,29 @@ end
 # well as `Float32`, and the zero-pivot index moves over 11/12/13. Naming pairs to skip would
 # encode one run's accidents and would keep needing revision.
 #
-# Deliberately narrow in two ways: only `SingularException` is absorbed, so a failure of any other
-# type still fails the run, and `@test_broken false` records the case as broken rather than as
-# passing, so the run summary carries a non-zero `Broken` count. The summary carries only that
-# count — `runtests.jl` sets no `verbose`, and `Test` prints the nested testsets only when
-# something actually fails — so the catch names the absorbed cell on stdout itself.
+# Deliberately narrow in three ways. Only `SingularException` is absorbed, so a failure of any
+# other type still fails the run. `@test_broken false` records the case as broken rather than as
+# passing, so the run summary carries a non-zero `Broken` count — and the summary carries only
+# that count (`runtests.jl` sets no `verbose`, and `Test` prints the nested testsets only when
+# something actually fails), so the catch names the absorbed cell on stdout itself.
 #
-# It is *not* narrow in a third way, and that is the price. Nothing here distinguishes #98 from a
-# regression that surfaces as the same exception, and two such paths exist: the reference fit
-# solves its Gram matrix unguarded (`src/oga/normal_equations.jl:91`), and a poor seed makes the
-# Newton Jacobian itself singular — the same site #98 fails at — which is what the `Float16`
-# analysis in `docs/src/oga/oga.md` describes. The `network_labels` bug in the note above is of
-# exactly that shape, so this loop no longer guards against its return.
+# Third, the zero pivot has to lie past the largest one a *fit* could report, which is what keeps
+# the guard the note above describes. The greedy loop solves a `k × k` Gram matrix with `k ≤ S`
+# (`src/oga/normal_equations.jl:87`), so a singular fit reports `info ≤ S`, while the Newton
+# systems are `2S + 1` or `3S + 1` unknowns — 9 or 13 — and `DenseNet`'s `D * (NP + 1)` is larger
+# still. #98's zero pivots are 11/12/13. So a `network_labels`-shaped regression, which left the
+# Gram matrix rank-deficient for *any* fit, still surfaces as `info ≤ S` and still fails the run.
+#
+# What no bound on `info` can separate is #98 from a poor seed making the *Newton* Jacobian
+# singular: that is the same matrix at the same site, the case the `Float16` analysis in
+# `docs/src/oga/oga.md` describes, and it is absorbed. The residual risk in the other direction is
+# a Newton pivot landing at `info ≤ S`, which rethrows and fails the run; every occurrence
+# observed so far has been in the final eliminations.
+
+# `S` is not carried on the rows, so this tracks the `S = 4` that `NETWORK_INTEGRATORS` builds
+# every `ShallowNet*` basis with; `DenseNet` seeds no OGA fit at all. Raise it with that table.
+const MAX_FIT_PIVOT = 4
+
 for row in NETWORK_INTEGRATORS,
     T in TEST_TYPES,
     (seed, seed_name) in row.seeds,
@@ -57,7 +68,7 @@ for row in NETWORK_INTEGRATORS,
         try
             dispatch_case(row.name, row.make, T, extrap; initial_guess_method = seed)
         catch e
-            e isa SingularException || rethrow()
+            (e isa SingularException && e.info > MAX_FIT_PIVOT) || rethrow()
             # `println` and not `@warn`: `runtests.jl` disables logging below error level, so a
             # warning here would be invisible. Naming the cell is what keeps #98's spread
             # measurable from a CI log, and what makes a newly absorbed failure noticeable at all.

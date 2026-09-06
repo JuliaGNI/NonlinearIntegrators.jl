@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests
+
+- **The network-integrator cross product now under-reports.** A `SingularException` from the
+  Newton solve is recorded as `@test_broken` rather than failing the run, so a green suite no
+  longer means all 54 cells of that cross product passed — read the `Broken` count and the
+  `quarantined (#98):` lines. The quarantine is bounded so that a rank-deficient OGA fit still
+  fails; see `### Nonlinear solve conditioning` under `## Open Issues` for what it does and does
+  not cover, and remove it once
+  [#98](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/98) is resolved.
+
 ## [0.4.3] - 2026-08-30
 
 The de-piracy wave, taken as a set of compat bounds. Nothing in this package's exported surface
@@ -1359,13 +1369,17 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   run, a quarantined case is reported as broken rather than passing, and the catch prints the cell
   it absorbed so the spread stays measurable from a CI log.
 
-  **What it does not do is distinguish #98 from a regression that raises the same exception**, and
-  that is the real price rather than the lost assertion. A poor seed makes the Newton Jacobian
-  singular at the very site #98 fails at (`docs/src/oga/oga.md`), and the reference fit solves its
-  Gram matrix unguarded (`src/oga/normal_equations.jl`), so no filter on origin would separate the
-  two classes. The `network_labels` defect fixed in [0.4.1] — which left the Gram matrix
-  rank-deficient for any fit, and which this loop is what caught — would now be recorded broken
-  instead of failing. Remove the catch when #98 is fixed.
+  The catch is bounded by the largest zero pivot an OGA fit could report. The greedy fit solves a
+  `k × k` Gram matrix with `k ≤ S = 4` (`src/oga/normal_equations.jl`), while the Newton systems
+  in this loop carry 9 or 13 unknowns and #98's pivots are 11/12/13 — so a rank-deficient *fit*
+  is outside the quarantine and still fails the run. That is what keeps the guard on the
+  `network_labels` defect fixed in [0.4.1], which left the Gram matrix rank-deficient for any fit
+  and which this very loop is what caught.
+
+  **What no bound on the pivot can separate is #98 from a poor seed making the Newton Jacobian
+  itself singular** — the same matrix at the same site, which is the case the `Float16` analysis
+  in `docs/src/oga/oga.md` describes. That class is absorbed, and it is the real price rather
+  than the lost assertion. Remove the catch once #98 is resolved.
 
 ### Dead code and documentation
 
