@@ -83,8 +83,10 @@ Random = "1"
 #
 # The floor moves to 0.13.3 because this package now *names* something only that release has:
 # `PivotedQR`, which `default_options` hands every network integrator as its `linear_solver_method`
-# (`src/nvi/network_integrator_core.jl`). This is a bound about what loads, not a bound about what
-# is measured -- on 0.13.2 the name does not exist and the package fails to precompile.
+# (`src/nvi/network_integrator_core.jl`). This is a bound about what runs, not a bound about what
+# is measured -- and it has to be a bound rather than a graceful fallback because the name sits in a
+# function body, so on 0.13.2 the package still precompiles and loads cleanly and the missing
+# binding surfaces only as an `UndefVarError` the first time a network integrator is constructed.
 SimpleSolvers = "0.13.3"
 StaticArrays = "1"
 Statistics = "1"

@@ -106,12 +106,12 @@ The framework's solver options, plus `linear_solver_method = SimpleSolvers.Pivot
 **The Newton Jacobian of a network integrator is exactly rank deficient, and no amount of
 conditioning care changes that.** Two mechanisms stack. The activation `relu_k(k)` is
 positively homogeneous — `σ(λx) = λᵏσ(x)` — so rescaling a neuron as
-`(wᵢ, bᵢ, cᵢ) ↦ (λwᵢ, λbᵢ, λ⁻ᵏcᵢ)` leaves the ansatz pointwise unchanged; [`residual!`](@ref)
+`(wᵢ, bᵢ, cᵢ) ↦ (λwᵢ, λbᵢ, λ⁻ᵏcᵢ)` leaves the ansatz pointwise unchanged; `residual!`
 depends on the parameters only through the trajectory, so it is invariant and its Jacobian
 annihilates those orbit tangents. And whenever every pre-activation keeps one sign across the
 element, `max(0, z)ᵏ = zᵏ` identically and the ansatz collapses onto a polynomial, mapping many
 more parameters onto its few coefficients. Measured at a converged `S = 4` point the Jacobian
-had rank 5 of 13, with a gap of eleven orders between the fifth and sixth singular values.
+had rank 5 of 13, with a gap of fourteen orders between the fifth and sixth singular values.
 
 An LU on such a matrix raises `SingularException`, and *which* pivot it reaches first is decided
 by the BLAS build rather than by the problem — which is why the same commit passed on macOS and

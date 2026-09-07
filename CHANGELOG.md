@@ -200,8 +200,10 @@ scripts sat in a talk directory, all carrying much the same code.
   `SimpleSolvers.PivotedQR` here, and a caller overriding the option has to write it out too.
 
 - **`[compat]` for `SimpleSolvers` moves to `0.13.3`**, which is the release that introduced
-  `PivotedQR` and `SVDSolver`. A bound about what loads, not about what is measured: on 0.13.2
-  the name does not exist and this package fails to precompile.
+  `PivotedQR` and `SVDSolver`. A bound about what *runs*, not about what is measured — and it has
+  to be a bound rather than a graceful fallback because the name sits in a function body: on
+  0.13.2 this package still precompiles and loads cleanly, and the missing binding surfaces only
+  as an `UndefVarError` the first time a network integrator is constructed.
 
 - **Output goes to `runs/` (data) and `results/` (figures), at the repository root**, and every
   driver takes `--runs-dir` and `--results-dir`. Previously each script derived its output path from
@@ -419,9 +421,11 @@ gets rediscovered:
 - **`scripts/newton_jacobian_rank.jl`** measures the rank of the Newton Jacobian at a converged
   point, at `S = 4, 5, 6` and three OGA seeds, and prints the residual each row was measured at
   so that a rank taken where Newton did not converge cannot be mistaken for evidence. It uses the
-  solver's own ForwardDiff Jacobian: with `‖x‖ ≈ 1.6e4` a central-difference Jacobian has a noise
-  floor five orders above the true null-space value, which is what makes an exact null space look
-  merely "suppressed" and is how #98 came to be read as ill-conditioning twice.
+  solver's own ForwardDiff Jacobian: the null directions are annihilated to `σ_{r+1}/σ₁ ≈ 5e-18`,
+  below `eps(Float64)` relative to the largest singular value, and a central-difference Jacobian
+  of a function whose argument has `‖x‖ ≈ 1.6e4` cannot resolve anything of that size. That is
+  what makes an exact null space look merely "suppressed", and it is how #98 came to be read as
+  ill-conditioning twice.
 
 ## [0.4.3] - 2026-08-30
 

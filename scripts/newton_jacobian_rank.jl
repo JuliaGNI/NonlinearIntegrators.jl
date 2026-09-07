@@ -1,6 +1,6 @@
 # The rank of the Newton Jacobian of a ShallowNet integrator, at a converged point.
 #
-#     julia --startup-file=no --project=. scripts/newton_jacobian_rank.jl
+#     julia --startup-file=no --project=scripts scripts/newton_jacobian_rank.jl
 #
 # This is the check behind issue #98 and behind the `default_options` docstring in
 # `src/nvi/network_integrator_core.jl`. The claim it establishes is *not* "the Jacobian is
@@ -21,22 +21,30 @@
 #
 # What is measured here is their *combined* effect, the rank, and not the split between them:
 # separating the two needs the pre-activation signs across the element, which this does not
-# collect. The `S`-dependence in the table is the indirect evidence — the deficiency does not
-# grow like `S`, which it would if only mechanism 1 were acting.
+# collect. What the `S`-dependence does show is an **offset**. Mechanism 1 alone predicts a
+# deficiency of exactly `S` — one generator per neuron — i.e. 4, 5, 6. Measured on the converged
+# `OGA1d` rows it is 8, 9, 10: the slope is 1, so mechanism 1 accounts for all of the growth, and
+# a constant 4 sits on top of it. Four is what a cubic collapse would contribute, `k + 1`
+# coefficients of the polynomial the ansatz degenerates to.
 #
-# **Why ForwardDiff and not finite differences.** With `‖x‖ ≈ 1.6e4` a central-difference
-# Jacobian has a noise floor around `‖J·v‖/σ₁ ≈ 1e-15`, five orders above the true value — which
-# makes an exact null space look merely "suppressed" and turns the measurement into the
-# ill-conditioning reading this script exists to refute. The Jacobian read back here is the
-# solver's own, and `NewtonSolver` builds it with `JacobianAutodiff`, i.e. ForwardDiff through
-# the symbolic basis with no fallback.
+# **Why ForwardDiff and not finite differences.** The null directions here are annihilated to
+# `σ_{r+1}/σ₁ ≈ 5e-18` — below `eps(Float64)` relative to the largest singular value. A
+# central-difference Jacobian of a function whose argument has `‖x‖ ≈ 1.6e4` cannot resolve
+# anything of that size: its own truncation and cancellation error puts a floor many orders
+# above, which makes an exact null space look merely "suppressed" and turns the measurement into
+# the ill-conditioning reading this script exists to refute. (The floor itself is not measured
+# here — the point is only that it is far above 5e-18, which the column reports.) The Jacobian
+# read back is the solver's own, and `NewtonSolver` builds it with `JacobianAutodiff`, i.e.
+# ForwardDiff through the symbolic basis with no fallback.
 #
 # **Why a converged point.** The constraint row annihilates the scaling fibre unconditionally,
 # but the second-derivative rows only do so at a critical point of the discrete action, so a rank
 # measured where Newton did not converge means nothing. The table shows this directly: the rows
-# marked `NOT CONVERGED` report ranks anywhere from 4 to full, with gaps of one or two orders
-# rather than twelve. Every row therefore carries the residual it was measured at, and only the
-# unmarked ones are evidence.
+# marked `NOT CONVERGED` report ranks anywhere from 4 to full rank, against a converged 5 of 13 at
+# the same `S`. Their gaps are not evidence either way — measured `Inf, 4.6, 1.5, 1.9, 2.6`, where
+# the `Inf` is structural (a full-rank row has no dropped singular value to compare against) — but
+# none of them is the twelve-to-fourteen the converged rows show. Every row therefore carries the
+# residual it was measured at, and only the unmarked ones are evidence.
 
 using LinearAlgebra
 using Printf

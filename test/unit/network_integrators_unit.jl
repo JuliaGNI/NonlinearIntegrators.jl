@@ -65,8 +65,10 @@
     end
 
     # `PivotedQR` is ambiguous in this package: the exported one is the OGA fit, a different
-    # type at a different layer. Pinned so that a future `using SimpleSolvers` cannot silently
-    # make the unqualified name mean the linear solver instead.
+    # type at a different layer. Pinned so that a future `using SimpleSolvers` here cannot change
+    # what the unqualified name means. Two exporting modules do not silently rebind it — Julia
+    # makes the name ambiguous, so every unqualified use raises `UndefVarError` — and that is
+    # exactly what these two assertions turn into a named failure.
     @test PivotedQR() isa NonlinearIntegrators.OGAFit
     @test PivotedQR !== SimpleSolvers.PivotedQR
 end
