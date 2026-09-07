@@ -130,11 +130,24 @@ question — the measurement script `scripts/newton_jacobian_rank.jl` does.
 This is a *default*, not a decision taken away from the caller: `default_options` is merged
 under the options passed to `GeometricIntegrator`, so `linear_solver_method = LapackLU()`
 restores the old behaviour for anyone who wants a singular Jacobian reported rather than solved.
+
+**`Float16` is left alone**, and keeps whatever `SimpleSolvers.default_linear_solver_method`
+picks for it — the generic `LU`. Both rank-revealing methods are LAPACK-backed (`geqp3`/`tzrzf`
+and `gesdd`), so they accept only `Float32`, `Float64`, `ComplexF32` and `ComplexF64` and refuse
+anything else by name; handing one a half-precision Jacobian raises `ArgumentError` before the
+first step. Adding the option unconditionally therefore turned #98 into a *new* failure class at
+`Float16`, which the dictionary regression test in
+`test/unit/network_integrators_unit.jl` caught by asserting that the only errors reachable there
+are the two documented ones. The consequence to be honest about: **`Float16` is still exposed to
+#98.** That is a narrower gap than it sounds — the Jacobian is ill-conditioned at half precision
+anyway, and that file already records that whether the Newton solve converges there is not a
+contract — but it is not closed, and closing it would need a rank-revealing method that does not
+go through LAPACK.
 """
 function default_options(method::NetworkIntegratorMethod, problem::GeometricProblem)
-    merge(
-        invoke(default_options, Tuple{GeometricMethod, GeometricProblem}, method, problem),
-        (; linear_solver_method = SimpleSolvers.PivotedQR()))
+    base = invoke(default_options, Tuple{GeometricMethod, GeometricProblem}, method, problem)
+    datatype(problem) <: LinearAlgebra.BlasFloat || return base
+    merge(base, (; linear_solver_method = SimpleSolvers.PivotedQR()))
 end
 # `initial_trajectory!` below integrates a LODE sub-problem and reads both `q` and `p` back out, so
 # this needs the `IODEProblem`/`LODEProblem` methods of `ImplicitMidpoint` rather than an

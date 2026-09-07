@@ -183,6 +183,17 @@ scripts sat in a talk directory, all carrying much the same code.
   passed to `GeometricIntegrator`, so `linear_solver_method = SimpleSolvers.LapackLU()` restores
   the previous behaviour for anyone who wants a singular Jacobian reported rather than solved.
 
+  ⚠️ **`Float16` is excluded and is still exposed to #98.** Both rank-revealing methods are
+  LAPACK-backed, so they accept only `Float32`, `Float64`, `ComplexF32` and `ComplexF64` and
+  refuse anything else by name. `default_options` therefore adds the option only for a
+  LAPACK element type, and half precision keeps the generic `LU` that
+  `SimpleSolvers.default_linear_solver_method` picks for it. Offering it unconditionally instead
+  replaced #98 at `Float16` with an `ArgumentError` raised before the first step — caught by the
+  dictionary regression test, which asserts that the only failures reachable there are the two
+  documented ones. This is a narrower gap than it sounds, since that test already records that
+  whether the Newton solve converges at half precision is not a contract; but it is a gap, and
+  closing it needs a rank-revealing method that does not go through LAPACK.
+
   ⚠️ **Two different `PivotedQR`s.** This package exports one of its own — the `OGAFit` that
   truncates the Gram solve of a greedy dictionary fit. Under `using NonlinearIntegrators` the
   unqualified name is that one, so the linear solver is always written

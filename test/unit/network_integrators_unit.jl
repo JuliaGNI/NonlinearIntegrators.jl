@@ -36,6 +36,18 @@
         @test lsm(int) isa SimpleSolvers.PivotedQR
     end
 
+    # `Float16` is deliberately excluded: both rank-revealing methods are LAPACK-backed and
+    # refuse a half-precision matrix by name, so offering one there replaces #98 with an
+    # `ArgumentError` before the first step. It keeps the generic `LU` that
+    # `SimpleSolvers.default_linear_solver_method` picks — which means it is still exposed to
+    # #98, and that is recorded rather than papered over.
+    int16 = GeometricIntegrator(
+        HarmonicOscillator.lodeproblem([Float16(0.5)], [Float16(0.0)];
+            timespan = (Float16(0.0), Float16(0.2)), timestep = Float16(0.1)),
+        NETWORK_INTEGRATORS[1].make(Float16))
+    @test !(lsm(int16) isa SimpleSolvers.RankRevealingMethod)
+    @test lsm(int16) isa SimpleSolvers.LU
+
     # It is a default, not a decision taken away from the caller: `default_options` is merged
     # *under* the options passed to `GeometricIntegrator`, so one keyword restores an LU.
     T = Float64
