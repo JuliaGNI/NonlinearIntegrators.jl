@@ -159,6 +159,39 @@ scripts sat in a talk directory, all carrying much the same code.
 
 ### Changed
 
+- **The Newton solve of every network integrator now uses a rank-revealing linear solver**, so a
+  rank-deficient Jacobian is solved rather than reported —
+  [#98](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/98).
+
+  What a caller sees: nothing, unless they were seeing `SingularException`. `default_options`
+  gains `linear_solver_method = SimpleSolvers.PivotedQR()`, which returns the **minimum-norm**
+  Newton step — of all the steps that satisfy the linearised system, the shortest — instead of
+  raising on a singular factorisation. On these systems that is not an approximation: the
+  residual lies in the range of the Jacobian, so the step solves the system exactly and simply
+  carries no component along the null space. It is what Newton was already computing whenever the
+  LU happened not to hit a zero pivot, which is why convergence and accuracy are unchanged.
+
+  Why this is a *default* and not an option a caller must find: the deficiency is a property of
+  the ansatz, not of a bad configuration. `relu_k(k)` is positively homogeneous, so rescaling one
+  neuron `(wᵢ, bᵢ, cᵢ) ↦ (λwᵢ, λbᵢ, λ⁻ᵏcᵢ)` leaves the trajectory pointwise unchanged and the
+  Jacobian annihilates all `S` of those directions; and where every pre-activation keeps one sign
+  across the element the ansatz collapses onto a polynomial, mapping `3S + 1` parameters onto a
+  handful of coefficients. `scripts/newton_jacobian_rank.jl` measures both, and reports rank 5 of
+  13 at `S = 4` with a gap of fourteen orders in the spectrum.
+
+  It remains a default rather than a decision: `default_options` is merged *under* the options
+  passed to `GeometricIntegrator`, so `linear_solver_method = SimpleSolvers.LapackLU()` restores
+  the previous behaviour for anyone who wants a singular Jacobian reported rather than solved.
+
+  ⚠️ **Two different `PivotedQR`s.** This package exports one of its own — the `OGAFit` that
+  truncates the Gram solve of a greedy dictionary fit. Under `using NonlinearIntegrators` the
+  unqualified name is that one, so the linear solver is always written
+  `SimpleSolvers.PivotedQR` here, and a caller overriding the option has to write it out too.
+
+- **`[compat]` for `SimpleSolvers` moves to `0.13.3`**, which is the release that introduced
+  `PivotedQR` and `SVDSolver`. A bound about what loads, not about what is measured: on 0.13.2
+  the name does not exist and this package fails to precompile.
+
 - **Output goes to `runs/` (data) and `results/` (figures), at the repository root**, and every
   driver takes `--runs-dir` and `--results-dir`. Previously each script derived its output path from
   `@__DIR__` as a `const`, which is what forced a caller who wanted the figures elsewhere to copy
@@ -363,6 +396,21 @@ gets rediscovered:
   fails; see `### Nonlinear solve conditioning` under `## Open Issues` for what it does and does
   not cover, and remove it once
   [#98](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/98) is resolved.
+
+  **The exception it absorbs can no longer be raised** — the rank-revealing solver under
+  *Changed* has no throwing path — so the quarantine is now dead code in the sense that it should
+  never fire. It is kept until the *rank* half of #98 lands, for two reasons: it is the tripwire
+  that would show the spread returning through some path not yet understood, and removing it is
+  the step the task file schedules last, after the rank measurement passes. If a
+  `quarantined (#98):` line appears in a CI log from here on, that is new information and not the
+  known issue.
+
+- **`scripts/newton_jacobian_rank.jl`** measures the rank of the Newton Jacobian at a converged
+  point, at `S = 4, 5, 6` and three OGA seeds, and prints the residual each row was measured at
+  so that a rank taken where Newton did not converge cannot be mistaken for evidence. It uses the
+  solver's own ForwardDiff Jacobian: with `‖x‖ ≈ 1.6e4` a central-difference Jacobian has a noise
+  floor five orders above the true null-space value, which is what makes an exact null space look
+  merely "suppressed" and is how #98 came to be read as ill-conditioning twice.
 
 ## [0.4.3] - 2026-08-30
 
@@ -1715,6 +1763,22 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   satisfy branch protection on its own merits. Any other exception still propagates and fails the
   run, a quarantined case is reported as broken rather than passing, and the catch prints the cell
   it absorbed so the spread stays measurable from a CI log.
+
+  **Half closed.** The reading above — LU on a matrix that is *sometimes* singular — was too
+  generous to the problem. The Jacobian is **exactly rank deficient**, at every converged point,
+  by construction rather than by rounding: `scripts/newton_jacobian_rank.jl` measures rank 5 of 13
+  unknowns at `S = 4`, with a gap of **fourteen orders** between the fifth and sixth singular
+  values. Nothing about a pivot landing on zero is accidental; what the BLAS decides is only
+  whether the zero pivot is reached before the factorisation ends.
+
+  The exception is now **impossible rather than intermittent**: `default_options` hands every
+  network integrator `SimpleSolvers.PivotedQR`, whose `ldiv!` has no throwing path at all (see
+  *Changed* under `[Unreleased]`). What is **not** closed is the deficiency itself — the solve
+  now steps around a null space instead of falling into it, but the null space is still there,
+  and `3S + 1` unknowns still carry far fewer degrees of freedom than that. The quarantine
+  therefore stays until the rank half of the fix lands: the dictionary change that puts the
+  activation kinks inside the element, and the gauge fixing that removes the scaling redundancy.
+  Both are in `Tasks/Fix the singular Newton Jacobian in the network integrators.md`.
 
   The catch is bounded by the largest zero pivot an OGA fit could report. The greedy fit solves a
   `k × k` Gram matrix with `k ≤ S = 4` (`src/oga/normal_equations.jl`), while the Newton systems
