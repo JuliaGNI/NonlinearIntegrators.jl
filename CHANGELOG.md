@@ -16,8 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   matches, where before it silently matched nothing. Each file is byte-equal to the NFC
   normalisation of its predecessor, and no string literal was affected.
 
-  The seven files under `obsolete/` are deliberately left as they are: they are superseded work
-  that nobody is reviewing, and normalising them would treble the diff for no benefit.
+  The seven files under `obsolete/` are converted too, in a separate commit, so that the invariant
+  holds for the whole repository rather than for the compiled part of it. They stored `ṽ`,
+  twenty-three times.
 
 The package can plot its own integrators, and the experiment suite that drives them lives in this
 repository. It had no `ext/` directory and no `[weakdeps]` at all until now, so every figure ever

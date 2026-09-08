@@ -72,7 +72,7 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
 
     q̃::Vector{ST}
     p̃::Vector{ST}
-    ṽ::Vector{ST}
+    ṽ::Vector{ST}
     f̃::Vector{ST}
     s̃::Vector{ST}
 
@@ -114,7 +114,7 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
         # create temporary vectors
         q̃ = zeros(ST, D)
         p̃ = zeros(ST, D)
-        ṽ = zeros(ST, D)
+        ṽ = zeros(ST, D)
         f̃ = zeros(ST, D)
         s̃ = zeros(ST, D)
 
@@ -148,7 +148,7 @@ struct NonLinear_OneLayer_LuxCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D}
         stage_values = zeros(ST, 41, D)
         network_labels = zeros(ST, N + 1, D)
 
-        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, st, r₀, r₁, m, a,
+        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, st, r₀, r₁, m, a,
             dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
             current_step, stage_values, network_labels)
     end
@@ -216,7 +216,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
             t=sol.t + network_inputs[i] * timestep(int),
             q=cache(int).q̃,
             p=cache(int).p̃,
-            v=cache(int).ṽ,
+            v=cache(int).ṽ,
             f=cache(int).f̃,
         )
         solutionstep!(soltmp, history, problem(int), iguess(int))
@@ -230,7 +230,7 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:No
         t=sol.t,
         q=cache(int).q̃,
         p=cache(int).p̃,
-        v=cache(int).ṽ,
+        v=cache(int).ṽ,
         f=cache(int).f̃,
     )
     solutionstep!(soltmp, history, problem(int), iguess(int))
