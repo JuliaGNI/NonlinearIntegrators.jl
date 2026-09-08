@@ -41,7 +41,7 @@ struct Nonlinear_BSpline_IntegratorCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D
 
     q̃::Vector{ST}
     p̃::Vector{ST}
-    ṽ::Vector{ST}
+    ṽ::Vector{ST}
     f̃::Vector{ST}
     s̃::Vector{ST}
 
@@ -80,7 +80,7 @@ struct Nonlinear_BSpline_IntegratorCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D
         # create temporary vectors
         q̃ = zeros(ST, D)
         p̃ = zeros(ST, D)
-        ṽ = zeros(ST, D)
+        ṽ = zeros(ST, D)
         f̃ = zeros(ST, D)
         s̃ = zeros(ST, D)
 
@@ -112,7 +112,7 @@ struct Nonlinear_BSpline_IntegratorCache{ST,D,S,R,N} <: IODEIntegratorCache{ST,D
         f_suctol_final = zeros(ST, 1)
         converge_status = [false]
 
-        new{ST,D,S,R,N}(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F,
+        new{ST,D,S,R,N}(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F,
             internal_knots, coefficients,
             r₀, r₁, m, a,
             dqdWc, dvdWc, dqdWr₁, dqdWr₀,

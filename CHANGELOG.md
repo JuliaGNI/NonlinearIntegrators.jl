@@ -222,6 +222,18 @@ scripts sat in a talk directory, all carrying much the same code.
   in `benchmark/Project.toml` points at this repository, so the instantiation resolves the working
   tree rather than a registered version.
 
+- **Every tracked source file is Unicode NFC-normalised.** `src/nvi/densenet.jl`,
+  `src/vise/vise.jl` and `scripts/test_vise.jl` stored `ṗ`, `ṽ` and `é` as a base letter plus a
+  combining mark, inherited from macOS rather than chosen. Nothing about the compiled code changes —
+  Julia's parser normalises identifiers to NFC, so the `q̇` and `ṗ` NamedTuple keys in `densenet.jl`
+  resolve to the same symbols as before — but a `grep` pattern or an editor search typed in NFC now
+  matches, where before it silently matched nothing. Each file is byte-equal to the NFC
+  normalisation of its predecessor, and no string literal was affected.
+
+  The seven files under `obsolete/` are converted too, in a separate commit, so the invariant holds
+  for the whole repository rather than for the compiled part of it. They stored `ṽ`, twenty-three
+  times.
+
 ### Measured
 
 **The OGA fit study's numbers have moved slightly since the archived CSV was written**, and this is
