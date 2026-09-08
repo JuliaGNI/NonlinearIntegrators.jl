@@ -90,6 +90,65 @@ function GeometricIntegratorsBase.issymplectic(::Union{
 end
 
 default_solver(::NetworkIntegratorMethod) = Newton()
+
+"""
+    default_options(method::NetworkIntegratorMethod, problem)
+
+The framework's solver options, plus `linear_solver_method = SimpleSolvers.PivotedQR()`.
+
+!!! warning "Two different `PivotedQR`s"
+    Written out in full because this package exports a `PivotedQR` of its own — the
+    [`PivotedQR`](@ref) `OGAFit` that truncates the Gram solve of a greedy dictionary fit. That
+    one is an `initial_guess_method` ingredient; this one is a `LinearSolverMethod` for the
+    Newton system. Under `using NonlinearIntegrators` the unqualified name is the fit, so a
+    caller overriding this option has to write `SimpleSolvers.PivotedQR()` too.
+
+**The Newton Jacobian of a network integrator is exactly rank deficient, and no amount of
+conditioning care changes that.** Two mechanisms stack. The activation `relu_k(k)` is
+positively homogeneous — `σ(λx) = λᵏσ(x)` — so rescaling a neuron as
+`(wᵢ, bᵢ, cᵢ) ↦ (λwᵢ, λbᵢ, λ⁻ᵏcᵢ)` leaves the ansatz pointwise unchanged; `residual!`
+depends on the parameters only through the trajectory, so it is invariant and its Jacobian
+annihilates those orbit tangents. And whenever every pre-activation keeps one sign across the
+element, `max(0, z)ᵏ = zᵏ` identically and the ansatz collapses onto a polynomial, mapping many
+more parameters onto its few coefficients. Measured at a converged `S = 4` point the Jacobian
+had rank 5 of 13, with a gap of fourteen orders between the fifth and sixth singular values.
+
+An LU on such a matrix raises `SingularException`, and *which* pivot it reaches first is decided
+by the BLAS build rather than by the problem — which is why the same commit passed on macOS and
+failed on Linux (issue
+[#98](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/98)). The system is
+*consistent*, though: the residual lies in the range of the Jacobian, which is why Newton
+converges to `3e-12` whenever it does not throw. That is exactly the situation a minimum-norm
+solve is defined for, so the deficient directions are dropped instead of divided by.
+
+`SimpleSolvers.PivotedQR` and not `SimpleSolvers.SVDSolver` because a Newton step is one solve
+per factorization, which is the ratio the complete orthogonal factorization wins on by 2–3×; and
+the rank here is a means to a stable step rather than the quantity of interest, which is the case
+`SVDSolver` is the more trustworthy one for. Ask `SVDSolver` when the spectrum itself is the
+question — the measurement script `scripts/newton_jacobian_rank.jl` does.
+
+This is a *default*, not a decision taken away from the caller: `default_options` is merged
+under the options passed to `GeometricIntegrator`, so `linear_solver_method = LapackLU()`
+restores the old behaviour for anyone who wants a singular Jacobian reported rather than solved.
+
+**`Float16` is left alone**, and keeps whatever `SimpleSolvers.default_linear_solver_method`
+picks for it — the generic `LU`. Both rank-revealing methods are LAPACK-backed (`geqp3`/`tzrzf`
+and `gesdd`), so they accept only `Float32`, `Float64`, `ComplexF32` and `ComplexF64` and refuse
+anything else by name; handing one a half-precision Jacobian raises `ArgumentError` before the
+first step. Adding the option unconditionally therefore turned #98 into a *new* failure class at
+`Float16`, which the dictionary regression test in
+`test/unit/network_integrators_unit.jl` caught by asserting that the only errors reachable there
+are the two documented ones. The consequence to be honest about: **`Float16` is still exposed to
+#98.** That is a narrower gap than it sounds — the Jacobian is ill-conditioned at half precision
+anyway, and that file already records that whether the Newton solve converges there is not a
+contract — but it is not closed, and closing it would need a rank-revealing method that does not
+go through LAPACK.
+"""
+function default_options(method::NetworkIntegratorMethod, problem::GeometricProblem)
+    base = invoke(default_options, Tuple{GeometricMethod, GeometricProblem}, method, problem)
+    datatype(problem) <: LinearAlgebra.BlasFloat || return base
+    merge(base, (; linear_solver_method = SimpleSolvers.PivotedQR()))
+end
 # `initial_trajectory!` below integrates a LODE sub-problem and reads both `q` and `p` back out, so
 # this needs the `IODEProblem`/`LODEProblem` methods of `ImplicitMidpoint` rather than an
 # ODE-only or `q`-only implicit midpoint.
