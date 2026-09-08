@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — targeting 0.5.0
 
+### Changed
+
+- `src/nvi/densenet.jl`, `src/vise/vise.jl` and `scripts/test_vise.jl` are now Unicode
+  NFC-normalised. They stored `ṗ`, `ṽ` and `é` as a base letter plus a combining mark, inherited
+  from macOS rather than chosen. Nothing about the compiled code changes — Julia's parser
+  normalises identifiers to NFC — but a `grep` pattern or an editor search typed in NFC now
+  matches, where before it silently matched nothing. Each file is byte-equal to the NFC
+  normalisation of its predecessor, and no string literal was affected.
+
+  The seven files under `obsolete/` are deliberately left as they are: they are superseded work
+  that nobody is reviewing, and normalising them would treble the diff for no benefit.
+
 The package can plot its own integrators, and the experiment suite that drives them lives in this
 repository. It had no `ext/` directory and no `[weakdeps]` at all until now, so every figure ever
 made from a `VISE` or `ShallowNet` run was made by a script carrying its own Makie code — and those

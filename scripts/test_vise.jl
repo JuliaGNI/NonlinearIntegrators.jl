@@ -600,7 +600,7 @@ using JLD2
 #         scatter!(ham_axis, t_coarse, HH_relative_hams_err, label="VISE Discrete Solution ",color =:blue)
 #         scatter!(ham_axis, t_coarse, HH_relative_imp_ham_err, label="Implicit Midpoint Solution ",color = :red)
 #         scatter!(ham_axis, t_coarse, HH_relative_cgvi_ham_err, label="Galerkin Integrator Solution ",color = :green)
-#         Label(fig[4:5, 0], "Hénon-Heiles Potential", rotation = pi/2,
+#         Label(fig[4:5, 0], "Hénon-Heiles Potential", rotation = pi/2,
 #             fontsize = label_font_size,tellheight = false)
 
 #         Legend(fig[6, 1:3], q1_axis,orientation = :horizontal,labelsize = label_font_size,
