@@ -75,12 +75,19 @@ Makie = "0.24"
 NeuralNetworkParameters = "0.3"
 QuadratureRules = "0.2"
 Random = "1"
-# 0.13.2 and not "0.12.1, 0.13": `GeometricOptimizers` 0.7.0 requires it, so the lower halves of that
-# range are no longer reachable from here. 0.13.2 is also where `GradientAutodiff`, `GradientFunction`
-# and `alloc_h` for a parameter set live, as an extension on `NeuralNetworkParameters` -- they were
-# `GeometricOptimizers`' type piracy until 0.7.0. Nothing here calls them; this package hands the
-# solver a flat `Vector`.
-SimpleSolvers = "0.13.2"
+# 0.13.3 and not "0.12.1, 0.13": `GeometricOptimizers` 0.7.0 requires 0.13.2, so the lower halves of
+# that range are no longer reachable from here. 0.13.2 is also where `GradientAutodiff`,
+# `GradientFunction` and `alloc_h` for a parameter set live, as an extension on
+# `NeuralNetworkParameters` -- they were `GeometricOptimizers`' type piracy until 0.7.0. Nothing here
+# calls them; this package hands the solver a flat `Vector`.
+#
+# The floor moves to 0.13.3 because this package now *names* something only that release has:
+# `PivotedQR`, which `default_options` hands every network integrator as its `linear_solver_method`
+# (`src/nvi/network_integrator_core.jl`). This is a bound about what runs, not a bound about what
+# is measured -- and it has to be a bound rather than a graceful fallback because the name sits in a
+# function body, so on 0.13.2 the package still precompiles and loads cleanly and the missing
+# binding surfaces only as an `UndefVarError` the first time a network integrator is constructed.
+SimpleSolvers = "0.13.3"
 StaticArrays = "1"
 Statistics = "1"
 # 0.8.0 gives an equation set its own name back -- `EquationSet`, which 0.7 had folded into
