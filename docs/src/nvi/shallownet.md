@@ -60,7 +60,7 @@ Results are written to `docs/src/nvi/figures/`.
 <table>
 <thead><tr><th></th><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
 <tbody>
-<tr><th>k = 2</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>k = 2</th><td><strong>S=4, k=2, Max Error = 1.277e-07<br/><img src="figures/shallownet_HO_relu_h0.05_S4_k2_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=2, Max Error = 1.961e-06<br/><img src="figures/shallownet_HO_relu_h0.05_S6_k2_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=2, Max Error = 3.108e-06<br/><img src="figures/shallownet_HO_relu_h0.05_S8_k2_best.png" style="width:100%;min-width:180px"/></td></tr>
 <tr><th>k = 3</th><td><strong>S=4, k=3, Max Error = 5.862e-13<br/><img src="figures/shallownet_HO_relu_h0.05_S4_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=3, Max Error = 1.769e-08<br/><img src="figures/shallownet_HO_relu_h0.05_S6_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=3, Max Error = 1.429e-08<br/><img src="figures/shallownet_HO_relu_h0.05_S8_k3_best.png" style="width:100%;min-width:180px"/></td></tr>
 <tr><th>k = 4</th><td><strong>S=4, k=4, Max Error = 1.771e-02<br/><img src="figures/shallownet_HO_relu_h0.05_S4_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=4, Max Error = 3.744e-08<br/><img src="figures/shallownet_HO_relu_h0.05_S6_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=4, Max Error = 4.218e-07<br/><img src="figures/shallownet_HO_relu_h0.05_S8_k4_best.png" style="width:100%;min-width:180px"/></td></tr>
 </tbody></table>
@@ -70,7 +70,7 @@ Results are written to `docs/src/nvi/figures/`.
 <table>
 <thead><tr><th></th><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
 <tbody>
-<tr><th>k = 2</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>k = 2</th><td><strong>S=4, k=2, Max Error = 9.849e-06<br/><img src="figures/shallownet_HO_relu_h0.1_S4_k2_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=2, Max Error = 1.602e-05<br/><img src="figures/shallownet_HO_relu_h0.1_S6_k2_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=2, Max Error = 2.061e-05<br/><img src="figures/shallownet_HO_relu_h0.1_S8_k2_best.png" style="width:100%;min-width:180px"/></td></tr>
 <tr><th>k = 3</th><td><strong>S=4, k=3, Max Error = 1.246e-12<br/><img src="figures/shallownet_HO_relu_h0.1_S4_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=3, Max Error = 2.684e-09<br/><img src="figures/shallownet_HO_relu_h0.1_S6_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=3, Max Error = 5.997e-09<br/><img src="figures/shallownet_HO_relu_h0.1_S8_k3_best.png" style="width:100%;min-width:180px"/></td></tr>
 <tr><th>k = 4</th><td><strong>S=4, k=4, Max Error = 8.038e-03<br/><img src="figures/shallownet_HO_relu_h0.1_S4_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=4, Max Error = 1.128e-06<br/><img src="figures/shallownet_HO_relu_h0.1_S6_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=4, Max Error = 4.175e-07<br/><img src="figures/shallownet_HO_relu_h0.1_S8_k4_best.png" style="width:100%;min-width:180px"/></td></tr>
 </tbody></table>
@@ -80,7 +80,7 @@ Results are written to `docs/src/nvi/figures/`.
 <table>
 <thead><tr><th></th><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
 <tbody>
-<tr><th>k = 2</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>k = 2</th><td><strong>S=4, k=2, Max Error = 2.462e-05<br/><img src="figures/shallownet_HO_relu_h0.2_S4_k2_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=2, Max Error = 3.090e-05<br/><img src="figures/shallownet_HO_relu_h0.2_S6_k2_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=2, Max Error = 5.363e-05<br/><img src="figures/shallownet_HO_relu_h0.2_S8_k2_best.png" style="width:100%;min-width:180px"/></td></tr>
 <tr><th>k = 3</th><td><strong>S=4, k=3, Max Error = 7.956e-11<br/><img src="figures/shallownet_HO_relu_h0.2_S4_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=3, Max Error = 1.713e-09<br/><img src="figures/shallownet_HO_relu_h0.2_S6_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=3, Max Error = 2.052e-09<br/><img src="figures/shallownet_HO_relu_h0.2_S8_k3_best.png" style="width:100%;min-width:180px"/></td></tr>
 <tr><th>k = 4</th><td><strong>S=4, k=4, Max Error = 1.060e-03<br/><img src="figures/shallownet_HO_relu_h0.2_S4_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=4, Max Error = 1.700e-05<br/><img src="figures/shallownet_HO_relu_h0.2_S6_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=4, Max Error = 1.658e-06<br/><img src="figures/shallownet_HO_relu_h0.2_S8_k4_best.png" style="width:100%;min-width:180px"/></td></tr>
 </tbody></table>
@@ -90,7 +90,7 @@ Results are written to `docs/src/nvi/figures/`.
 <table>
 <thead><tr><th></th><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
 <tbody>
-<tr><th>k = 2</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>k = 2</th><td><strong>S=4, k=2, Max Error = 7.658e-05<br/><img src="figures/shallownet_HO_relu_h0.5_S4_k2_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=2, Max Error = 5.578e-05<br/><img src="figures/shallownet_HO_relu_h0.5_S6_k2_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=2, Max Error = 2.349e-04<br/><img src="figures/shallownet_HO_relu_h0.5_S8_k2_best.png" style="width:100%;min-width:180px"/></td></tr>
 <tr><th>k = 3</th><td><strong>S=4, k=3, Max Error = 1.968e-08<br/><img src="figures/shallownet_HO_relu_h0.5_S4_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=3, Max Error = 1.150e-05<br/><img src="figures/shallownet_HO_relu_h0.5_S6_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=3, Max Error = 8.064e-06<br/><img src="figures/shallownet_HO_relu_h0.5_S8_k3_best.png" style="width:100%;min-width:180px"/></td></tr>
 <tr><th>k = 4</th><td><strong>S=4, k=4, Max Error = 4.436e-05<br/><img src="figures/shallownet_HO_relu_h0.5_S4_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=4, Max Error = 1.874e-05<br/><img src="figures/shallownet_HO_relu_h0.5_S6_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=4, Max Error = 2.671e-05<br/><img src="figures/shallownet_HO_relu_h0.5_S8_k4_best.png" style="width:100%;min-width:180px"/></td></tr>
 </tbody></table>
@@ -100,7 +100,7 @@ Results are written to `docs/src/nvi/figures/`.
 <table>
 <thead><tr><th></th><th>S = 4</th><th>S = 6</th><th>S = 8</th></tr></thead>
 <tbody>
-<tr><th>k = 2</th><td>—</td><td>—</td><td>—</td></tr>
+<tr><th>k = 2</th><td><strong>S=4, k=2, Max Error = 3.902e-04<br/><img src="figures/shallownet_HO_relu_h1.0_S4_k2_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=2, Max Error = 5.155e-04<br/><img src="figures/shallownet_HO_relu_h1.0_S6_k2_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=2, Max Error = 6.279e-04<br/><img src="figures/shallownet_HO_relu_h1.0_S8_k2_best.png" style="width:100%;min-width:180px"/></td></tr>
 <tr><th>k = 3</th><td><strong>S=4, k=3, Max Error = 1.321e-06<br/><img src="figures/shallownet_HO_relu_h1.0_S4_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=3, Max Error = 3.232e-04<br/><img src="figures/shallownet_HO_relu_h1.0_S6_k3_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=3, Max Error = 5.216e-04<br/><img src="figures/shallownet_HO_relu_h1.0_S8_k3_best.png" style="width:100%;min-width:180px"/></td></tr>
 <tr><th>k = 4</th><td><strong>S=4, k=4, Max Error = 2.875e-05<br/><img src="figures/shallownet_HO_relu_h1.0_S4_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=6, k=4, Max Error = 4.471e-06<br/><img src="figures/shallownet_HO_relu_h1.0_S6_k4_best.png" style="width:100%;min-width:180px"/></td><td><strong>S=8, k=4, Max Error = 1.521e-05<br/><img src="figures/shallownet_HO_relu_h1.0_S8_k4_best.png" style="width:100%;min-width:180px"/></td></tr>
 </tbody></table>
