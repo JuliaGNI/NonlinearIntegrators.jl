@@ -132,7 +132,7 @@ worth more than a faithful report that the fit was impossible — and the rank-d
 itself is already reported, through `OGAResult`'s `gains` and `rejected`.
 """
 function oga_solve(fit::OGAFit, Â::AbstractMatrix{T}, ŷ::AbstractVector{T},
-                   qr::IncrementalQRState{T}) where {T}
+        qr::IncrementalQRState{T}) where {T}
     x = try
         _oga_solve(fit, Â, ŷ, qr)
     catch e
@@ -143,19 +143,25 @@ function oga_solve(fit::OGAFit, Â::AbstractMatrix{T}, ŷ::AbstractVector{T},
     return ridged_lstsq(Â, ŷ)
 end
 
-_oga_solve(::WeightedQR, Â::AbstractMatrix, ŷ::AbstractVector, ::IncrementalQRState) =
+function _oga_solve(::WeightedQR, Â::AbstractMatrix, ŷ::AbstractVector, ::IncrementalQRState)
     scaled_lstsq(Â, ŷ)
+end
 
-_oga_solve(::IncrementalQR, ::AbstractMatrix, ŷ::AbstractVector, qr::IncrementalQRState) =
+function _oga_solve(::IncrementalQR, ::AbstractMatrix, ŷ::AbstractVector, qr::IncrementalQRState)
     oga_qr_solve(qr, ŷ)
+end
 
-_oga_solve(fit::PivotedQR, Â::AbstractMatrix{T}, ŷ::AbstractVector{T}, ::IncrementalQRState) where {T} =
+function _oga_solve(fit::PivotedQR, Â::AbstractMatrix{T}, ŷ::AbstractVector{T}, ::IncrementalQRState) where {T}
     pivoted_qr_lstsq(Â, ŷ, _rtol(fit.rtol, T, minimum(size(Â))))
+end
 
-_oga_solve(fit::TruncatedSVD, Â::AbstractMatrix{T}, ŷ::AbstractVector{T}, ::IncrementalQRState) where {T} =
+function _oga_solve(fit::TruncatedSVD, Â::AbstractMatrix{T},
+        ŷ::AbstractVector{T}, ::IncrementalQRState) where {T}
     truncated_svd_lstsq(Â, ŷ, _rtol(fit.rtol, T, minimum(size(Â))))
+end
 
-function _oga_solve(fit::NormalEquationsFit, Â::AbstractMatrix{T}, ŷ::AbstractVector{T}, ::IncrementalQRState) where {T}
+function _oga_solve(fit::NormalEquationsFit, Â::AbstractMatrix{T},
+        ŷ::AbstractVector{T}, ::IncrementalQRState) where {T}
     if fit.island
         # The `Float64` island: the whole solve is widened, then rounded back into `T`.
         x = _normal_equations(Float64.(Â), Float64.(ŷ), fit.ridge)
@@ -165,7 +171,7 @@ function _oga_solve(fit::NormalEquationsFit, Â::AbstractMatrix{T}, ŷ::Abstract
 end
 
 function _normal_equations(Â::AbstractMatrix{T}, ŷ::AbstractVector{T}, ridge::Bool) where {T}
-    G   = Â' * Â
+    G = Â' * Â
     rhs = Â' * ŷ
     if ridge
         λ = oga_tikhonov(G)

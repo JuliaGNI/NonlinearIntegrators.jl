@@ -51,40 +51,48 @@ const MAXIT = 1000
 # comparable number of atoms; the greedy step is linear in that count, so holding it fixed
 # is what makes the comparison about the dictionary's *shape* rather than its size.
 const SEEDS_1D = [
-    ("reference",   OGA1dNormalEquations()),
-    ("oga1d",       OGA1d()),
+    ("reference", OGA1dNormalEquations()),
+    ("oga1d", OGA1d()),
     ("oga1d-stable", OGA1dStable()),
-    ("oga1d-tsvd",  OGA(BiasGrid1d(), OrthogonalProjection(), TruncatedSVD())),
+    ("oga1d-tsvd", OGA(BiasGrid1d(), OrthogonalProjection(), TruncatedSVD())),
     ("oga1d-pivqr", OGA(BiasGrid1d(), OrthogonalProjection(), PivotedQR())),
-    ("oga1d-refined", OGA(Refined(BiasGrid1d()), NormalizedProjection(), IncrementalQR())),
+    ("oga1d-refined", OGA(Refined(BiasGrid1d()), NormalizedProjection(), IncrementalQR()))
 ]
 
 const SEEDS_2D = [
-    ("oga1d",       OGA1d()),
+    ("oga1d", OGA1d()),
     ("oga1d-stable", OGA1dStable()),
-    ("oga2d",       OGA2d(dictionary = WeightBiasGrid2d(octaves = (-3, 3), weight_amount = 6,
-                                                       bias_amount = 56))),
-    ("oga-sphere",  OGASphere(dictionary = AngularGrid(radii = (0.25, 1.0, 4.0), amount = 266))),
-    ("oga2d-refined", OGA(Refined(WeightBiasGrid2d(octaves = (-3, 3), weight_amount = 6,
-                                                  bias_amount = 56)),
-                          NormalizedProjection(), IncrementalQR())),
+    ("oga2d",
+        OGA2d(dictionary = WeightBiasGrid2d(octaves = (-3, 3), weight_amount = 6,
+            bias_amount = 56))),
+    ("oga-sphere",
+        OGASphere(dictionary = AngularGrid(radii = (0.25, 1.0, 4.0), amount = 266))),
+    ("oga2d-refined",
+        OGA(
+            Refined(WeightBiasGrid2d(octaves = (-3, 3), weight_amount = 6,
+                bias_amount = 56)),
+            NormalizedProjection(), IncrementalQR()))
 ]
 
 # ---- one case ---------------------------------------------------------------
 
-classify(e) = e isa SingularException ? "singular" :
-    (n = string(nameof(typeof(e))); occursin("NonlinearSolver", n) ? "diverged" : first(n, 14))
+function classify(e)
+    e isa SingularException ? "singular" :
+    (n = string(nameof(typeof(e)));
+        occursin("NonlinearSolver", n) ? "diverged" : first(n, 14))
+end
 
 function reference_q(::Type{T}, params) where {T}
     # The analytic solution at the end of the horizon, in Float64 — the accuracy yardstick.
-    return Float64(HarmonicOscillator.exact_solution_q(T(NSTEPS * DT), T(0.5), T(0.0), T(0.0), params))
+    return Float64(HarmonicOscillator.exact_solution_q(
+        T(NSTEPS * DT), T(0.5), T(0.0), T(0.0), params))
 end
 
 function run_case(basis, ::Type{T}, seed, λ, params, prob, refq) where {T}
     method = ShallowNet(basis, QuadratureRules.GaussLegendreQuadrature(T, R_QUAD);
-                                   show_status = false,
-                                   bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
-                                   initial_guess_method = seed)
+        show_status = false,
+        bias_interval = [-T(pi), T(pi)], dict_amount = DICT_AMOUNT,
+        initial_guess_method = seed)
     status, ref_err, iters, secs = "ok", NaN, NaN, NaN
     upcast = false
     # Timed outside the `try` so a *failing* case still reports its cost. Most of this
@@ -93,13 +101,19 @@ function run_case(basis, ::Type{T}, seed, λ, params, prob, refq) where {T}
     t0 = time()
     try
         int = GeometricIntegrator(prob, method; regularization_factor = T(λ),
-                                  max_iterations = MAXIT,
-                                  f_abstol = oga_f_abstol(T))
+            max_iterations = MAXIT,
+            f_abstol = oga_f_abstol(T))
         local sol
         sol, _ = integrate(int)
         # The iteration count of the *final* step — the integrator keeps no per-step history.
         # Enough to catch a run that stalls, which is what the status below uses it for.
-        try; iters = Float64(solverstate(int).iterations); catch; end
+        try
+            iters = Float64(solverstate(int).iterations)
+        catch exception
+            # `iters` stays `NaN`: not every solver state carries an iteration count, and no row
+            # of this sweep depends on it. An interrupt is still an interrupt, though.
+            exception isa InterruptException && rethrow()
+        end
         qend = collect(sol.q[:, 1])[end]
         # The precision invariant: a run started at `T` must still be at `T` at the end. A
         # silent upcast would make the reduced-precision rows meaningless, so it is recorded
@@ -132,15 +146,15 @@ const CSV_HEADER = "study,problem,T,dt,S,R,activation,seed,lambda_multiple,lambd
                    "ref_err,iterations,secs"
 
 function run_stage(name::AbstractString, seeds, activations)
-    mkpath(RESULTS_DIR)
-    csvpath = joinpath(RESULTS_DIR, "$(name).csv")
+    mkpath(RUNS_DIR[])
+    csvpath = joinpath(RUNS_DIR[], "$(name).csv")
 
     total = length(TYPES) * length(activations) * length(seeds) * (1 + 6)
     println("="^104)
     println("Tier B — $(name): $total end-to-end runs ($(NSTEPS) steps, dt=$(DT), S=$(S_NEURONS), R=$(R_QUAD))")
     println("="^104)
     @printf("%-8s %-8s %-15s %-7s %-10s | %-10s %-11s %-6s %-7s\n",
-            "T", "act", "seed", "λ/√eps", "λ", "status", "ref_err", "iters", "secs")
+        "T", "act", "seed", "λ/√eps", "λ", "status", "ref_err", "iters", "secs")
     println("-"^104)
 
     open(csvpath, "w") do io
@@ -164,17 +178,21 @@ function run_stage(name::AbstractString, seeds, activations)
                 end
 
                 for (sname, seed) in seeds, l in ladder
+
                     r = run_case(basis, T, seed, l.factor, params, prob, refq)
                     @printf("%-8s %-8s %-15s %-7d %-10s | %-10s %-11s %-6s %-7s\n",
-                            string(T), aname, sname, l.multiple,
-                            @sprintf("%.2e", Float64(l.factor)), r.status,
-                            isfinite(r.ref_err) ? @sprintf("%.3e", r.ref_err) : "—",
-                            isnan(r.iters) ? "—" : string(round(Int, r.iters)),
-                            isnan(r.secs) ? "—" : @sprintf("%.2f", r.secs))
-                    println(io, join(("sweep", "harmonic_oscillator", string(T), csvnum(DT),
-                                      string(S_NEURONS), string(R_QUAD), aname, sname,
-                                      string(l.multiple), csvnum(Float64(l.factor)), r.status,
-                                      csvnum(r.ref_err), csvnum(r.iters), csvnum(r.secs)), ","))
+                        string(T), aname, sname, l.multiple,
+                        @sprintf("%.2e", Float64(l.factor)), r.status,
+                        isfinite(r.ref_err) ? @sprintf("%.3e", r.ref_err) : "—",
+                        isnan(r.iters) ? "—" : string(round(Int, r.iters)),
+                        isnan(r.secs) ? "—" : @sprintf("%.2f", r.secs))
+                    println(io,
+                        join(
+                            ("sweep", "harmonic_oscillator", string(T), csvnum(DT),
+                                string(S_NEURONS), string(R_QUAD), aname, sname,
+                                string(l.multiple), csvnum(Float64(l.factor)), r.status,
+                                csvnum(r.ref_err), csvnum(r.iters), csvnum(r.secs)),
+                            ","))
                     flush(io)
                 end
             end
@@ -186,14 +204,17 @@ function run_stage(name::AbstractString, seeds, activations)
     return csvpath
 end
 
-function main()
-    mode = isempty(ARGS) ? "all" : ARGS[1]
+function main(args)
+    names, _ = parse_arguments(args)
+    length(names) ≤ 1 || throw(ArgumentError(
+        "this script takes one mode at most, got $(join(names, ", "))"))
+    mode = isempty(names) ? "all" : first(names)
+    mode in ("all", "relu", "smooth") ||
+        error("unknown mode $(repr(mode)); use \"all\", \"relu\" or \"smooth\"")
     mode in ("all", "relu") &&
         run_stage("oga_sweep_relu", SEEDS_1D, OGA_ACTIVATIONS_RELU)
     mode in ("all", "smooth") &&
         run_stage("oga_sweep_smooth", SEEDS_2D, OGA_ACTIVATIONS_SMOOTH)
-    mode in ("all", "relu", "smooth") ||
-        error("unknown mode $(repr(mode)); use \"all\", \"relu\" or \"smooth\"")
 end
 
-main()
+main(ARGS)

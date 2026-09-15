@@ -5,12 +5,13 @@
 
 @testset "method smoke ($T)" for T in TEST_TYPES
     @debug "method smoke: element type = $T"
-    net  = build_shallownet_basis(T; S = 4)
+    net = build_shallownet_basis(T; S = 4)
     dnet = build_densenet_basis(T; S₁ = 3, S = 3)
     quad = gauss(T, 4)
 
     @testset "ShallowNet" begin
-        m = ShallowNet(net, quad; show_status = false, bias_interval = [-T(pi), T(pi)], dict_amount = 400)
+        m = ShallowNet(net, quad; show_status = false,
+            bias_interval = [-T(pi), T(pi)], dict_amount = 400)
         @test m isa ShallowNetMethod
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
@@ -20,7 +21,8 @@
     end
 
     @testset "ShallowNetAutodiff" begin
-        m = ShallowNetAutodiff(net, quad; show_status = false, bias_interval = [-T(pi), T(pi)], dict_amount = 400)
+        m = ShallowNetAutodiff(net, quad; show_status = false,
+            bias_interval = [-T(pi), T(pi)], dict_amount = 400)
         @test m isa ShallowNetMethod
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
@@ -29,7 +31,8 @@
     end
 
     @testset "ShallowNetReversible" begin
-        m = ShallowNetReversible(net, quad; show_status = false, bias_interval = [-T(pi), T(pi)], dict_amount = 400)
+        m = ShallowNetReversible(net, quad; show_status = false,
+            bias_interval = [-T(pi), T(pi)], dict_amount = 400)
         @test m isa ShallowNetMethod
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
@@ -39,7 +42,8 @@
     end
 
     @testset "ShallowNetAutodiffReversible" begin
-        m = ShallowNetAutodiffReversible(net, quad; show_status = false, bias_interval = [-T(pi), T(pi)], dict_amount = 400)
+        m = ShallowNetAutodiffReversible(net, quad; show_status = false,
+            bias_interval = [-T(pi), T(pi)], dict_amount = 400)
         @test m isa ShallowNetMethod
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
@@ -55,7 +59,8 @@
         odd = build_shallownet_basis(T; S = 5)
         @test_throws ArgumentError ShallowNetReversible(odd, quad; show_status = false,
             bias_interval = [-T(pi), T(pi)], dict_amount = 400)
-        @test_throws ArgumentError ShallowNetAutodiffReversible(odd, quad; show_status = false,
+        @test_throws ArgumentError ShallowNetAutodiffReversible(
+            odd, quad; show_status = false,
             bias_interval = [-T(pi), T(pi)], dict_amount = 400)
     end
 

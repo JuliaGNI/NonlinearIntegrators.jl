@@ -2,11 +2,17 @@ module NonlinearIntegrators
 
 using GeometricEquations
 using GeometricIntegratorsBase
-import GeometricIntegratorsBase: default_solver, default_options, initsolver, CacheDict, Cache, cache, CacheType, solutionstep, reset!, default_iguess, iguess
-import GeometricIntegratorsBase: problem, method, parameters, SolverMethod, history, solver, residual!, copy_internal_variables!, internal, current, update!, solverstate
-import GeometricIntegratorsBase: compute_vectorfields!, _extrapolate!, internal_variables, nlsolution, integrate!, IODEIntegratorCache, LODEMethod
+import GeometricIntegratorsBase: default_solver, default_options, initsolver, CacheDict,
+                                 Cache, cache, CacheType, solutionstep, reset!,
+                                 default_iguess, iguess
+import GeometricIntegratorsBase: problem, method, parameters, SolverMethod, history, solver,
+                                 residual!, copy_internal_variables!, internal, current,
+                                 update!, solverstate
+import GeometricIntegratorsBase: compute_vectorfields!, _extrapolate!, internal_variables,
+                                 nlsolution, integrate!, IODEIntegratorCache, LODEMethod
 import GeometricBase: datatype, timetype, ntime
-import GeometricBase: initialtime, finaltime, timespan, timestep, periodicity, NullPeriodicity
+import GeometricBase: initialtime, finaltime, timespan, timestep, periodicity,
+                      NullPeriodicity
 using GeometricSolutions: GeometricSolution, timesteps
 
 using QuadratureRules
@@ -45,15 +51,16 @@ import GeometricOptimizers
 using SymbolicNeuralNetworks
 using AbstractNeuralNetworks
 # The parameter container lives in `NeuralNetworkParameters` as of `AbstractNeuralNetworks` 0.7,
-# under the name `NetworkParameters`. The import is selective: `NeuralNetworkParameters` also exports
-# `flatten`/`unflatten`, and the flat-vector conversions in `nvi/utilities.jl` are this package's own.
-# The module itself is listed alongside the type because the accessor is taken qualified,
-# `NeuralNetworkParameters.params`, for the same reason `solve!` is above: `params` is too generic a
-# name to read bare. `using M: x` alone does not bind `M`.
+# under the name `NetworkParameters`. `NetworkParameters` is the only name taken unqualified,
+# because it appears in type annotations where a module prefix would only add noise. Everything
+# else this package uses from there — `params`, and the `flatten`/`unflatten`/`unflatten!` trio
+# the training loops flatten a network with — is called qualified, for the same reason `solve!`
+# is above: they are names generic enough that the reader has to be told whose they are. The
+# module itself is therefore listed alongside the type, since `using M: x` alone does not bind
+# `M`.
 using NeuralNetworkParameters: NeuralNetworkParameters, NetworkParameters
 using LinearAlgebra
 using ForwardDiff
-
 
 include("methods.jl")
 export ShallowNetMethod, DenseNetMethod, NetworkIntegratorMethod
@@ -120,6 +127,14 @@ using Symbolics
 include("vise/vise.jl")
 include("vise/vise_basis.jl")
 export VISE, VISEBasis
+
+# The plotting API. The data layer — `continuous_solution`, `Trajectory`, the error reductions —
+# and the figure naming scheme are implemented in `src/` rather than in the extension because
+# neither is plotting: every caller of a network or symbolic integrator needs them, whether or not
+# it goes on to draw anything, and the naming has to be reachable from both the extension that
+# names a figure and the script that finds that figure's archive. The three `plot_*` stubs get
+# their methods in `ext/NonlinearIntegratorsPlots.jl`, which loads together with `Makie`.
+include("plots.jl")
 
 # The linear reference integrator this package used to carry, `CGVINodal` — continuous
 # Galerkin on a nodal basis — now lives in GeometricIntegrators alongside `CGVI`, which is where

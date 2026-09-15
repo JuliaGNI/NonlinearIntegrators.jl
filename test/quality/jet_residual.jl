@@ -56,17 +56,18 @@ symbolic_basis() = ShallowNetBasis{Float64}(relu_k(3), 4)
 autodiff_basis() = ShallowNetBasis{Float64}(relu_k(3), 4; symbolic = false)
 
 const CASES = [
-    ("ShallowNet",                   () -> ShallowNet(symbolic_basis(), QUAD; KW...)),
-    ("ShallowNetReversible",         () -> ShallowNetReversible(symbolic_basis(), QUAD; KW...)),
-    ("ShallowNetAutodiff",           () -> ShallowNetAutodiff(autodiff_basis(), QUAD; KW...)),
-    ("ShallowNetAutodiffReversible", () -> ShallowNetAutodiffReversible(autodiff_basis(), QUAD; KW...)),
+    ("ShallowNet", () -> ShallowNet(symbolic_basis(), QUAD; KW...)),
+    ("ShallowNetReversible", () -> ShallowNetReversible(symbolic_basis(), QUAD; KW...)),
+    ("ShallowNetAutodiff", () -> ShallowNetAutodiff(autodiff_basis(), QUAD; KW...)),
+    ("ShallowNetAutodiffReversible",
+        () -> ShallowNetAutodiffReversible(autodiff_basis(), QUAD; KW...))
 ]
 
 failed = String[]
 for (name, make) in CASES
     p = probe(make)
     result = JET.report_opt(residual!, typeof.((p.b, p.x, p.s, p.params, p.int));
-                            target_modules = (NonlinearIntegrators,))
+        target_modules = (NonlinearIntegrators,))
     reports = JET.get_reports(result)
     if isempty(reports)
         println("ok   $name: no runtime dispatch in residual!")

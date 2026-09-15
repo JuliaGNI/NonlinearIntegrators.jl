@@ -12,8 +12,10 @@
 # finiteness — which is what it used to do, on a single time step, making it the weakest guard
 # in the suite and no basis at all for the type-stability work on `VISECache`/`VISEBasis`.
 
-vise_method(; kwargs...) = VISE(build_vise_basis(Float64), gauss(Float64, 4),
-                                [Float64[0.5, sqrt(0.5), 0.0]]; kwargs...)
+function vise_method(; kwargs...)
+    VISE(build_vise_basis(Float64), gauss(Float64, 4),
+        [Float64[0.5, sqrt(0.5), 0.0]]; kwargs...)
+end
 
 @testset "VISE (Float64)" begin
     params = HarmonicOscillator.default_parameters(Float64)
@@ -28,7 +30,7 @@ vise_method(; kwargs...) = VISE(build_vise_basis(Float64), gauss(Float64, 4),
         @test eltype(sol.q[end]) == Float64
         qend = collect(sol.q[:, 1])[end]
         qref = HarmonicOscillator.exact_solution_q(tend, 0.5, 0.0, 0.0, params)
-        @debug "VISE" nsteps q_end=qend q_ref=qref abs_err=abs(qend - qref)
+        @debug "VISE" nsteps q_end=qend q_ref=qref abs_err=abs(qend-qref)
         # The ansatz spans the exact solution, so the only error is the Newton residual.
         @test abs(qend - qref) < 1e-12
 

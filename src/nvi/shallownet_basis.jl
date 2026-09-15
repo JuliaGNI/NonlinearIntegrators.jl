@@ -47,24 +47,25 @@ plain_codegen = ShallowNetBasis{Float64}(tanh, 8; cse = false, inplace = false)
 ```
 """
 struct ShallowNetBasis{T, AT, NT, BT, SNNT, QWFT, VT, VWFT} <: AbstractShallowNetBasis{T}
-    S      :: Int
-    common :: NetworkBasisCore{AT,NT, BT, SNNT, QWFT, VT, VWFT}
+    S::Int
+    common::NetworkBasisCore{AT, NT, BT, SNNT, QWFT, VT, VWFT}
 
-    function ShallowNetBasis{T}(activation, S; backend=CPU(), symbolic::Bool=true,
-                                cse::Bool=true, inplace::Bool=true) where T
+    function ShallowNetBasis{T}(activation, S; backend = CPU(), symbolic::Bool = true,
+            cse::Bool = true, inplace::Bool = true) where {T}
         NN = AbstractNeuralNetworks.Chain(
             AbstractNeuralNetworks.Dense(1, S, activation),
-            AbstractNeuralNetworks.Dense(S, 1, identity, use_bias=false))
+            AbstractNeuralNetworks.Dense(S, 1, identity, use_bias = false))
 
         # `nothing` in all four slots rather than a separate type: `NetworkBasisCore` is
         # parametric over them, so the derivative-free basis is just the one whose
         # `SNNT`/`QWFT`/`VT`/`VWFT` are `Nothing`, and every call site that only wants
         # `NN`, `activation` or `S` keeps working unchanged.
-        SNN, dqdθ_built, V_built, dvdθ_built =
-            symbolic ? build_network_derivatives(NN; cse = cse, inplace = inplace) :
-                       (nothing, nothing, nothing, nothing)
+        SNN, dqdθ_built, V_built, dvdθ_built = symbolic ?
+                                               build_network_derivatives(NN; cse = cse, inplace = inplace) :
+                                               (nothing, nothing, nothing, nothing)
 
-        core = NetworkBasisCore(activation, NN, backend, SNN, dqdθ_built, V_built, dvdθ_built)
+        core = NetworkBasisCore(
+            activation, NN, backend, SNN, dqdθ_built, V_built, dvdθ_built)
         new{T, typeof(activation), typeof(NN), typeof(backend), typeof(SNN),
             typeof(dqdθ_built), typeof(V_built), typeof(dvdθ_built)}(S, core)
     end
@@ -80,6 +81,6 @@ function Base.show(io::IO, basis::ShallowNetBasis)
     print(io, "    Last Layer Nodes, Number of Basis S  = ", basis.S, "\n")
     print(io, "    Trainable NN Parameters Amount  = ", 3*basis.S, "\n")
     print(io, "    Symbolic derivatives  = ",
-          has_symbolic_derivatives(basis) ? "compiled" : "none (symbolic = false)", "\n")
+        has_symbolic_derivatives(basis) ? "compiled" : "none (symbolic = false)", "\n")
     print(io, "\n")
 end

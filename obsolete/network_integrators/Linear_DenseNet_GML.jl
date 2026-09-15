@@ -54,7 +54,7 @@ struct Linear_DenseNet_GMLCache{ST,D,S₁,S,R,N} <: IODEIntegratorCache{ST,D}
 
     q̃::Vector{ST}
     p̃::Vector{ST}
-    ṽ::Vector{ST}
+    ṽ::Vector{ST}
     f̃::Vector{ST}
     s̃::Vector{ST}
 
@@ -84,7 +84,7 @@ struct Linear_DenseNet_GMLCache{ST,D,S₁,S,R,N} <: IODEIntegratorCache{ST,D}
         # create temporary vectors
         q̃ = zeros(ST,D)
         p̃ = zeros(ST,D)
-        ṽ = zeros(ST,D)
+        ṽ = zeros(ST,D)
         f̃ = zeros(ST,D)
         s̃ = zeros(ST,D)
 
@@ -108,7 +108,7 @@ struct Linear_DenseNet_GMLCache{ST,D,S₁,S,R,N} <: IODEIntegratorCache{ST,D}
         stage_values = zeros(ST, N, D)
         network_labels = zeros(ST, N+1, D)
 
-        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a
+        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a
                 ,stage_values,network_labels)
     end
 end

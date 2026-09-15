@@ -5,9 +5,8 @@
 # an upstream change into a red build here. Restricting it to stable releases from 1.12 on
 # means exactly one CI job runs it, which still catches a regression introduced in this
 # package. Set `NI_STATIC_ANALYSIS=true` to force it on locally.
-const RUN_STATIC_ANALYSIS =
-    get(ENV, "NI_STATIC_ANALYSIS", "") == "true" ||
-    (isempty(VERSION.prerelease) && VERSION >= v"1.12")
+const RUN_STATIC_ANALYSIS = get(ENV, "NI_STATIC_ANALYSIS", "") == "true" ||
+                            (isempty(VERSION.prerelease) && VERSION >= v"1.12")
 
 if RUN_STATIC_ANALYSIS
     using Aqua

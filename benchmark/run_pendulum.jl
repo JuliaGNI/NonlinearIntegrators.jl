@@ -12,8 +12,9 @@ using GeometricProblems.Pendulum
 const NAME = "pendulum"
 
 function build_prob(::Type{T}, timespan, timestep) where {T}
-    d  = Pendulum.iodeproblem()                     # Float64 defaults, to read the ics
-    q0 = T.(d.ics.q); p0 = T.(d.ics.p)
+    d = Pendulum.iodeproblem()                     # Float64 defaults, to read the ics
+    q0 = T.(d.ics.q)
+    p0 = T.(d.ics.p)
     Pendulum.iodeproblem(q0, p0;
         timespan = timespan, timestep = timestep,
         parameters = Pendulum.default_parameters(T))
@@ -29,7 +30,7 @@ let mode = pick_mode()
     # Jacobian singular, and widening the network enlarges its null space.
     over = mode == "quick" ? (; Ss = [8]) : (;)
     csv = run_sweep(; problem_name = NAME, build_prob = build_prob,
-                    hamiltonian = ham, mode = mode, over...)
+        hamiltonian = ham, mode = mode, over...)
     write_report(read_results(csv);
         title = "Shallow-net benchmark — Pendulum ($(mode))",
         mode = mode, outdir = RESULTS_DIR, prefix = "$(NAME)_$(mode)")

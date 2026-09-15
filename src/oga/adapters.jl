@@ -30,7 +30,7 @@ quadrature taken from the integrator's method.
 `modulation` is the optional per-node ansatz factor (see [`oga_fit`](@ref)).
 """
 function oga_seed(int::GeometricIntegrator, oga::OGA, symmetry::OGASymmetry,
-                  targets::AbstractVector, modulation)
+        targets::AbstractVector, modulation)
     local S = nbasis(method(int))
     local D = length(cache(int).q̃)
     local T = eltype(nlsolution(int))
@@ -41,8 +41,8 @@ function oga_seed(int::GeometricIntegrator, oga::OGA, symmetry::OGASymmetry,
     local dict_amount = method(int).dict_amount
 
     return [oga_fit(oga, σ, nodes, quad_weights, targets[d], S;
-                    bias_interval = bias_interval, dict_amount = dict_amount,
-                    modulation = modulation, symmetry = symmetry) for d in 1:D]
+                bias_interval = bias_interval, dict_amount = dict_amount,
+                modulation = modulation, symmetry = symmetry) for d in 1:D]
 end
 
 # Keep the parameter cache consistent with the seed. `components!` and `record_finer_solution!`
@@ -67,9 +67,9 @@ function _store_full!(x, results, D::Int, S::Int)
     for d in 1:D
         r = results[d]
         for i in 1:S
-            x[D*(i-1)+d]           = r.c[i]
-            x[D*(S+1)+D*(i-1)+d]   = r.W[i]
-            x[D*(S+1+S)+D*(i-1)+d] = r.b[i]
+            x[D * (i - 1) + d] = r.c[i]
+            x[D * (S + 1) + D * (i - 1) + d] = r.W[i]
+            x[D * (S + 1 + S) + D * (i - 1) + d] = r.b[i]
         end
     end
     return nothing
@@ -83,11 +83,11 @@ function _store_symmetric!(x, results, D::Int, S::Int)
     for d in 1:D
         r = results[d]
         for i in 1:S
-            x[D*(i-1)+d] = r.c[i]
+            x[D * (i - 1) + d] = r.c[i]
         end
         for i in 1:half
-            x[D*(S+1)+D*(i-1)+d]      = r.W[2i-1]
-            x[D*(S+1+half)+D*(i-1)+d] = r.b[2i-1]
+            x[D * (S + 1) + D * (i - 1) + d] = r.W[2i - 1]
+            x[D * (S + 1 + half) + D * (i - 1) + d] = r.b[2i - 1]
         end
     end
     return nothing
@@ -101,9 +101,12 @@ function _ansatz_target(labels, nodes::AbstractVector{T}, q_begin, q_end) where 
     return labels .- ((one(T) .- nodes) .* q_begin .+ nodes .* q_end)
 end
 
-_oga_status(results, show_status) = show_status && for (d, r) in enumerate(results)
-    println("OGA dimension $d: $(r.neurons) neurons, weighted residual $(r.residual)" *
-            (r.rejected > 0 ? ", $(r.rejected) atom(s) rejected for adding no new direction" : ""))
+function _oga_status(results, show_status)
+    show_status && for (d, r) in enumerate(results)
+        println("OGA dimension $d: $(r.neurons) neurons, weighted residual $(r.residual)" *
+                (r.rejected > 0 ?
+                 ", $(r.rejected) atom(s) rejected for adding no new direction" : ""))
+    end
 end
 
 # ---- ShallowNet -------------------------------------------------
@@ -145,7 +148,7 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNetAutodiff}, oga::OG
     _store_params!(cache(int).ps, results)
     _store_full!(x, results, D, S)
     for d in 1:D
-        x[D*S+d] = cache(int).q̃[d]      # the ansatz's endpoint unknown
+        x[D * S + d] = cache(int).q̃[d]      # the ansatz's endpoint unknown
     end
     _oga_status(results, method(int).show_status)
     return nothing
@@ -189,7 +192,7 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNetAutodiffReversible
     _store_params!(cache(int).ps, results)
     _store_symmetric!(x, results, D, S)
     for d in 1:D
-        x[D*S+d] = q̃[d]
+        x[D * S + d] = q̃[d]
     end
     _oga_status(results, method(int).show_status)
     return nothing

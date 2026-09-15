@@ -18,14 +18,14 @@ relu_k(k::Int) = x -> max(zero(x), x)^k
 
 # ELU (α = 1) and the tanh approximation of GELU. Neither is positively homogeneous, so
 # `|w|` is a genuine length-scale parameter for them — the motivation for a 2-D dictionary.
-elu(x)  = max(zero(x), x) + min(zero(x), exp(x) - one(x))
+elu(x) = max(zero(x), x) + min(zero(x), exp(x) - one(x))
 gelu(x) = x / 2 * (one(x) + tanh(sqrt(oftype(x, 2 / pi)) *
-                                (x + oftype(x, 0.044715) * x^3)))
+                                 (x + oftype(x, 0.044715) * x^3)))
 
 # ReLU¹ is not C¹, so the Newton solve on it is expected to struggle; it is included as the
 # k = 1 end of the ReLUᵏ axis rather than as a candidate for use.
 const OGA_ACTIVATIONS_RELU = [("relu1", relu_k(1)), ("relu2", relu_k(2)),
-                              ("relu3", relu_k(3)), ("relu4", relu_k(4))]
+    ("relu3", relu_k(3)), ("relu4", relu_k(4))]
 const OGA_ACTIVATIONS_SMOOTH = [("elu", elu), ("gelu", gelu), ("tanh", tanh)]
 const OGA_ACTIVATIONS_ALL = vcat(OGA_ACTIVATIONS_RELU, OGA_ACTIVATIONS_SMOOTH)
 
@@ -46,8 +46,7 @@ oga_reg_multiples(::Type{T}) where {T} = (2, 4, 8, 16, 32, 64)      # 2^1 … 2^
 
 # Formed in `Float64` and converted once: `T(multiple) * sqrt(eps(T))` overflows to `Inf` for
 # `Float16` well inside the ladder.
-oga_reg_factor(::Type{T}, multiple::Integer) where {T} =
-    T(multiple * sqrt(Float64(eps(T))))
+oga_reg_factor(::Type{T}, multiple::Integer) where {T} = T(multiple * sqrt(Float64(eps(T))))
 
 # ---- the residual tolerance --------------------------------------------------
 #

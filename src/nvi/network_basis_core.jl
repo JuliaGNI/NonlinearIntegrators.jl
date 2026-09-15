@@ -26,14 +26,14 @@ distinction is visible to dispatch.
 - `dvdθ`: compiled function returning ∂v/∂θ — the Jacobian of the velocity with
   respect to the network parameters θ.
 """
-struct NetworkBasisCore{AT,NT, BT, SNNT, QWFT, VT, VWFT}
-    activation:: AT
-    NN        :: NT
-    backend   :: BT
-    SNN       :: SNNT
-    dqdθ      :: QWFT
-    V_func    :: VT
-    dvdθ      :: VWFT
+struct NetworkBasisCore{AT, NT, BT, SNNT, QWFT, VT, VWFT}
+    activation::AT
+    NN::NT
+    backend::BT
+    SNN::SNNT
+    dqdθ::QWFT
+    V_func::VT
+    dvdθ::VWFT
 end
 
 """
@@ -63,7 +63,7 @@ function build_network_derivatives(NN; cse::Bool = true, inplace::Bool = true)
     VNN = SymbolicNeuralNetworks.derivative(SymbolicNeuralNetworks.Jacobian(SNN))
     V_built = build(VNN)
 
-    dvdθ_built = build(SymbolicNeuralNetworks.symbolic_parameter_gradient(VNN[1,1], SNN))
+    dvdθ_built = build(SymbolicNeuralNetworks.symbolic_parameter_gradient(VNN[1, 1], SNN))
 
     return SNN, dqdθ_built, V_built, dvdθ_built
 end

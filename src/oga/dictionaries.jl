@@ -64,13 +64,13 @@ very different raw norms, so [`RawProjection`](@ref) would rank them by amplitud
 rather than by fit.
 """
 struct WeightBiasGrid2d{B} <: OGADictionary
-    octaves::Tuple{Float64,Float64}
+    octaves::Tuple{Float64, Float64}
     weight_amount::Int
     signed::Bool
     bias_amount::B
 
     function WeightBiasGrid2d(; octaves = (-3.0, 3.0), weight_amount::Int = 6,
-                                signed::Bool = true, bias_amount = nothing)
+            signed::Bool = true, bias_amount = nothing)
         oct = (Float64(octaves[1]), Float64(octaves[2]))
         new{typeof(bias_amount)}(oct, weight_amount, signed, bias_amount)
     end
@@ -97,12 +97,13 @@ The full circle is used rather than a half circle because `ReLUᵏ(x)` and `ReLU
 are different functions — the sign of `w` is real shape information (only the *scale*
 is redundant).
 """
-struct AngularGrid{R,A} <: OGADictionary
+struct AngularGrid{R, A} <: OGADictionary
     radii::R
     amount::A
 
-    AngularGrid(; radii = (1.0,), amount = nothing) =
-        new{typeof(radii),typeof(amount)}(radii, amount)
+    function AngularGrid(; radii = (1.0,), amount = nothing)
+        new{typeof(radii), typeof(amount)}(radii, amount)
+    end
 end
 
 """
@@ -128,13 +129,14 @@ The polished objective is always the *normalised* score, even when the selection
 product continuously over `(w, b)` would reward growing the atom rather than fitting the
 residual.
 """
-struct Refined{D<:OGADictionary} <: OGADictionary
+struct Refined{D <: OGADictionary} <: OGADictionary
     inner::D
     iterations::Int
     shrink::Float64
 
-    Refined(inner::D; iterations::Int = 3, shrink = 0.5) where {D<:OGADictionary} =
+    function Refined(inner::D; iterations::Int = 3, shrink = 0.5) where {D <: OGADictionary}
         new{D}(inner, iterations, Float64(shrink))
+    end
 end
 
 """
@@ -158,6 +160,7 @@ function oga_atoms(dict::WeightBiasGrid2d, bias_interval, dict_amount::Integer, 
     A = Matrix{T}(undef, length(W) * length(B), 2)
     i = 0
     for w in W, b in B
+
         i += 1
         A[i, 1] = w
         A[i, 2] = b
@@ -175,6 +178,7 @@ function oga_atoms(dict::AngularGrid, bias_interval, dict_amount::Integer, ::Typ
     A = Matrix{T}(undef, length(radii) * length(θ), 2)
     i = 0
     for r in radii, t in θ
+
         i += 1
         A[i, 1] = r * cos(t)
         A[i, 2] = r * sin(t)
@@ -182,8 +186,9 @@ function oga_atoms(dict::AngularGrid, bias_interval, dict_amount::Integer, ::Typ
     return A
 end
 
-oga_atoms(dict::Refined, bias_interval, dict_amount::Integer, ::Type{T}) where {T} =
+function oga_atoms(dict::Refined, bias_interval, dict_amount::Integer, ::Type{T}) where {T}
     oga_atoms(dict.inner, bias_interval, dict_amount, T)
+end
 
 """
     oga_refine(dict, score, w, b) -> (w, b)
@@ -231,5 +236,6 @@ oga_label(::WeightedQR) = "qr"
 oga_label(::IncrementalQR) = "incqr"
 oga_label(::PivotedQR) = "pivqr"
 oga_label(::TruncatedSVD) = "tsvd"
-oga_label(f::NormalEquationsFit) =
+function oga_label(f::NormalEquationsFit)
     "normaleq" * (f.ridge ? "+ridge" : "") * (f.island ? "+f64" : "")
+end

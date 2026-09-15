@@ -70,7 +70,7 @@ end
 
 @testset "OGA seeds" begin
     for seed in (OGA1d(), OGA1dNormalized(), OGA1dStable(), OGA2d(), OGASphere(),
-                 OGA1dNormalEquations())
+        OGA1dNormalEquations())
         @test seed isa InitialParametersMethod
     end
     # The presets are named corners of one composable type, so a hand-built configuration

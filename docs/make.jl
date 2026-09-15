@@ -15,10 +15,23 @@ using NonlinearIntegrators
 # summary section.
 function generate_benchmark_figures()
     benchdir = normpath(joinpath(@__DIR__, "..", "benchmark"))
-    figdir   = joinpath(@__DIR__, "src", "benchmarks", "figures")
-    resdir   = joinpath(benchdir, "results")
+    figdir = joinpath(@__DIR__, "src", "benchmarks", "figures")
+    resdir = joinpath(benchdir, "results")
     mkpath(figdir)
     julia = Base.julia_cmd()
+
+    # `julia-actions/julia-docdeploy` instantiates `docs/` and nothing else, and no manifest is
+    # tracked, so in CI this environment is unresolved when the runs below start and each one dies
+    # with `Package NonlinearIntegrators … is required but does not seem to be installed` — before
+    # the manual is built at all. `[sources]` in `benchmark/Project.toml` points at this
+    # repository, so instantiating here resolves the working tree rather than a registered version.
+    #
+    # A *stale* local `benchmark/Manifest.toml` is not repaired by this, and `Pkg.resolve()` does
+    # not repair it either — it preserves the pinned versions and then fails to satisfy them. One
+    # left over from an earlier checkout still named a path that no longer exists. Delete it and
+    # re-run rather than reaching for `Pkg.develop`, which would rewrite `Project.toml` and discard
+    # its comments.
+    run(`$(julia) --project=$(benchdir) -e "using Pkg; Pkg.instantiate()"`)
 
     # The Toda lattice is deliberately absent. Its quick sweep costs about five hours against
     # seven minutes for the other three combined, because every `Float64` case runs its full
@@ -34,22 +47,23 @@ function generate_benchmark_figures()
 
     # Per-problem figures (coloured by precision).
     per_problem_metrics = ["accuracy_vs_dt", "energy_drift_vs_dt", "runtime_vs_dt",
-                           "iterations_vs_dt", "convergence_heatmap"]
+        "iterations_vs_dt", "convergence_heatmap"]
     figs = ["$(p)_quick_$(m).png" for p in problems for m in per_problem_metrics]
 
     # Combined summary figures (scatters coloured by problem).
-    append!(figs, ["shallownet_benchmark_convergence_problem.png",
-                   "shallownet_benchmark_convergence_solver.png",
-                   "shallownet_benchmark_convergence_heatmap.png",
-                   "shallownet_benchmark_accuracy_vs_dt.png",
-                   "shallownet_benchmark_energy_drift_vs_dt.png",
-                   "shallownet_benchmark_runtime_vs_dt.png",
-                   "shallownet_benchmark_iterations_vs_dt.png"])
+    append!(figs,
+        ["shallownet_benchmark_convergence_problem.png",
+            "shallownet_benchmark_convergence_solver.png",
+            "shallownet_benchmark_convergence_heatmap.png",
+            "shallownet_benchmark_accuracy_vs_dt.png",
+            "shallownet_benchmark_energy_drift_vs_dt.png",
+            "shallownet_benchmark_runtime_vs_dt.png",
+            "shallownet_benchmark_iterations_vs_dt.png"])
 
     # A plot the reporting step skipped (no data) leaves no file, so copy what is there.
     for fig in figs
         src = joinpath(resdir, fig)
-        isfile(src) && cp(src, joinpath(figdir, fig); force=true)
+        isfile(src) && cp(src, joinpath(figdir, fig); force = true)
     end
 
     # The reporting step skips any plot with no measured cases, which used to surface
@@ -71,21 +85,26 @@ if get(ENV, "SKIP_SHALLOWNET_BENCH", "false") != "true"
     generate_benchmark_figures()
 end
 
-DocMeta.setdocmeta!(NonlinearIntegrators, :DocTestSetup, :(using NonlinearIntegrators); recursive=true)
+DocMeta.setdocmeta!(NonlinearIntegrators, :DocTestSetup, :(using NonlinearIntegrators); recursive = true)
 
 # Create bibliography
 bib = CitationBibliography(joinpath(@__DIR__, "NonlinearIntegrators.bib"))
 println(joinpath(@__DIR__, "NonlinearIntegrators.bib"))
+# `modules` names the top-level module only, and `checkdocs` is left at its default. That pairing
+# is why `docs/src/index.md` carries a *second* `@autodocs` block for the `Diagnostics` submodule:
+# `@autodocs` does not descend into a submodule while `checkdocs` does, so without that block the
+# submodule's docstrings are checked, found undocumented, and `makedocs` fails with
+# `:missing_docs`. Narrowing `checkdocs` would hide the gap instead of closing it.
 makedocs(
-    sitename="NonlinearIntegrators.jl",
-    plugins=[bib,],
-    modules=[NonlinearIntegrators],
-    authors="Michael Kraus <michael.kraus@ipp.mpg.de>, Zeyuan Li <zeyuan.li@ipp.mpg.de> and contributors",
-    format=Documenter.HTML(;
-        canonical="https://JuliaGNI.github.io/NonlinearIntegrators.jl",
-        assets=String[],
+    sitename = "NonlinearIntegrators.jl",
+    plugins = [bib,],
+    modules = [NonlinearIntegrators],
+    authors = "Michael Kraus <michael.kraus@ipp.mpg.de>, Zeyuan Li <zeyuan.li@ipp.mpg.de> and contributors",
+    format = Documenter.HTML(;
+        canonical = "https://JuliaGNI.github.io/NonlinearIntegrators.jl",
+        assets = String[]
     ),
-    pages=[
+    pages = [
         "Home" => "index.md",
         "Orthogonal Greedy Algorithm" => [
             "Overview" => "oga/oga.md",
@@ -93,7 +112,7 @@ makedocs(
             "Algorithms" => "oga/algorithms.md",
             "Usage" => "oga/usage.md",
             "Precision" => "oga/precision.md",
-            "Studies" => "oga/studies.md",
+            "Studies" => "oga/studies.md"
         ],
         "Variational Integrator with Symbolic Expression" =>
             "vise/vise.md",
@@ -126,6 +145,6 @@ makedocs(
 # to `/vX.Y.Z/`, and `/stable/` is the symlink to the newest release, which is what "stable" should
 # mean for a registered package.
 deploydocs(;
-    repo="github.com/JuliaGNI/NonlinearIntegrators.jl",
-    devbranch="main",
+    repo = "github.com/JuliaGNI/NonlinearIntegrators.jl",
+    devbranch = "main"
 )

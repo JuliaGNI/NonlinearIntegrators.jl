@@ -59,7 +59,7 @@ struct NonLinear_OneLayer_VectorValue_GMLCache{ST,D,S,R,N} <: IODEIntegratorCach
 
     q̃::Vector{ST}
     p̃::Vector{ST}
-    ṽ::Vector{ST}
+    ṽ::Vector{ST}
     f̃::Vector{ST}
     s̃::Vector{ST}
 
@@ -99,7 +99,7 @@ struct NonLinear_OneLayer_VectorValue_GMLCache{ST,D,S,R,N} <: IODEIntegratorCach
         # create temporary vectors
         q̃ = zeros(ST,D)
         p̃ = zeros(ST,D)
-        ṽ = zeros(ST,D)
+        ṽ = zeros(ST,D)
         f̃ = zeros(ST,D)
         s̃ = zeros(ST,D)
 
@@ -134,7 +134,7 @@ struct NonLinear_OneLayer_VectorValue_GMLCache{ST,D,S,R,N} <: IODEIntegratorCach
         stage_values = zeros(ST, N, D)
         network_labels = zeros(ST, N+1, D)
 
-        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a, 
+        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, s̃, X, Q, P, V, F, ps, r₀, r₁, m, a, 
             dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
             current_step,stage_values,network_labels)
     end

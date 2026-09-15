@@ -1,5 +1,4 @@
 
-
 using Symbolics
 using LinearAlgebra
 
@@ -13,37 +12,48 @@ Parameters:
 function derive_stability_matrix(s, r, quad_type)
     # 1. Define basic symbolic variables
     @variables h ω τ
-    
+
     # Fix: manually create a scalar variable array to avoid Symbolics array indexing errors
     q_vars = [Symbolics.variable(:q, i) for i in 0:s]
-    
+
     # 2. Determine quadrature nodes c and weights b (keep symbolic)
     # Use Num(5) to keep sqrt(5) symbolic
     c, b = if quad_type == :Gauss
-        if r == 1; ([1//2], [1])
-        elseif r == 2; ([1//2 - sqrt(Num(3))/6, 1//2 + sqrt(Num(3))/6], [1//2, 1//2])
-        elseif r == 3; ([1//2 - sqrt(Num(15))/10, 1//2, 1//2 + sqrt(Num(15))/10], [5//18, 8//18, 5//18])
-        else error("Need to manually add Gauss nodes for order $r") end
+        if r == 1
+            ([1//2], [1])
+        elseif r == 2
+            ([1//2 - sqrt(Num(3))/6, 1//2 + sqrt(Num(3))/6], [1//2, 1//2])
+        elseif r == 3
+            ([1//2 - sqrt(Num(15))/10, 1//2, 1//2 + sqrt(Num(15))/10],
+                [5//18, 8//18, 5//18])
+        else
+            error("Need to manually add Gauss nodes for order $r")
+        end
     elseif quad_type == :Lobatto
-        if r == 2; ([0, 1], [1//2, 1//2])
-        elseif r == 3; ([0, 1//2, 1], [1//6, 4//6, 1//6])
-        elseif r == 4; ([0, (5-sqrt(Num(5)))/10, (5+sqrt(Num(5)))/10, 1], [1//12, 5//12, 5//12, 1//12])
-        else error("Need to manually add Lobatto nodes for order $r") end
+        if r == 2
+            ([0, 1], [1//2, 1//2])
+        elseif r == 3
+            ([0, 1//2, 1], [1//6, 4//6, 1//6])
+        elseif r == 4
+            ([0, (5-sqrt(Num(5)))/10, (5+sqrt(Num(5)))/10, 1], [1//12, 5//12, 5//12, 1//12])
+        else
+            error("Need to manually add Lobatto nodes for order $r")
+        end
     end
 
     # 3. Build Lagrange basis functions (control points d are equally spaced)
     # Control points could also be chosen as quadrature nodes
-    d = collect(range(0, 1, length=s+1))
+    d = collect(range(0, 1, length = s+1))
     function L_basis(j, t)
         res = 1.0
-        for m in 1:s+1
+        for m in 1:(s + 1)
             m != j && (res *= (t - d[m]) / (d[j] - d[m]))
         end
         return res
     end
 
     # 4. Construct the discrete Lagrangian Ld
-    q_poly = sum(q_vars[j] * L_basis(j, τ) for j in 1:s+1)
+    q_poly = sum(q_vars[j] * L_basis(j, τ) for j in 1:(s + 1))
     q_dot_poly = Symbolics.derivative(q_poly, τ) # dq/dτ
 
     Ld = 0.0
@@ -51,12 +61,13 @@ function derive_stability_matrix(s, r, quad_type)
         # L = 1/2*v^2 - 1/2*ω^2*q^2, dt = h * dτ
         qi = substitute(q_poly, Dict(τ => c[i]))
         vi = (1/h) * substitute(q_dot_poly, Dict(τ => c[i]))
-        Ld += h * b[i] * ( (1//2)*vi^2 - (1//2)*ω^2*qi^2 )
+        Ld += h * b[i] * ((1//2)*vi^2 - (1//2)*ω^2*qi^2)
     end
 
     # 5. Extract linear system coefficients (second derivatives yield A matrix)
     # Ld = 1/2 * q' * A * q
-    A = [Symbolics.derivative(Symbolics.derivative(Ld, q_vars[i]), q_vars[j]) for i in 1:s+1, j in 1:s+1]
+    A = [Symbolics.derivative(Symbolics.derivative(Ld, q_vars[i]), q_vars[j])
+         for i in 1:(s + 1), j in 1:(s + 1)]
 
     # 6. Elimination process (Schur complement on block matrix)
     # Block partition of A
@@ -65,18 +76,18 @@ function derive_stability_matrix(s, r, quad_type)
         idx_int = 2:s
         A_00 = A[1, 1]
         A_0I = A[1, idx_int]
-        A_0s = A[1, s+1]
-        
+        A_0s = A[1, s + 1]
+
         A_II = A[idx_int, idx_int]
         A_I0 = A[idx_int, 1]
-        A_Is = A[idx_int, s+1]
-        
-        A_s0 = A[s+1, 1]
-        A_sI = A[s+1, idx_int]
-        A_ss = A[s+1, s+1]
+        A_Is = A[idx_int, s + 1]
+
+        A_s0 = A[s + 1, 1]
+        A_sI = A[s + 1, idx_int]
+        A_ss = A[s + 1, s + 1]
 
         invA_II = inv(A_II)
-        
+
         # p0 = -D1 Ld, ps = Ds+1 Ld
         # Effective coefficients after enforcing internal stationarity
         X = -(A_00 - (A_0I' * invA_II * A_I0))
@@ -127,21 +138,21 @@ using FastGaussQuadrature
 function compute_matrix_numeric(s, r, quad_type, hw)
     h = 1.0
     omega = hw
-    
+
     # Quadrature nodes and weights
     nodes, weights = quad_type == :Gauss ? gausslegendre(r) : gausslobatto(r)
     c = (nodes .+ 1) ./ 2
     b = weights ./ 2
-    d = collect(range(0, 1, length=s+1))
+    d = collect(range(0, 1, length = s+1))
 
     # Basis functions and derivatives
-    l_basis(j, t) = prod((t - d[m])/(d[j] - d[m]) for m in 1:s+1 if m != j)
+    l_basis(j, t) = prod((t - d[m])/(d[j] - d[m]) for m in 1:(s + 1) if m != j)
     function l_deriv(j, t)
         val = 0.0
-        for m in 1:s+1
+        for m in 1:(s + 1)
             if m != j
                 term = 1.0/(d[j]-d[m])
-                for k in 1:s+1
+                for k in 1:(s + 1)
                     if k != j && k != m
                         term *= (t-d[k])/(d[j]-d[k])
                     end
@@ -153,26 +164,28 @@ function compute_matrix_numeric(s, r, quad_type, hw)
     end
 
     # Build stiffness K and mass M
-    K = [sum(b[k] * l_deriv(i, c[k]) * l_deriv(j, c[k]) for k in 1:r) for i in 1:s+1, j in 1:s+1]
-    M = [sum(b[k] * l_basis(i, c[k]) * l_basis(j, c[k]) for k in 1:r) for i in 1:s+1, j in 1:s+1]
-    
+    K = [sum(b[k] * l_deriv(i, c[k]) * l_deriv(j, c[k]) for k in 1:r)
+         for i in 1:(s + 1), j in 1:(s + 1)]
+    M = [sum(b[k] * l_basis(i, c[k]) * l_basis(j, c[k]) for k in 1:r)
+         for i in 1:(s + 1), j in 1:(s + 1)]
+
     A = (1/h)*K - (h*omega^2)*M
 
     # Elimination (Schur complement)
     if s > 1
         idx_int = 2:s
         # Note: for some hw, A_II can be singular; add a tiny perturbation or use pinv
-        invA_II = inv(A[idx_int, idx_int] + I*1e-14) 
-        X = -(A[1,1] - A[1,idx_int]' * invA_II * A[idx_int, 1])
-        Y = -(A[1,s+1] - A[1,idx_int]' * invA_II * A[idx_int, s+1])
-        Z = (A[s+1,1] - A[s+1,idx_int]' * invA_II * A[idx_int, 1])
-        W = (A[s+1,s+1] - A[s+1,idx_int]' * invA_II * A[idx_int, s+1])
+        invA_II = inv(A[idx_int, idx_int] + I*1e-14)
+        X = -(A[1, 1] - A[1, idx_int]' * invA_II * A[idx_int, 1])
+        Y = -(A[1, s + 1] - A[1, idx_int]' * invA_II * A[idx_int, s + 1])
+        Z = (A[s + 1, 1] - A[s + 1, idx_int]' * invA_II * A[idx_int, 1])
+        W = (A[s + 1, s + 1] - A[s + 1, idx_int]' * invA_II * A[idx_int, s + 1])
     else
-        X, Y, Z, W = -A[1,1], -A[1,2], A[2,1], A[2,2]
+        X, Y, Z, W = -A[1, 1], -A[1, 2], A[2, 1], A[2, 2]
     end
 
     # Map [p, omega*q]
-    return [W/Y  (Z-W*X/Y)/omega; omega/Y  -X/Y]
+    return [W/Y (Z-W*X/Y)/omega; omega/Y -X/Y]
 end
 
 # --- 2. Data preparation ---
@@ -194,7 +207,7 @@ fig = Figure(resolution = (1000, 800), font = "DejaVu Sans")
 
 # Subplot 1: Fig 2 (P2N3Q4Lob)
 ax1 = Axis(fig[1, 1], title = "Fig 2: (P2N3Q4Lob)", xlabel = "hw", ylabel = "|λ|")
-hw1 = range(-5, 5, length=500)
+hw1 = range(-5, 5, length = 500)
 lmax1, lmin1 = get_stability_data(2, 3, :Lobatto, hw1)
 lines!(ax1, hw1, lmax1, color = :red, label = "|λ₁|")
 lines!(ax1, hw1, lmin1, color = :blue, label = "|λ₂|")
@@ -203,7 +216,7 @@ axislegend(ax1)
 
 # Subplot 2: Fig 3 (P3N4Q6Lob)
 ax2 = Axis(fig[1, 2], title = "Fig 3: (P3N4Q6Lob)", xlabel = "hw")
-hw2 = range(-8, 8, length=1000)
+hw2 = range(-8, 8, length = 1000)
 lmax2, lmin2 = get_stability_data(3, 4, :Lobatto, hw2)
 lines!(ax2, hw2, lmax2, color = :red)
 lines!(ax2, hw2, lmin2, color = :blue)
@@ -211,7 +224,7 @@ hlines!(ax2, [1.0], color = :black, linestyle = :dash)
 
 # Subplot 3: Fig 4 (P3N4Q6Lob) zoom on unstable bubble
 ax3 = Axis(fig[2, 1], title = "Fig 4: Zoom (P3N4Q6Lob)", xlabel = "hw", ylabel = "|λ|")
-hw3 = range(3.1, 3.18, length=500)
+hw3 = range(3.1, 3.18, length = 500)
 lmax3, lmin3 = get_stability_data(3, 4, :Lobatto, hw3)
 lines!(ax3, hw3, lmax3, color = :red)
 lines!(ax3, hw3, lmin3, color = :blue)
@@ -220,7 +233,7 @@ ylims!(ax3, 0.98, 1.02)
 
 # Subplot 4: Gauss comparison (P3N3Q6Gau) shows A-stability
 ax4 = Axis(fig[2, 2], title = "A-stable: (P3N3Q6Gau)", xlabel = "hw")
-hw4 = range(-8, 8, length=500)
+hw4 = range(-8, 8, length = 500)
 lmax4, lmin4 = get_stability_data(3, 3, :Gauss, hw4)
 lines!(ax4, hw4, lmax4, color = :red)
 lines!(ax4, hw4, lmin4, color = :blue)
@@ -235,7 +248,6 @@ colgap!(fig.layout, 30)
 # Save figure
 save("stability_reproduction.png", fig)
 display(fig)
-
 
 using LinearAlgebra
 using ForwardDiff
@@ -273,6 +285,7 @@ function compute_neural_stability(s, act, w, b, h, omega, quad_order)
     M_mat = zeros(s, s)
 
     for i in 1:s, j in 1:s
+
         for k in 1:quad_order
             # Quadrature sampling
             K_mat[i, j] += b_q[k] * dphi(i, c[k]) * dphi(j, c[k])
@@ -364,18 +377,18 @@ Considers sensitivity to all parameters (w, b, alpha)
 function compute_full_neural_stability(s, act, theta_0, h, omega, r)
     # theta_0 are parameters at the equilibrium point [w...; b...; alpha...]
     # s is the number of neurons; total parameters are typically 3s
-    
+
     # 1. Define neural-network trajectory q(t, theta)
     function nntraj(t_normalized, p)
-        w = zeros(eltype(p),s)
-        b = zeros(eltype(p),s)
-        α = zeros(eltype(p),s)
+        w = zeros(eltype(p), s)
+        b = zeros(eltype(p), s)
+        α = zeros(eltype(p), s)
         k = 1
-        D = 1 
+        D = 1
         for i in 1:s
-            α[i] = p[D*(i-1)+k]
-            w[i] = p[D*(s+1)+D*(i-1)+k]
-            b[i] = p[D*(s+1+s)+D*(i-1)+k]
+            α[i] = p[D * (i - 1) + k]
+            w[i] = p[D * (s + 1) + D * (i - 1) + k]
+            b[i] = p[D * (s + 1 + s) + D * (i - 1) + k]
         end
 
         # w = p[1:s]
@@ -389,7 +402,6 @@ function compute_full_neural_stability(s, act, theta_0, h, omega, r)
     quad_rule = QuadratureRules.GaussLegendreQuadrature(r)
     b_q, c = quad_rule.weights, quad_rule.nodes
 
-
     # 3. Compute sensitivity basis functions Psi(t) = dq/dtheta
     # Evaluate Psi and Psi_dot at quadrature points
     num_p = length(theta_0)
@@ -400,7 +412,7 @@ function compute_full_neural_stability(s, act, theta_0, h, omega, r)
         tau = c[k]
         # Use automatic differentiation to compute gradient w.r.t. p (Psi)
         psi = ForwardDiff.gradient(p -> nntraj(tau, p), theta_0)
-        
+
         # Compute Psi_dot (gradient of time-derivative w.r.t. p)
         # Use: d/dt (dq/dp) = d/dp (dq/dt)
         psi_dot = ForwardDiff.gradient(p -> ForwardDiff.derivative(t -> nntraj(t, p), tau), theta_0)
@@ -430,9 +442,10 @@ function compute_full_neural_stability(s, act, theta_0, h, omega, r)
         L00, L01 = H_q[1, 1], H_q[1, 2]
         L10, L11 = H_q[2, 1], H_q[2, 2]
 
-        J = [-L00/L01  -1/L01; L10-L11*L00/L01  -L11/L01]
-        
-        return (Jacobian = J, Eigenvalues = eigvals(J), Det = det(J), Eigenvalues_norm = abs.(eigvals(J)))
+        J = [-L00/L01 -1/L01; L10-L11*L00/L01 -L11/L01]
+
+        return (Jacobian = J, Eigenvalues = eigvals(J),
+            Det = det(J), Eigenvalues_norm = abs.(eigvals(J)))
     catch e
         return "Computation failed: $e"
     end
@@ -445,16 +458,19 @@ omega = sqrt(k/m)
 s = 4
 r = 4
 relu_k = 2
-act = x->max(0.0,x) ^ relu_k
+act = x->max(0.0, x) ^ relu_k
 # Initial parameters: ensure the NN can express meaningful physics under these values
 # For example, larger w implies higher frequency; alpha should not be all zeros
-initial_x= [0.025330291766675752, 0.025330300250204125, -0.05191035724744225, 1.41857361323206e-6, -0.02497906796879972, 1.0, -1.0, 1.0, 1.0, 3.1415926535897922, 3.1415926535897922, -4.440892098500626e-16, -0.514702832400884]
-final_x = [0.02533052411188818, 0.02533010942057078, -0.0519056811470894, 2.5769832077184494e-13, -0.024979171875433304, 0.999995335351156, -0.9999988884321463, 1.0000358570900132, 0.968858079436883, 3.1415912394269774, 3.141591481313382, 2.354529515720423e-5, -0.5659583990970317]
-
+initial_x = [0.025330291766675752, 0.025330300250204125, -0.05191035724744225,
+    1.41857361323206e-6, -0.02497906796879972, 1.0, -1.0, 1.0, 1.0,
+    3.1415926535897922, 3.1415926535897922, -4.440892098500626e-16, -0.514702832400884]
+final_x = [0.02533052411188818, 0.02533010942057078, -0.0519056811470894,
+    2.5769832077184494e-13, -0.024979171875433304, 0.999995335351156,
+    -0.9999988884321463, 1.0000358570900132, 0.968858079436883, 3.1415912394269774,
+    3.141591481313382, 2.354529515720423e-5, -0.5659583990970317]
 
 init_J = compute_full_neural_stability(s, act, initial_x, 0.1, omega, r)
 final_J = compute_full_neural_stability(s, act, final_x, 0.1, omega, r)
-
 
 function get_stability_data_full_neural(s, act, params, omega, r, hw_range)
     λ_max = Float64[]
@@ -472,17 +488,18 @@ end
 fig = Figure(size = (1000, 800), font = "DejaVu Sans")
 
 # Subplot 1: Fig 2 (P2N3Q4Lob)
-ax1 = Axis(fig[1, 1], title = "S$(s)R$(r)k$(relu_k), Initial X", xlabel = "h", ylabel = "|λ|",yscale=log10)
+ax1 = Axis(fig[1, 1], title = "S$(s)R$(r)k$(relu_k), Initial X",
+    xlabel = "h", ylabel = "|λ|", yscale = log10)
 
 y_min, y_max = 1 - 5e-13, 1 + 5e-13
 ylims!(ax1, y_min, y_max)
 ax1.ytickformat = values -> map(v -> v == 1.0 ? "1.0" : @sprintf("1 + %.0e", v - 1.0), values)
 
-h_range = range(-0.1, 3.0, length=500)
+h_range = range(-0.1, 3.0, length = 500)
 hw1 = h_range .* omega
 lmax1, lmin1 = get_stability_data_full_neural(s, act, initial_x, omega, r, hw1)
 lines!(ax1, h_range, lmax1, color = :red, label = "|λ₁|")
-lines!(ax1, h_range, lmin1, color = :blue, label = "|λ₂|",linestyle=:dash)
+lines!(ax1, h_range, lmin1, color = :blue, label = "|λ₂|", linestyle = :dash)
 hlines!(ax1, [1.0], color = :black, linestyle = :dash)
 axislegend(ax1)
 

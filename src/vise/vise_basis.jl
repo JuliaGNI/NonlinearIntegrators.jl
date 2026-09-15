@@ -25,9 +25,9 @@ returns a `RuntimeGeneratedFunction`. The previous form was
     dispatch. `RuntimeGeneratedFunction` is a concrete type, so the fields below are
     parametrised on it and the calls resolve statically.
 """
-struct VISEBasis{T,QE,DQ,VE,DV} <: Basis{T}
+struct VISEBasis{T, QE, DQ, VE, DV} <: Basis{T}
     q_expr::QE
-    W::Vector{Symbolics.Arr{Num,1}}
+    W::Vector{Symbolics.Arr{Num, 1}}
     dqdW::DQ
 
     v_expr::VE
@@ -36,8 +36,8 @@ struct VISEBasis{T,QE,DQ,VE,DV} <: Basis{T}
     problem_dim::Int
     W_sizes::Vector{Int}
 
-    function VISEBasis{T}(q_expr::Vector{Num}, W::Vector{Symbolics.Arr{Num,1}}, t::Num,
-                          D::Int) where {T}
+    function VISEBasis{T}(q_expr::Vector{Num}, W::Vector{Symbolics.Arr{Num, 1}}, t::Num,
+            D::Int) where {T}
         v_expr = [Symbolics.derivative(q_expr[i], t) for i in 1:D]
         W_sizes = map(length, W)
 
@@ -46,15 +46,17 @@ struct VISEBasis{T,QE,DQ,VE,DV} <: Basis{T}
         # previous `mat = []` / `push!` built a `Vector{Any}` whose elements were `Any` too.
         compile(expr, d) = Symbolics.build_function(expr, W[d], t; expression = Val(false))
 
-        dqdW_Mat = [[compile(Symbolics.derivative(q_expr[d], W[d][i]), d) for i in 1:W_sizes[d]]
+        dqdW_Mat = [[compile(Symbolics.derivative(q_expr[d], W[d][i]), d)
+                     for i in 1:W_sizes[d]]
                     for d in 1:D]
-        dvdW_Mat = [[compile(Symbolics.derivative(v_expr[d], W[d][i]), d) for i in 1:W_sizes[d]]
+        dvdW_Mat = [[compile(Symbolics.derivative(v_expr[d], W[d][i]), d)
+                     for i in 1:W_sizes[d]]
                     for d in 1:D]
 
         q_funcs = [compile(q_expr[d], d) for d in 1:D]
         v_funcs = [compile(v_expr[d], d) for d in 1:D]
 
-        new{T,typeof(q_funcs),typeof(dqdW_Mat),typeof(v_funcs),typeof(dvdW_Mat)}(
+        new{T, typeof(q_funcs), typeof(dqdW_Mat), typeof(v_funcs), typeof(dvdW_Mat)}(
             q_funcs, W, dqdW_Mat, v_funcs, dvdW_Mat, D, W_sizes)
     end
 end
