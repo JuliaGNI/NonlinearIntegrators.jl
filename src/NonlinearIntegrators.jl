@@ -33,7 +33,7 @@ import CompactBasisFunctions: nbasis
 using Random
 using Statistics
 using StaticArrays
-using SimpleSolvers: Newton, solve_with_status!
+using SimpleSolvers: Newton, solve_with_status!, isconverged, status, SolverState
 # `import`, not `using`: `GeometricOptimizers.Newton` is a *different type* from the `Newton` on the
 # line above — an `OptimizerMethod` of its own, against SimpleSolvers' `NonlinearSolverMethod` — and
 # it is exported. A blanket `using` would therefore put a second, unrelated `Newton` in scope beside

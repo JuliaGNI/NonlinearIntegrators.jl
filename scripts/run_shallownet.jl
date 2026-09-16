@@ -24,11 +24,11 @@ x_suctol = length(ARGS) >= 5 ? eval(Meta.parse(ARGS[5])) : T(2.0)
 f_abstol = f_abstol * eps(T)
 x_suctol = x_suctol * eps(T)
 
-int_timespan = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : T(100.0)
+int_timespan = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : T(10.0)
 solver_name = length(ARGS) >= 7 ? ARGS[7] : "backtracking"  # "backtracking", "static", "strongwolfe", or "dogleg"
 R = length(ARGS) >= 8 ? parse(Int, ARGS[8]) : 4
 S = length(ARGS) >= 9 ? parse(Int, ARGS[9]) : 4
-k_relu = length(ARGS) >= 10 ? parse(Int, ARGS[10]) : 3
+k_relu = length(ARGS) >= 10 ? parse(Int, ARGS[10]) : 2
 run_dp = "--double-pendulum" in ARGS
 
 outdir = joinpath(@__DIR__, "results", "shallownet")
@@ -65,7 +65,7 @@ try
     net = ShallowNetBasis{T}(relu, S)
     nlmethod = ShallowNet(net, QGau, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
-    HO_sol, HO_internal = integrate(HO_lode, nlmethod;
+    HO_sol, HO_internal,solver_status = integrate(HO_lode, nlmethod;
         regularization_factor=reg_factor, max_iterations=max_iterations,
         f_abstol=f_abstol, x_suctol=x_suctol, solver_kwargs...)
     qend = HO_sol.q[end]
@@ -81,9 +81,10 @@ try
 
         fname = "NVI_HO_h$(int_step)S$(S)R$(R)reluk=$(k_relu)reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
         plot_1d!(outdir, fname, ts_HO, collect(HO_sol.q[:, 1]), collect(HO_sol.p[:, 1]), hams_err,
-            "HO ReLU k=$(k_relu) S$(S)R$(R) h=$(int_step) $(dtype_str)")
+            "HO ReLU k=$(k_relu) S$(S)R$(R) h=$(int_step) $(dtype_str)";
+            solver_status=solver_status)
         save_1d_jld2(outdir, fname, collect(HO_sol.q[:, 1]), collect(HO_sol.p[:, 1]),
-            HO_internal, HO_qerror, hams_err; prefix="HO")
+            HO_internal, HO_qerror, hams_err, solver_status; prefix="HO")
     end
 catch e
     println("Error HO ReLU h=$(int_step) S=$(S) R=$(R) k=$(k_relu): ", e)
@@ -94,7 +95,7 @@ try
     net = ShallowNetBasis{T}(tanh, S)
     nlmethod = ShallowNet(net, QGau, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
-    HO_sol, HO_internal = integrate(HO_lode, nlmethod;
+    HO_sol, HO_internal, solver_status = integrate(HO_lode, nlmethod;
         regularization_factor=reg_factor, max_iterations=max_iterations,
         f_abstol=f_abstol, x_suctol=x_suctol, solver_kwargs...)
     qend = HO_sol.q[end]
@@ -110,9 +111,10 @@ try
 
         fname = "NVI_HO_h$(int_step)S$(S)R$(R)tanh_reg=$(reg_factor)fabs=$(f_abstol)xsuc=$(x_suctol)_$(solver_name)_$(dtype_str)"
         plot_1d!(outdir, fname, ts_HO, collect(HO_sol.q[:, 1]), collect(HO_sol.p[:, 1]), hams_err,
-            "HO tanh S$(S)R$(R) h=$(int_step) $(dtype_str)")
+            "HO tanh S$(S)R$(R) h=$(int_step) $(dtype_str)";
+            solver_status=solver_status)
         save_1d_jld2(outdir, fname, collect(HO_sol.q[:, 1]), collect(HO_sol.p[:, 1]),
-            HO_internal, HO_qerror, hams_err; prefix="HO")
+            HO_internal, HO_qerror, hams_err, solver_status; prefix="HO")
     end
 catch e
     println("Error HO tanh h=$(int_step) S=$(S) R=$(R): ", e)
@@ -138,7 +140,7 @@ if run_dp
         net = ShallowNetBasis{T}(relu, S)
         nlmethod = ShallowNet(net, QGau, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
-        DP_sol, DP_internal = integrate(DP_lode, nlmethod;
+        DP_sol, DP_internal, DP_solver_status = integrate(DP_lode, nlmethod;
             regularization_factor=reg_factor, max_iterations=max_iterations,
             f_abstol=f_abstol, x_suctol=x_suctol, solver_kwargs...)
         qend = DP_sol.q[end]
@@ -156,11 +158,12 @@ if run_dp
             plot_2d!(outdir, fname, ts_DP,
                 collect(DP_sol.q[:, 1]), collect(DP_sol.q[:, 2]),
                 collect(DP_sol.p[:, 1]), collect(DP_sol.p[:, 2]),
-                DP_hams_err, "DP ReLU k=$(k_relu) S$(S)R$(R) h=$(int_step) $(dtype_str)")
+                DP_hams_err, "DP ReLU k=$(k_relu) S$(S)R$(R) h=$(int_step) $(dtype_str)";
+                solver_status=DP_solver_status)
             save_2d_jld2(outdir, fname,
                 collect(DP_sol.q[:, 1]), collect(DP_sol.q[:, 2]),
                 collect(DP_sol.p[:, 1]), collect(DP_sol.p[:, 2]),
-                DP_internal, DP_qerror, DP_hams_err; prefix="DP")
+                DP_internal, DP_qerror, DP_hams_err, DP_solver_status; prefix="DP")
         end
     catch e
         println("Error DP ReLU h=$(int_step) S=$(S) R=$(R) k=$(k_relu): ", e)
@@ -171,7 +174,7 @@ if run_dp
         net = ShallowNetBasis{T}(tanh, S)
         nlmethod = ShallowNet(net, QGau, show_status=false, bias_interval=[T(-pi), T(pi)], dict_amount=dict_amount)
 
-        DP_sol, DP_internal = integrate(DP_lode, nlmethod;
+        DP_sol, DP_internal, DP_solver_status = integrate(DP_lode, nlmethod;
             regularization_factor=reg_factor, max_iterations=max_iterations,
             f_abstol=f_abstol, x_suctol=x_suctol, solver_kwargs...)
         qend = DP_sol.q[end]
@@ -189,11 +192,12 @@ if run_dp
             plot_2d!(outdir, fname, ts_DP,
                 collect(DP_sol.q[:, 1]), collect(DP_sol.q[:, 2]),
                 collect(DP_sol.p[:, 1]), collect(DP_sol.p[:, 2]),
-                DP_hams_err, "DP tanh S$(S)R$(R) h=$(int_step) $(dtype_str)")
+                DP_hams_err, "DP tanh S$(S)R$(R) h=$(int_step) $(dtype_str)";
+                solver_status=DP_solver_status)
             save_2d_jld2(outdir, fname,
                 collect(DP_sol.q[:, 1]), collect(DP_sol.q[:, 2]),
                 collect(DP_sol.p[:, 1]), collect(DP_sol.p[:, 2]),
-                DP_internal, DP_qerror, DP_hams_err; prefix="DP")
+                DP_internal, DP_qerror, DP_hams_err, DP_solver_status; prefix="DP")
         end
     catch e
         println("Error DP tanh h=$(int_step) S=$(S) R=$(R): ", e)

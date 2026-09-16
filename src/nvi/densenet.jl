@@ -88,6 +88,7 @@ struct DenseNetCache{ST} <: NetworkIntegratorCache{ST}
 
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
+    solver_converged::Vector{Bool}
 
     function DenseNetCache{ST}(ics, S₁::Int, S::Int, NP::Int, R::Int, N::Int;
             record_grid_points::Int = 41) where {ST}
@@ -125,10 +126,11 @@ struct DenseNetCache{ST} <: NetworkIntegratorCache{ST}
 
         stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N+1, D)
+        solver_converged = [true]
 
         return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, q0, X, Q, P, V, F, ps,
             g0_params, g1_params, dqdθc, dvdθc,
-            stage_values, network_labels)
+            stage_values, network_labels,solver_converged)
     end
 end
 

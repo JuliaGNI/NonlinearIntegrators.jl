@@ -118,7 +118,7 @@ makedocs(
             "vise/vise.md",
         "Neural Variational Integrators" => [
             "ShallowNet"                 => "nvi/shallownet.md",
-            # "ShallowNet (Reversible)"    => "nvi/shallownet_reversible.md",
+            "ShallowNet (Reversible)"    => "nvi/shallownet_reversible.md",
             # "ShallowNet (Autodiff)"      => "nvi/shallownet_autodiff.md",
             # "ShallowNet (Autodiff+Rev.)" => "nvi/shallownet_autodiff_reversible.md",
             # "DenseNet"                   => "nvi/densenet.md",

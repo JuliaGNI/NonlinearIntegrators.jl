@@ -49,6 +49,6 @@ HC_int_072/
 parallel_result_figures/
 time_reversible/
 result_figures/
-
+scripts/results/shallownet/
 # pdf for docs
 docs/src/nvi/figures/*.pdf

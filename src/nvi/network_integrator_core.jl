@@ -188,7 +188,7 @@ struct SymbolicShallowNetCache{ST} <: NetworkIntegratorCache{ST}
 
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
-
+    solver_converged::Vector{Bool}
     function SymbolicShallowNetCache{ST}(ics, nx::Int, S::Int, R::Int, N::Int;
             record_grid_points::Int = 41) where {ST}
         D = length(vec(ics.q))
@@ -231,10 +231,10 @@ struct SymbolicShallowNetCache{ST} <: NetworkIntegratorCache{ST}
 
         stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N + 1, D)
-
+        solver_converged = [true]
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, X, Q, P, V, F, ps, tbuf, r₀, r₁, m, a,
             dqdWc, dqdbc, dvdWc, dvdbc, dqdWr₁, dqdWr₀, dqdbr₁, dqdbr₀,
-            stage_values, network_labels)
+            stage_values, network_labels, solver_converged)
     end
 end
 
@@ -286,7 +286,7 @@ struct AutodiffShallowNetCache{ST} <: NetworkIntegratorCache{ST}
 
     stage_values::Matrix{ST}
     network_labels::Matrix{ST}
-
+    solver_converged::Vector{Bool}
     function AutodiffShallowNetCache{ST}(ics, nx::Int, S::Int, R::Int, N::Int;
             record_grid_points::Int = 41) where {ST}
         D = length(vec(ics.q))
@@ -322,10 +322,10 @@ struct AutodiffShallowNetCache{ST} <: NetworkIntegratorCache{ST}
 
         stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N + 1, D)
-
+        solver_converged = [true]
         new(x, q̄, p̄, q̃, p̃, ṽ, f̃, Q, P, V, F, ps, ps_vec, g_buf, gv_buf,
             dqdW2c, dvdW2c, dqdW1c, dvdW1c, dqdbc, dvdbc,
-            stage_values, network_labels)
+            stage_values, network_labels, solver_converged)
     end
 end
 
@@ -474,6 +474,13 @@ function GeometricIntegratorsBase.integrate_step!(
         int::GeometricIntegrator{<:NetworkIntegratorMethod, <:AbstractProblemIODE})
     solverstatus = solve_with_status!(nlsolution(int), solver(int), solverstate(int), (
         sol, params, int))
+    @show solverstatus
+    @show isconverged(solverstatus)
+
+    if hasfield(typeof(cache(int)), :solver_converged) 
+        cache(int).solver_converged[1] = isconverged(solverstatus)
+    end
+    
     check_solver_status(solverstatus, int)
     record_finer_solution!(sol, int)
     GeometricIntegratorsBase.update!(sol, params, nlsolution(int), int)
@@ -489,7 +496,7 @@ function GeometricIntegratorsBase.integrate!(
 
     solstep = solutionstep(int, sol[n₁ - 1])
     internal_values = Vector{typeof(cache(int).stage_values)}(undef, n₂ - n₁ + 1)
-
+    solver_status_vector = Vector{Bool}(undef,n₂ - n₁ + 1)
     for n in n₁:n₂
         @debug "integrate! step" n
         reset!(solstep, timesteps(sol)[n])
@@ -505,6 +512,10 @@ function GeometricIntegratorsBase.integrate!(
             # break
         end
 
+        if hasfield(typeof(cache(int)), :solver_converged)
+            solver_status_vector[n - n₁ + 1] = cache(int).solver_converged[1] 
+        end
+        
         # `hasfield(typeof(...))`, not `hasproperty(...)`: this is a compile-time constant, so
         # the branch folds away instead of being re-tested every step.
         if hasfield(typeof(cache(int)), :stage_values)
@@ -513,7 +524,9 @@ function GeometricIntegratorsBase.integrate!(
             # `copy`, not `deepcopy`: `stage_values` is a plain `Matrix{ST}` of floats.
             internal_values[n - n₁ + 1] = copy(cache(int).stage_values)
         end
+
+        cache(int).solver_converged[1] = true
     end
 
-    return sol, internal_values
+    return sol, internal_values, solver_status_vector
 end
