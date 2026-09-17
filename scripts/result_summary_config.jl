@@ -131,44 +131,32 @@ tanh_stats(data, hi, Si)     = _valid_stats(get(data, (hi, Si),     Float64[]))
 # ── Figure: ReLU error trend ──────────────────────────────────────────────────
 
 """
-Generate and save an error-trend figure for the ReLU sweep (mean ± [min, max] bands vs h).
+Generate and save an error-trend figure for the ReLU sweep (minimum error vs h).
 One line per (S, k) pair present in `relu_data`.
 """
 function save_relu_error_trend(figdir, figname, relu_data, title)
-    fig = Figure(size=sum_size_trend)
+    fig = Figure(size=(1100, 600))
     Label(fig[0, 1], title, fontsize=sum_title_size, tellwidth=false)
-    ax_mean = Axis(fig[1, 1],
-        xlabel="Time Step h", ylabel="Mean Maximum Hamiltonian Error",
-        xscale=log10, yscale=log10,
-        xlabelsize=sum_label_size, ylabelsize=sum_label_size,
-        xticklabelsize=sum_tick_size, yticklabelsize=sum_tick_size)
-    ax_min = Axis(fig[2, 1],
+    ax = Axis(fig[1, 1],
         xlabel="Time Step h", ylabel="Minimum Maximum Hamiltonian Error",
         xscale=log10, yscale=log10,
         xlabelsize=sum_label_size, ylabelsize=sum_label_size,
         xticklabelsize=sum_tick_size, yticklabelsize=sum_tick_size)
 
-    palette  = cgrad(:tab10, length(S_list_sum) * length(k_list_sum), categorical=true)
-    idx      = 1
-    any_mean = false
-    any_min  = false
+    palette = cgrad(:tab10, length(S_list_sum) * length(k_list_sum), categorical=true)
+    idx     = 1
+    any_data = false
     for (Si, S) in enumerate(S_list_sum), (ki, k) in enumerate(k_list_sum)
         stats = [relu_stats(relu_data, hi, Si, ki) for hi in eachindex(h_list)]
-        means = [s[1] for s in stats]
-        maxs  = [s[2] for s in stats]
         mins  = [s[3] for s in stats]
-        valid = isfinite.(means)
+        valid = isfinite.(mins)
         any(valid) || (idx += 1; continue)
-        c = palette[idx]
-        scatterlines!(ax_mean, h_list[valid], means[valid], label="S$(S) k$(k)", color=c, markersize=6, linewidth=2)
-        errorbars!(ax_mean, h_list[valid], means[valid], means[valid] .- mins[valid], maxs[valid] .- means[valid], color=c, linewidth=2, whiskerwidth=10)
-        scatterlines!(ax_min,  h_list[valid], mins[valid], label="S$(S) k$(k)", color=c, markersize=6, linewidth=2)
-        any_mean = true
-        any_min  = true
+        scatterlines!(ax, h_list[valid], mins[valid], label="S$(S) k$(k)",
+            color=palette[idx], markersize=6, linewidth=2)
+        any_data = true
         idx += 1
     end
-    any_mean && axislegend(ax_mean, position=:rb, labelsize=18)
-    any_min  && axislegend(ax_min,  position=:rb, labelsize=18)
+    any_data && axislegend(ax, position=:rb, labelsize=sum_tick_size)
 
     for ext in ("pdf", "png")
         save(joinpath(figdir, "$(figname).$(ext)"), fig)
@@ -178,42 +166,30 @@ end
 # ── Figure: tanh error trend ──────────────────────────────────────────────────
 
 """
-Generate and save an error-trend figure for the tanh sweep (mean ± [min, max] bands vs h).
+Generate and save an error-trend figure for the tanh sweep (minimum error vs h).
 One line per S value present in `tanh_data`.
 """
 function save_tanh_error_trend(figdir, figname, tanh_data, title)
-    fig = Figure(size=sum_size_trend)
+    fig = Figure(size=(1100, 600))
     Label(fig[0, 1], title, fontsize=sum_title_size, tellwidth=false)
-    ax_mean = Axis(fig[1, 1],
-        xlabel="Time Step h", ylabel="Mean Maximum Hamiltonian Error",
-        xscale=log10, yscale=log10,
-        xlabelsize=sum_label_size, ylabelsize=sum_label_size,
-        xticklabelsize=sum_tick_size, yticklabelsize=sum_tick_size)
-    ax_min = Axis(fig[2, 1],
+    ax = Axis(fig[1, 1],
         xlabel="Time Step h", ylabel="Minimum Maximum Hamiltonian Error",
         xscale=log10, yscale=log10,
         xlabelsize=sum_label_size, ylabelsize=sum_label_size,
         xticklabelsize=sum_tick_size, yticklabelsize=sum_tick_size)
 
     palette  = cgrad(:tab10, length(S_list_sum), categorical=true)
-    any_mean = false
-    any_min  = false
+    any_data = false
     for (Si, S) in enumerate(S_list_sum)
         stats = [tanh_stats(tanh_data, hi, Si) for hi in eachindex(h_list)]
-        means = [s[1] for s in stats]
-        maxs  = [s[2] for s in stats]
         mins  = [s[3] for s in stats]
-        valid = isfinite.(means)
+        valid = isfinite.(mins)
         any(valid) || continue
-        c = palette[Si]
-        scatterlines!(ax_mean, h_list[valid], means[valid], label="S$(S)", color=c, markersize=6, linewidth=2)
-        errorbars!(ax_mean, h_list[valid], means[valid], means[valid] .- mins[valid], maxs[valid] .- means[valid], color=c, linewidth=2, whiskerwidth=10)
-        scatterlines!(ax_min,  h_list[valid], mins[valid], label="S$(S)", color=c, markersize=6, linewidth=2)
-        any_mean = true
-        any_min  = true
+        scatterlines!(ax, h_list[valid], mins[valid], label="S$(S)",
+            color=palette[Si], markersize=6, linewidth=2)
+        any_data = true
     end
-    any_mean && axislegend(ax_mean, position=:rb, labelsize=18)
-    any_min  && axislegend(ax_min,  position=:rb, labelsize=18)
+    any_data && axislegend(ax, position=:rb, labelsize=sum_tick_size)
 
     for ext in ("pdf", "png")
         save(joinpath(figdir, "$(figname).$(ext)"), fig)
