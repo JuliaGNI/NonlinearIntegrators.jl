@@ -474,8 +474,6 @@ function GeometricIntegratorsBase.integrate_step!(
         int::GeometricIntegrator{<:NetworkIntegratorMethod, <:AbstractProblemIODE})
     solverstatus = solve_with_status!(nlsolution(int), solver(int), solverstate(int), (
         sol, params, int))
-    @show solverstatus
-    @show isconverged(solverstatus)
 
     if hasfield(typeof(cache(int)), :solver_converged) 
         cache(int).solver_converged[1] = isconverged(solverstatus)
