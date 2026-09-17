@@ -12,8 +12,8 @@ const k_list_sum = [2, 3, 4]
 run_dp = false
 
 # Figure style (kept in sync with run_config.jl)
-const sum_label_size = 22
-const sum_tick_size  = 18
+const sum_label_size = 26
+const sum_tick_size  = 20
 const sum_title_size = 22
 const sum_size_1d    = (800, 900)
 const sum_size_trend = (1100, 1200)
@@ -484,7 +484,7 @@ function load_relu_tensor_ex(resultsdir, method_prefix, problem_prefix, jld2_key
                 fewest_pct_by_key[key]    = cur_pct
                 fewest_maxerr_by_key[key] = val
                 fewest_by_key[key] = (hams_err=hams_err, solver_status=solver_status,
-                                      config_str=config_str, pct=cur_pct)
+                                      config_str=config_str, pct=cur_pct, max_err=val)
                 fewest_data[key]   = [val]
             end
         catch e
@@ -546,7 +546,7 @@ function load_tanh_tensor_ex(resultsdir, method_prefix, problem_prefix, jld2_key
                 fewest_pct_by_key[key]    = cur_pct
                 fewest_maxerr_by_key[key] = val
                 fewest_by_key[key] = (hams_err=hams_err, solver_status=solver_status,
-                                      config_str=config_str, pct=cur_pct)
+                                      config_str=config_str, pct=cur_pct, max_err=val)
                 fewest_data[key]   = [val]
             end
         catch e
@@ -710,18 +710,27 @@ function print_relu_table_ex(relu_data, header, io=stdout;
                     if fewest_fig !== nothing
                         pct_str = (fewest_cfg !== nothing && isfinite(fewest_cfg.pct)) ?
                             @sprintf("%.1f%%", fewest_cfg.pct * 100) : "n/a"
+                        fewest_err_str = (fewest_cfg !== nothing && isfinite(fewest_cfg.max_err)) ?
+                            @sprintf("%.3e", fewest_cfg.max_err) : "n/a"
+                        best_pct = (best_cfg !== nothing && !isempty(best_cfg.solver_status)) ?
+                            count(!, best_cfg.solver_status) / length(best_cfg.solver_status) : NaN
+                        best_pct_str = isfinite(best_pct) ? @sprintf("%.1f%%", best_pct * 100) : "n/a"
                         print(io, "<table style=\"width:100%\"><tr>")
                         print(io, "<td style=\"text-align:center;vertical-align:top;width:50%\">")
-                        print(io, "<strong>Best error: $(val_str)</strong><br/>")
+                        print(io, "<strong>Min-Max Error: $(val_str)</strong><br/>")
                         if best_fig !== nothing
                             print(io, "<img src=\"$(figdir_rel)/$(best_fig)\" style=\"width:100%;min-width:130px\"/><br/>")
                         end
-                        if best_cfg !== nothing; print(io, "<small>$(best_cfg.config_str)</small>"); end
+                        if best_cfg !== nothing
+                            print(io, "<small>$(best_cfg.config_str)<br/>Unconverged: $(best_pct_str)</small>")
+                        end
                         print(io, "</td>")
                         print(io, "<td style=\"text-align:center;vertical-align:top;width:50%\">")
-                        print(io, "<strong>Fewest unconverged: $(pct_str)</strong><br/>")
+                        print(io, "<strong>Fewest unconverged: $(pct_str), Error: $(fewest_err_str)</strong><br/>")
                         print(io, "<img src=\"$(figdir_rel)/$(fewest_fig)\" style=\"width:100%;min-width:130px\"/><br/>")
-                        if fewest_cfg !== nothing; print(io, "<small>$(fewest_cfg.config_str)</small>"); end
+                        if fewest_cfg !== nothing
+                            print(io, "<small>$(fewest_cfg.config_str)<br/>Unconverged: $(pct_str)</small>")
+                        end
                         print(io, "</td>")
                         print(io, "</tr></table>")
                     elseif best_fig !== nothing
@@ -774,18 +783,27 @@ function print_tanh_table_ex(tanh_data, header, io=stdout;
                 if fewest_fig !== nothing
                     pct_str = (fewest_cfg !== nothing && isfinite(fewest_cfg.pct)) ?
                         @sprintf("%.1f%%", fewest_cfg.pct * 100) : "n/a"
+                    fewest_err_str = (fewest_cfg !== nothing && isfinite(fewest_cfg.max_err)) ?
+                        @sprintf("%.3e", fewest_cfg.max_err) : "n/a"
+                    best_pct = (best_cfg !== nothing && !isempty(best_cfg.solver_status)) ?
+                        count(!, best_cfg.solver_status) / length(best_cfg.solver_status) : NaN
+                    best_pct_str = isfinite(best_pct) ? @sprintf("%.1f%%", best_pct * 100) : "n/a"
                     print(io, "<table style=\"width:100%\"><tr>")
                     print(io, "<td style=\"text-align:center;vertical-align:top;width:50%\">")
-                    print(io, "<strong>Best error: $(val_str)</strong><br/>")
+                    print(io, "<strong>Min-Max Error: $(val_str)</strong><br/>")
                     if best_fig !== nothing
                         print(io, "<img src=\"$(figdir_rel)/$(best_fig)\" style=\"width:100%;min-width:130px\"/><br/>")
                     end
-                    if best_cfg !== nothing; print(io, "<small>$(best_cfg.config_str)</small>"); end
+                    if best_cfg !== nothing
+                        print(io, "<small>$(best_cfg.config_str)<br/>Unconverged: $(best_pct_str)</small>")
+                    end
                     print(io, "</td>")
                     print(io, "<td style=\"text-align:center;vertical-align:top;width:50%\">")
-                    print(io, "<strong>Fewest unconverged: $(pct_str)</strong><br/>")
+                    print(io, "<strong>Fewest unconverged: $(pct_str), Error: $(fewest_err_str)</strong><br/>")
                     print(io, "<img src=\"$(figdir_rel)/$(fewest_fig)\" style=\"width:100%;min-width:130px\"/><br/>")
-                    if fewest_cfg !== nothing; print(io, "<small>$(fewest_cfg.config_str)</small>"); end
+                    if fewest_cfg !== nothing
+                        print(io, "<small>$(fewest_cfg.config_str)<br/>Unconverged: $(pct_str)</small>")
+                    end
                     print(io, "</td>")
                     print(io, "</tr></table>")
                 elseif best_fig !== nothing

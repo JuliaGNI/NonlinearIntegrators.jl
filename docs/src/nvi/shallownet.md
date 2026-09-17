@@ -27,12 +27,12 @@ H_LIST="0.05 0.1 0.2 0.5 1.0" #
 REG_LIST="0.0 1e-3 1e-5 1e-7" # 
 FABS_LIST="0.0" # 0.0 2.0 8.0
 XSUC_LIST="2.0" # 0.0 2.0 8.0
-SOLVER_LIST="backtracking" # static strongwolfe dogleg
+SOLVER_LIST="backtracking dogleg" # static strongwolfe dogleg
 DTYPE_LIST="Float64" #Float16 Float32
 INT_TIMESPAN="100.0"
 R_LIST="4 8 16"   # quadrature points
 S_LIST="4 6 8"    # hidden neurons
-K_LIST="3 4"    # ReLU exponent
+K_LIST="2 3 4"    # ReLU exponent
 ```
 
 After all jobs complete, generate the summary figures and error tables:
@@ -50,6 +50,8 @@ Results are written to `docs/src/nvi/figures/`.
 ### ReLU Activation
 
 ![Maximum Hamiltonian error vs timestep h (ReLU)](figures/shallownet_HO_relu_error_trend.png)
+
+![Min-Max Hamiltonian error from fewest unconverged runs (ReLU)](figures/shallownet_HO_relu_fewest_error_trend.png)
 
 <!-- HO_RELU_TABLE_START -->
 
@@ -112,6 +114,8 @@ Results are written to `docs/src/nvi/figures/`.
 
 ![Maximum Hamiltonian error vs timestep h (tanh)](figures/shallownet_HO_tanh_error_trend.png)
 
+![Min-Max Hamiltonian error from fewest unconverged runs (tanh)](figures/shallownet_HO_tanh_fewest_error_trend.png)
+
 <!-- HO_TANH_TABLE_START -->
 
 ## ShallowNet HO — tanh
@@ -163,6 +167,8 @@ For the Harmonic Oscillator problem, the Hamiltonian error does not always exhib
 
 ![Maximum Hamiltonian error vs timestep h (ReLU)](figures/shallownet_DP_relu_error_trend.png)
 
+![Min-Max Hamiltonian error from fewest unconverged runs (ReLU)](figures/shallownet_DP_relu_fewest_error_trend.png)
+
 <!-- DP_RELU_TABLE_START -->
 <!-- DP_RELU_TABLE_END -->
 
@@ -170,6 +176,8 @@ For the Harmonic Oscillator problem, the Hamiltonian error does not always exhib
 ### tanh Activation
 
 ![Maximum Hamiltonian error vs timestep h (tanh)](figures/shallownet_DP_tanh_error_trend.png)
+
+![Min-Max Hamiltonian error from fewest unconverged runs (tanh)](figures/shallownet_DP_tanh_fewest_error_trend.png)
 
 <!-- DP_TANH_TABLE_START -->
 <!-- DP_TANH_TABLE_END -->

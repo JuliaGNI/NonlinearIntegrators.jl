@@ -26,6 +26,8 @@ julia --project=scripts scripts/result_summary_shallownet_reversible.jl
 
 ![Maximum Hamiltonian error vs timestep h (ReLU)](figures/shallownet_reversible_HO_relu_error_trend.png)
 
+![Min-Max Hamiltonian error from fewest unconverged runs (ReLU)](figures/shallownet_reversible_HO_relu_fewest_error_trend.png)
+
 <!-- HO_RELU_TABLE_START -->
 
 ## ShallowNetReversible HO — ReLU
@@ -87,6 +89,8 @@ julia --project=scripts scripts/result_summary_shallownet_reversible.jl
 
 ![Maximum Hamiltonian error vs timestep h (tanh)](figures/shallownet_reversible_HO_tanh_error_trend.png)
 
+![Min-Max Hamiltonian error from fewest unconverged runs (tanh)](figures/shallownet_reversible_HO_tanh_fewest_error_trend.png)
+
 <!-- HO_TANH_TABLE_START -->
 
 ## ShallowNetReversible HO — tanh
@@ -134,6 +138,8 @@ julia --project=scripts scripts/result_summary_shallownet_reversible.jl
 ### ReLU Activation
 
 ![Maximum Hamiltonian error vs timestep h (ReLU)](figures/shallownet_reversible_DP_relu_error_trend.png)
+
+![Min-Max Hamiltonian error from fewest unconverged runs (ReLU)](figures/shallownet_reversible_DP_relu_fewest_error_trend.png)
 
 <!-- DP_RELU_TABLE_START -->
 
@@ -195,6 +201,8 @@ julia --project=scripts scripts/result_summary_shallownet_reversible.jl
 ### tanh Activation
 
 ![Maximum Hamiltonian error vs timestep h (tanh)](figures/shallownet_reversible_DP_tanh_error_trend.png)
+
+![Min-Max Hamiltonian error from fewest unconverged runs (tanh)](figures/shallownet_reversible_DP_tanh_fewest_error_trend.png)
 
 <!-- DP_TANH_TABLE_START -->
 

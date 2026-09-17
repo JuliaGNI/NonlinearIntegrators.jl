@@ -26,12 +26,16 @@ julia --project=scripts scripts/result_summary_shallownet_autodiff.jl
 
 ![Maximum Hamiltonian error vs timestep h (ReLU)](figures/shallownet_autodiff_HO_relu_error_trend.png)
 
+![Min-Max Hamiltonian error from fewest unconverged runs (ReLU)](figures/shallownet_autodiff_HO_relu_fewest_error_trend.png)
+
 <!-- HO_RELU_TABLE_START -->
 <!-- HO_RELU_TABLE_END -->
 
 ### tanh Activation
 
 ![Maximum Hamiltonian error vs timestep h (tanh)](figures/shallownet_autodiff_HO_tanh_error_trend.png)
+
+![Min-Max Hamiltonian error from fewest unconverged runs (tanh)](figures/shallownet_autodiff_HO_tanh_fewest_error_trend.png)
 
 <!-- HO_TANH_TABLE_START -->
 <!-- HO_TANH_TABLE_END -->
@@ -42,12 +46,16 @@ julia --project=scripts scripts/result_summary_shallownet_autodiff.jl
 
 ![Maximum Hamiltonian error vs timestep h (ReLU)](figures/shallownet_autodiff_DP_relu_error_trend.png)
 
+![Min-Max Hamiltonian error from fewest unconverged runs (ReLU)](figures/shallownet_autodiff_DP_relu_fewest_error_trend.png)
+
 <!-- DP_RELU_TABLE_START -->
 <!-- DP_RELU_TABLE_END -->
 
 ### tanh Activation
 
 ![Maximum Hamiltonian error vs timestep h (tanh)](figures/shallownet_autodiff_DP_tanh_error_trend.png)
+
+![Min-Max Hamiltonian error from fewest unconverged runs (tanh)](figures/shallownet_autodiff_DP_tanh_fewest_error_trend.png)
 
 <!-- DP_TANH_TABLE_START -->
 <!-- DP_TANH_TABLE_END -->
