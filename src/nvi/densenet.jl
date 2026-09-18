@@ -66,7 +66,7 @@ struct DenseNetCache{ST} <: NetworkIntegratorCache{ST}
 
     q̃::Vector{ST}
     p̃::Vector{ST}
-    ṽ::Vector{ST}
+    ṽ::Vector{ST}
     f̃::Vector{ST}
     q0::Vector{ST}
 
@@ -100,7 +100,7 @@ struct DenseNetCache{ST} <: NetworkIntegratorCache{ST}
         # create temporary vectors
         q̃ = zeros(ST, D)
         p̃ = zeros(ST, D)
-        ṽ = zeros(ST, D)
+        ṽ = zeros(ST, D)
         f̃ = zeros(ST, D)
 
         q0 = zeros(ST, D)
@@ -126,7 +126,7 @@ struct DenseNetCache{ST} <: NetworkIntegratorCache{ST}
         stage_values = zeros(ST, record_grid_points, D)
         network_labels = zeros(ST, N+1, D)
 
-        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, q0, X, Q, P, V, F, ps,
+        return new(x, q̄, p̄, q̃, p̃, ṽ, f̃, q0, X, Q, P, V, F, ps,
             g0_params, g1_params, dqdθc, dvdθc,
             stage_values, network_labels)
     end
@@ -200,8 +200,8 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:De
             t = sol.t + (network_inputs[i]-1) * timestep(int),
             q = cache(int).q̃,
             p = cache(int).p̃,
-            q̇ = cache(int).ṽ,
-            ṗ = cache(int).f̃
+            q̇ = cache(int).ṽ,
+            ṗ = cache(int).f̃
         )
         solutionstep!(soltmp, history, problem(int), iguess(int))
         for k in 1:D
@@ -212,8 +212,8 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:De
         t = sol.t,
         q = cache(int).q̃,
         p = cache(int).p̃,
-        q̇ = cache(int).ṽ,
-        ṗ = cache(int).f̃
+        q̇ = cache(int).ṽ,
+        ṗ = cache(int).f̃
     )
     solutionstep!(soltmp, history, problem(int), iguess(int))
 

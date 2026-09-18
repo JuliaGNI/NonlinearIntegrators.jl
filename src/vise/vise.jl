@@ -94,7 +94,7 @@ struct VISECache{ST, R} <: IODEIntegratorCache{ST}
 
     q̃::Vector{ST}
     p̃::Vector{ST}
-    ṽ::Vector{ST}
+    ṽ::Vector{ST}
     f̃::Vector{ST}
 
     # X::Vector{Vector{ST}}
@@ -128,7 +128,7 @@ struct VISECache{ST, R} <: IODEIntegratorCache{ST}
         # create temporary vectors
         q̃ = zeros(ST, D)
         p̃ = zeros(ST, D)
-        ṽ = zeros(ST, D)
+        ṽ = zeros(ST, D)
         f̃ = zeros(ST, D)
 
         # create internal stage vectors
@@ -159,7 +159,7 @@ struct VISECache{ST, R} <: IODEIntegratorCache{ST}
 
         stage_values = zeros(ST, record_grid_points, D)
 
-        new{ST, R}(x, int_x, q̄, p̄, q̃, p̃, ṽ, f̃, Q, P, V, F, dqdWc, dvdWc,
+        new{ST, R}(x, int_x, q̄, p̄, q̃, p̃, ṽ, f̃, Q, P, V, F, dqdWc, dvdWc,
             dqdWr₁, dqdWr₀, dvdWr₁, dvdWr₀, tem_W, stage_values)
     end
 end
