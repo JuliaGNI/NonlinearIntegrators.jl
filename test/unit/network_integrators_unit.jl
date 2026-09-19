@@ -11,6 +11,68 @@
 # The `Float16` OGA dictionary regression below is *not* part of the cross-product and keeps
 # its own testset.
 
+# ---- the linear solver every network integrator gets ------------------------
+#
+# `default_options` hands these methods `SimpleSolvers.PivotedQR()`, because their Newton
+# Jacobian is *exactly* rank deficient — see the docstring in `network_integrator_core.jl` and
+# `scripts/newton_jacobian_rank.jl`, which measures rank 5 of 13 unknowns at `S = 4` with a gap
+# of fourteen orders in the spectrum. An LU raises `SingularException` on such a matrix, and
+# which pivot it reaches first is decided by the BLAS build rather than by the problem, which is
+# issue #98.
+#
+# These assertions are here because the failure they guard against is *invisible on macOS*: the
+# cross product below raises nothing locally on any BLAS tested here, so "no exception was
+# thrown" is not evidence that the plumbing works. What can be checked everywhere is that the
+# solver the integrator actually holds is the rank-revealing one.
+@testset "the Newton solve uses a rank-revealing linear solver" begin
+    function lsm(int)
+        SimpleSolvers.method(
+            SimpleSolvers.linearsolver(GeometricIntegratorsBase.solver(int)))
+    end
+
+    for row in NETWORK_INTEGRATORS, T in TEST_TYPES
+
+        int = GeometricIntegrator(ho_problem(T), row.make(T))
+        @test lsm(int) isa SimpleSolvers.PivotedQR
+    end
+
+    # `Float16` is deliberately excluded: both rank-revealing methods are LAPACK-backed and
+    # refuse a half-precision matrix by name, so offering one there replaces #98 with an
+    # `ArgumentError` before the first step. It keeps the generic `LU` that
+    # `SimpleSolvers.default_linear_solver_method` picks — which means it is still exposed to
+    # #98, and that is recorded rather than papered over.
+    int16 = GeometricIntegrator(
+        HarmonicOscillator.lodeproblem([Float16(0.5)], [Float16(0.0)];
+            timespan = (Float16(0.0), Float16(0.2)), timestep = Float16(0.1)),
+        NETWORK_INTEGRATORS[1].make(Float16))
+    @test !(lsm(int16) isa SimpleSolvers.RankRevealingMethod)
+    @test lsm(int16) isa SimpleSolvers.LU
+
+    # It is a default, not a decision taken away from the caller: `default_options` is merged
+    # *under* the options passed to `GeometricIntegrator`, so one keyword restores an LU.
+    T = Float64
+    m = NETWORK_INTEGRATORS[1].make(T)
+    @test lsm(GeometricIntegrator(ho_problem(T), m;
+        linear_solver_method = SimpleSolvers.LapackLU())) isa SimpleSolvers.LapackLU
+    @test lsm(GeometricIntegrator(ho_problem(T), m;
+        linear_solver_method = SimpleSolvers.SVDSolver())) isa SimpleSolvers.SVDSolver
+
+    # and the framework's own solver options survive the merge rather than being replaced
+    opts = GeometricIntegratorsBase.default_options(
+        GeometricIntegratorsBase.initmethod(m, ho_problem(T)), ho_problem(T))
+    for k in (:min_iterations, :f_abstol, :f_stall_window, :linear_solver_method)
+        @test haskey(opts, k)
+    end
+
+    # `PivotedQR` is ambiguous in this package: the exported one is the OGA fit, a different
+    # type at a different layer. Pinned so that a future `using SimpleSolvers` here cannot change
+    # what the unqualified name means. Two exporting modules do not silently rebind it — Julia
+    # makes the name ambiguous, so every unqualified use raises `UndefVarError` — and that is
+    # exactly what these two assertions turn into a named failure.
+    @test PivotedQR() isa NonlinearIntegrators.OGAFit
+    @test PivotedQR !== SimpleSolvers.PivotedQR
+end
+
 # ---- accuracy guards: default seed, ten steps, analytic reference ------------
 for row in NETWORK_INTEGRATORS, T in TEST_TYPES
 
