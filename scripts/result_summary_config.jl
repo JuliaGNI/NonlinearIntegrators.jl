@@ -379,24 +379,29 @@ end
 
 """
 Parse a JLD2 filename base into a short config display string.
-Extracts S, R, k (relu only), regularization factor, solver name, and dtype.
+Extracts S, R, k (relu only), regularization factor, absolute function
+tolerance (f_abs), successive-x tolerance (x_suc), solver name, and dtype.
 """
 function parse_config_str(fname_base; is_relu=true)
     m_S      = match(r"S(\d+)",                                        fname_base)
     m_R      = match(r"R(\d+)",                                        fname_base)
     m_k      = is_relu ? match(r"reluk=(\d+)",                         fname_base) : nothing
     m_reg    = match(r"reg=([0-9.e+\-]+)",                             fname_base)
+    m_fabs   = match(r"fabs=([0-9.e+\-]+)",                            fname_base)
+    m_xsuc   = match(r"xsuc=([0-9.e+\-]+)",                            fname_base)
     m_solver = match(r"_(backtracking|static|strongwolfe|dogleg)_",    fname_base)
     m_dtype  = match(r"_(Float\d+)(?:\.jld2)?$",                       fname_base)
 
-    S_str      = m_S      !== nothing ? "S=$(m_S[1])"   : ""
-    R_str      = m_R      !== nothing ? "R=$(m_R[1])"   : ""
-    k_str      = m_k      !== nothing ? "k=$(m_k[1])"   : ""
-    reg_str    = m_reg    !== nothing ? "λ=$(m_reg[1])" : ""
-    solver_str = m_solver !== nothing ? m_solver[1]     : ""
-    dtype_str  = m_dtype  !== nothing ? m_dtype[1]      : ""
+    S_str      = m_S      !== nothing ? "S=$(m_S[1])"      : ""
+    R_str      = m_R      !== nothing ? "R=$(m_R[1])"      : ""
+    k_str      = m_k      !== nothing ? "k=$(m_k[1])"      : ""
+    reg_str    = m_reg    !== nothing ? "λ=$(m_reg[1])"    : ""
+    fabs_str   = m_fabs   !== nothing ? "f_abs=$(m_fabs[1])" : ""
+    xsuc_str   = m_xsuc   !== nothing ? "x_suc=$(m_xsuc[1])" : ""
+    solver_str = m_solver !== nothing ? m_solver[1]        : ""
+    dtype_str  = m_dtype  !== nothing ? m_dtype[1]         : ""
 
-    parts = filter(!isempty, [S_str, R_str, k_str, reg_str, solver_str, dtype_str])
+    parts = filter(!isempty, [S_str, R_str, k_str, reg_str, fabs_str, xsuc_str, solver_str, dtype_str])
     join(parts, " · ")
 end
 
@@ -702,7 +707,7 @@ function print_relu_table_ex(relu_data, header, io=stdout;
                         end
                         print(io, "</td>")
                         print(io, "<td style=\"text-align:center;vertical-align:top;width:50%\">")
-                        print(io, "<strong>Fewest unconverged: $(pct_str), Error: $(fewest_err_str)</strong><br/>")
+                        print(io, "<strong>Fewest Unconverged Run — Error: $(fewest_err_str)</strong><br/>")
                         print(io, "<img src=\"$(figdir_rel)/$(fewest_fig)\" style=\"width:100%;min-width:130px\"/><br/>")
                         if fewest_cfg !== nothing
                             print(io, "<small>$(fewest_cfg.config_str)<br/>Unconverged: $(pct_str)</small>")
@@ -775,7 +780,7 @@ function print_tanh_table_ex(tanh_data, header, io=stdout;
                     end
                     print(io, "</td>")
                     print(io, "<td style=\"text-align:center;vertical-align:top;width:50%\">")
-                    print(io, "<strong>Fewest unconverged: $(pct_str), Error: $(fewest_err_str)</strong><br/>")
+                    print(io, "<strong>Fewest Unconverged Run — Error: $(fewest_err_str)</strong><br/>")
                     print(io, "<img src=\"$(figdir_rel)/$(fewest_fig)\" style=\"width:100%;min-width:130px\"/><br/>")
                     if fewest_cfg !== nothing
                         print(io, "<small>$(fewest_cfg.config_str)<br/>Unconverged: $(pct_str)</small>")
