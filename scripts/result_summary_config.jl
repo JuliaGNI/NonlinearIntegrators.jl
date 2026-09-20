@@ -5,8 +5,8 @@
 # Requires JLD2, CairoMakie, Statistics, Printf to be loaded.
 
 # ── Key parameter axes (used for plot/table indices) ─────────────────────────
-const h_list     = [0.05, 0.1, 0.2, 0.5, 1.0]
-const S_list_sum = [4, 6, 8]
+const h_list     = [0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0]
+const S_list_sum = [4, 6, 8, 10, 12, 16]
 const k_list_sum = [2, 3, 4]
 
 run_dp = false
@@ -135,8 +135,8 @@ Generate and save an error-trend figure for the ReLU sweep (minimum error vs h).
 One line per (S, k) pair present in `relu_data`.
 """
 function save_relu_error_trend(figdir, figname, relu_data, title)
-    fig = Figure(size=(1100, 600))
-    Label(fig[0, 1], title, fontsize=sum_title_size, tellwidth=false)
+    fig = Figure(size=(1200, 600))
+    Label(fig[0, 1:2], title, fontsize=sum_title_size, tellwidth=false)
     ax = Axis(fig[1, 1],
         xlabel="Time Step h", ylabel="Minimum Maximum Hamiltonian Error",
         xscale=log10, yscale=log10,
@@ -156,8 +156,8 @@ function save_relu_error_trend(figdir, figname, relu_data, title)
         any_data = true
         idx += 1
     end
-    any_data && axislegend(ax, position=:rb, labelsize=sum_tick_size)
-
+    any_data && Legend(fig[1, 2], ax, labelsize=sum_tick_size)
+    
     for ext in ("pdf", "png")
         save(joinpath(figdir, "$(figname).$(ext)"), fig)
     end
@@ -170,8 +170,8 @@ Generate and save an error-trend figure for the tanh sweep (minimum error vs h).
 One line per S value present in `tanh_data`.
 """
 function save_tanh_error_trend(figdir, figname, tanh_data, title)
-    fig = Figure(size=(1100, 600))
-    Label(fig[0, 1], title, fontsize=sum_title_size, tellwidth=false)
+    fig = Figure(size=(1200, 600))
+    Label(fig[0, 1:2], title, fontsize=sum_title_size, tellwidth=false)
     ax = Axis(fig[1, 1],
         xlabel="Time Step h", ylabel="Minimum Maximum Hamiltonian Error",
         xscale=log10, yscale=log10,
@@ -189,8 +189,8 @@ function save_tanh_error_trend(figdir, figname, tanh_data, title)
             color=palette[Si], markersize=6, linewidth=2)
         any_data = true
     end
-    any_data && axislegend(ax, position=:rb, labelsize=sum_tick_size)
-
+    any_data && Legend(fig[1, 2], ax, labelsize=sum_tick_size)
+    
     for ext in ("pdf", "png")
         save(joinpath(figdir, "$(figname).$(ext)"), fig)
     end

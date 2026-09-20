@@ -67,7 +67,7 @@ try
 
     HO_sol, HO_internal,solver_status = integrate(HO_lode, nlmethod;
         regularization_factor=reg_factor, max_iterations=max_iterations,
-        f_abstol=f_abstol, x_suctol=x_suctol, solver_kwargs...)
+        solver_kwargs...)
     qend = HO_sol.q[end]
     if !(eltype(qend) === T)
         @warn "upcast from $(T) for HO ReLU h=$(int_step) S=$(S) R=$(R) k=$(k_relu)"
@@ -97,7 +97,7 @@ try
 
     HO_sol, HO_internal, solver_status = integrate(HO_lode, nlmethod;
         regularization_factor=reg_factor, max_iterations=max_iterations,
-        f_abstol=f_abstol, x_suctol=x_suctol, solver_kwargs...)
+        solver_kwargs...)
     qend = HO_sol.q[end]
     if !(eltype(qend) === T)
         @warn "upcast from $(T) for HO tanh h=$(int_step) S=$(S) R=$(R)"
