@@ -143,13 +143,15 @@ function save_relu_error_trend(figdir, figname, relu_data, title)
         xlabelsize=sum_label_size, ylabelsize=sum_label_size,
         xticklabelsize=sum_tick_size, yticklabelsize=sum_tick_size)
 
-    palette = cgrad(:tab10, length(S_list_sum) * length(k_list_sum), categorical=true)
-    idx     = 1
+    palette  = cgrad(:tab10, length(S_list_sum) * length(k_list_sum), categorical=true)
+    idx      = 1
     any_data = false
+    jld2_rec = Dict{String, Any}("h_list" => collect(h_list))
     for (Si, S) in enumerate(S_list_sum), (ki, k) in enumerate(k_list_sum)
         stats = [relu_stats(relu_data, hi, Si, ki) for hi in eachindex(h_list)]
         mins  = [s[3] for s in stats]
         valid = isfinite.(mins)
+        jld2_rec["S$(S)_k$(k)_min_err"] = mins
         any(valid) || (idx += 1; continue)
         scatterlines!(ax, h_list[valid], mins[valid], label="S$(S) k$(k)",
             color=palette[idx], markersize=6, linewidth=2)
@@ -157,10 +159,10 @@ function save_relu_error_trend(figdir, figname, relu_data, title)
         idx += 1
     end
     any_data && Legend(fig[1, 2], ax, labelsize=sum_tick_size)
-    
     for ext in ("pdf", "png")
         save(joinpath(figdir, "$(figname).$(ext)"), fig)
     end
+    save(joinpath(figdir, "$(figname).jld2"), jld2_rec)
 end
 
 # ── Figure: tanh error trend ──────────────────────────────────────────────────
@@ -180,20 +182,22 @@ function save_tanh_error_trend(figdir, figname, tanh_data, title)
 
     palette  = cgrad(:tab10, length(S_list_sum), categorical=true)
     any_data = false
+    jld2_rec = Dict{String, Any}("h_list" => collect(h_list))
     for (Si, S) in enumerate(S_list_sum)
         stats = [tanh_stats(tanh_data, hi, Si) for hi in eachindex(h_list)]
         mins  = [s[3] for s in stats]
         valid = isfinite.(mins)
+        jld2_rec["S$(S)_min_err"] = mins
         any(valid) || continue
         scatterlines!(ax, h_list[valid], mins[valid], label="S$(S)",
             color=palette[Si], markersize=6, linewidth=2)
         any_data = true
     end
     any_data && Legend(fig[1, 2], ax, labelsize=sum_tick_size)
-    
     for ext in ("pdf", "png")
         save(joinpath(figdir, "$(figname).$(ext)"), fig)
     end
+    save(joinpath(figdir, "$(figname).jld2"), jld2_rec)
 end
 
 # ── Figure: Hamiltonian error time series ─────────────────────────────────────

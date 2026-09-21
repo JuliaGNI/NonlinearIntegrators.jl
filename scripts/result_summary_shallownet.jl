@@ -39,17 +39,6 @@ HO_tanh_fignames        = save_tanh_best_figures_ex(figdir, "shallownet_HO", HO_
 HO_relu_fewest_fignames = save_relu_fewest_figures(figdir, "shallownet_HO", HO_relu_fewest_by_key)
 HO_tanh_fewest_fignames = save_tanh_fewest_figures(figdir, "shallownet_HO", HO_tanh_fewest_by_key)
 
-let errfile = joinpath(resultsdir, "shallownet_error_tables.jld2")
-    jldopen(errfile, "w") do f
-        f["HO_relu"] = Dict{String,Vector{Float64}}(
-            "h=$(h_list[hi])_S=$(S_list_sum[Si])_k=$(k_list_sum[ki])" => vals
-            for ((hi,Si,ki), vals) in HO_relu_data)
-        f["HO_tanh"] = Dict{String,Vector{Float64}}(
-            "h=$(h_list[hi])_S=$(S_list_sum[Si])" => vals
-            for ((hi,Si), vals) in HO_tanh_data)
-    end
-end
-
 let io = IOBuffer()
     print_relu_table_ex(HO_relu_data, "ShallowNet HO", io;
         figdir_rel="figures", fignames=HO_relu_fignames,
