@@ -16,19 +16,19 @@ include(joinpath(@__DIR__, "run_config.jl"))
 
 dtype_str = length(ARGS) >= 1 ? ARGS[1] : "Float64"        # "Float16", "Float32", or "Float64"
 T = eval(Meta.parse(dtype_str))
-int_step = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : T(0.1)
+int_step = length(ARGS) >= 2 ? parse(Float64, ARGS[2]) : T(5.0)
 reg_factor = length(ARGS) >= 3 ? eval(Meta.parse(ARGS[3])) : T(1e-5)
-f_abstol = length(ARGS) >= 4 ? eval(Meta.parse(ARGS[4])) : T(0.0)
-x_suctol = length(ARGS) >= 5 ? eval(Meta.parse(ARGS[5])) : T(2.0)
+f_abstol = length(ARGS) >= 4 ? eval(Meta.parse(ARGS[4])) : T(-1.0)
+x_suctol = length(ARGS) >= 5 ? eval(Meta.parse(ARGS[5])) : T(-1.0)
 
 f_abstol = f_abstol * eps(T)
 x_suctol = x_suctol * eps(T)
 
-int_timespan = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : T(10.0)
+int_timespan = length(ARGS) >= 6 ? parse(Float64, ARGS[6]) : T(100.0)
 solver_name = length(ARGS) >= 7 ? ARGS[7] : "backtracking"  # "backtracking", "static", "strongwolfe", or "dogleg"
-R = length(ARGS) >= 8 ? parse(Int, ARGS[8]) : 4
-S = length(ARGS) >= 9 ? parse(Int, ARGS[9]) : 4
-k_relu = length(ARGS) >= 10 ? parse(Int, ARGS[10]) : 2
+R = length(ARGS) >= 8 ? parse(Int, ARGS[8]) : 64
+S = length(ARGS) >= 9 ? parse(Int, ARGS[9]) : 16
+k_relu = length(ARGS) >= 10 ? parse(Int, ARGS[10]) : 4
 run_dp = "--double-pendulum" in ARGS
 
 outdir = joinpath(@__DIR__, "results", "shallownet")
