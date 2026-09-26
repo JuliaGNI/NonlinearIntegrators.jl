@@ -463,7 +463,8 @@ exactly `NP`), which is the check now in `test/unit/dispatch_variants_unit.jl`.
 
 - location: `KNOWN_ISSUES.md`
 - evidence: K1 says "Unlike the two above … that trio", but the two entries it means were closed and
-  did not move. K17 cites "[0.4.1]". K25 and K28 cite "the *0.3 → 0.4* entry above", and K27 cites
+  did not move. K17 cites "[0.4.1]". K25 cites "the *`SymbolicNeuralNetworks` 0.3 → 0.4* entry above", K28 cites "the whole 0.3 → 0.4
+  entry", and K27 cites
   "the *Added* entry above". These are in `CHANGELOG.md`, and `[0.2.0]` and `[0.4.1]` have no link
   definition in this file. The text moved word for word, so it was not changed.
 - kind: docs
