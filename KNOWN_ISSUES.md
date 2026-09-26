@@ -457,23 +457,23 @@ exactly `NP`), which is the check now in `test/unit/dispatch_variants_unit.jl`.
 - kind: missing test
 - found: 2026-08-15
 
-## Found while moving the section out of the CHANGELOG
+## Entries about the form of this file
 
 ### K31 · Several moved entries refer to text that is not in this file.
 
 - location: `KNOWN_ISSUES.md`
-- evidence: K1 says "Unlike the two above … that trio", but the two entries it means were closed and
-  did not move. K17 cites "[0.4.1]". K25 cites "the *`SymbolicNeuralNetworks` 0.3 → 0.4* entry above", K28 cites "the whole 0.3 → 0.4
-  entry", and K27 cites
-  "the *Added* entry above". These are in `CHANGELOG.md`, and `[0.2.0]` and `[0.4.1]` have no link
-  definition in this file. The text moved word for word, so it was not changed.
+- evidence: K1 says "Unlike the two above … that trio", but the two entries it means are closed and
+  are not in this file. K17 cites "[0.4.1]". K25 cites "the *`SymbolicNeuralNetworks` 0.3 → 0.4*
+  entry above", K28 cites "the whole 0.3 → 0.4 entry", K27 cites "the *Added* entry above", and
+  K27 also cites "the kernel table". These are in `CHANGELOG.md`, and `[0.2.0]` and `[0.4.1]` have
+  no link definition in this file. The text is word for word, so it stays as written.
 - kind: docs
-- found: critic round 1 of the move, 2026-09-26
+- found: 2026-09-26
 
 ### K32 · The evidence of K17 starts with `—`, which reads as an empty field.
 
 - location: `KNOWN_ISSUES.md`, K17
-- evidence: The old text is `** — [#98](…)`, so the dash is part of the entry, and the evidence
-  continues on the next line. The field convention uses `—` alone for "nothing remains".
+- evidence: The CHANGELOG text reads `** — [#98](…)`, so the dash is part of the entry, and the
+  evidence continues on the next line. The field convention uses `—` alone for "nothing remains".
 - kind: docs
-- found: critic round 1 of the move, 2026-09-26
+- found: 2026-09-26
