@@ -211,8 +211,7 @@ scripts sat in a talk directory, all carrying much the same code.
   The cap is 0.13 because 0.14 changes what `PivotedQR` is. In 0.13 it is LAPACK-backed and
   refuses `Float16`; in 0.14 it accepts `Float16`, and the LAPACK-backed method is renamed
   `LapackPivotedQR`. The `BlasFloat` guard in `initsolver`, and its docstring, describe the 0.13
-  method. Admitting 0.14 is deferred to a separate change (see open PR #105, GeometricOptimizers
-  0.8).
+  method.
 
 - **Output goes to `runs/` (data) and `results/` (figures), at the repository root**, and every
   driver takes `--runs-dir` and `--results-dir`. Previously each script derived its output path from

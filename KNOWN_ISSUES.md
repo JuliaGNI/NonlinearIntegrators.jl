@@ -251,7 +251,7 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   values. Nothing about a pivot landing on zero is accidental; what the BLAS decides is only
   whether the zero pivot is reached before the factorisation ends.
 
-  The exception is now **impossible rather than intermittent**: `initsolver` hands every
+  The exception is **impossible rather than intermittent**: `initsolver` hands every
   network integrator `SimpleSolvers.PivotedQR`, whose `ldiv!` has no throwing path at all (see
   *Changed* under `[Unreleased]`). What is **not** closed is the deficiency itself — the solve
   now steps around a null space instead of falling into it, but the null space is still there,

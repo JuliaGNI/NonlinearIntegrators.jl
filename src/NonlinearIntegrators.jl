@@ -2,7 +2,7 @@ module NonlinearIntegrators
 
 using GeometricEquations
 using GeometricIntegratorsBase
-import GeometricIntegratorsBase: default_solver, default_options, initsolver, CacheDict,
+import GeometricIntegratorsBase: default_solver, initsolver, CacheDict,
                                  Cache, cache, CacheType, solutionstep, reset!,
                                  default_iguess, iguess
 import GeometricIntegratorsBase: problem, method, parameters, SolverMethod, history, solver,
