@@ -40,10 +40,12 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
-# Not housekeeping: `NonlinearIntegrators` requires `SimpleSolvers` 0.13.2 through
-# `GeometricOptimizers` 0.7, and `GeometricIntegrators` 0.18.2/0.18.3 both cap `SimpleSolvers` at
-# 0.12.1. The resolver derives this bound on its own — it cannot silently pick 0.18.2, it simply
-# fails — so this entry documents the constraint rather than creating it.
+# Not housekeeping: `NonlinearIntegrators` requires `SimpleSolvers` 0.13.3 — directly, since
+# `default_options` names `PivotedQR`, which no earlier release has — and `GeometricIntegrators`
+# 0.18.2/0.18.3 both cap `SimpleSolvers` at 0.12.1. The resolver derives this bound on its own —
+# it cannot silently pick 0.18.2, it simply fails — so this entry documents the constraint rather
+# than creating it. (Before the rank-revealing solve the same bound followed indirectly, from
+# `GeometricOptimizers` 0.7 requiring 0.13.2.)
 GeometricIntegrators = "0.18.4"
 
 [sources]

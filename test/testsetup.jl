@@ -34,6 +34,10 @@ import GeometricProblems.CoupledHarmonicOscillator
 using GeometricSolutions: relative_maximum_error
 using LinearAlgebra: SingularException
 using SimpleSolvers: NonlinearSolverException
+# `import`, not `using`: SimpleSolvers exports a `PivotedQR` and so does this package, and they
+# are different types — the linear solver against the OGA fit. Every reference to the solver one
+# is written `SimpleSolvers.PivotedQR` for that reason.
+import SimpleSolvers
 using Symbolics: @variables
 
 const TEST_TYPES = (Float64, Float32)
