@@ -58,8 +58,9 @@ using NonlinearIntegrators
 const T = Float64
 
 # The tolerance the rank is reported at. Deliberately the same one
-# `SimpleSolvers.rank_tolerance` defaults to, so that the number here is the number the
-# integrator's own `PivotedQR` acts on.
+# `SimpleSolvers.rank_tolerance` defaults to. The `rank` column counts at it on the
+# row-equilibrated matrix, the integrator's own `PivotedQR` on the raw one, so the two can differ;
+# the `solver` column is the rank that `PivotedQR` acts on.
 const RTOL = sqrt(eps(T))
 
 # Defined here rather than imported: `relu_k` lives in `test/testsetup.jl`, and a script in
@@ -113,8 +114,8 @@ println("Julia $(VERSION), rank tolerance = sqrt(eps) = ", RTOL)
 println("harmonic oscillator, D = 1, gauss(T, 8), relu_k(3), dict_amount = 400, ",
     "bias_interval = [-π, π]")
 println()
-@printf("%3s %22s %7s %6s %6s %11s %11s %11s\n",
-    "S", "seed", "unknown", "rank", "gap", "residual", "σ_r/σ_1", "σ_r+1/σ_1")
+@printf("%3s %22s %7s %6s %6s %6s %11s %11s %11s\n",
+    "S", "seed", "unknown", "rank", "solver", "gap", "residual", "σ_r/σ_1", "σ_r+1/σ_1")
 
 # Named explicitly: all three seeds are `OGA{...}` aliases, so `nameof(typeof(seed))` prints
 # `OGA` for every one of them and the table cannot be read.
@@ -134,12 +135,13 @@ for S in (4, 5, 6), (seed_name, seed) in SEEDS
     # the gap: how many orders separate the last kept singular value from the first dropped one
     gap = r < n ? log10(σ[r] / σ[r + 1]) : Inf
 
-    @printf("%3d %22s %7d %6d %6.1f %11.2e %11.2e %11.2e%s\n",
-        S, seed_name, n, r, gap, resid, σ[r] / σ[1],
+    @printf("%3d %22s %7d %6d %6d %6.1f %11.2e %11.2e %11.2e%s\n",
+        S, seed_name, n, r, rank(SimpleSolvers.linearsolver(s)), gap, resid, σ[r] / σ[1],
         r < n ? σ[r + 1] / σ[1] : 0.0,
         resid < 1e-8 ? "" : "   NOT CONVERGED — not evidence")
 end
 
 println()
-println("`unknown` is D*(3S+1); `rank` counts σ > sqrt(eps)*σ₁; `gap` is log₁₀(σ_r/σ_{r+1}).")
-println("The done condition of Tasks/'Fix the singular Newton Jacobian…' is rank == unknown.")
+println("`unknown` is D*(3S+1); `rank` counts σ > sqrt(eps)*σ₁ of the row-equilibrated Jacobian;")
+println("`solver` is the rank the integrator's PivotedQR acts on; `gap` is log₁₀(σ_r/σ_{r+1}).")
+println("The Jacobian has full rank when rank == unknown.")
