@@ -20,7 +20,7 @@ using NonlinearIntegrators
 # ---- where output goes -------------------------------------------------------
 #
 # Code in `scripts/`, data in `runs/`, figures in `results/` — the tree-wide rule, in
-# `Packages/CLAUDE.md`, with the reasoning in `Knowledge/AI/Folder-Structure.md`.
+# `Packages/CLAUDE.md`, with the reasoning in `Environment/Harness/Folder-Structure.md`.
 #
 # `Ref`s rather than `const` paths, because `--runs-dir` and `--results-dir` have to be able to
 # redirect them. Deriving an output directory from `@__DIR__` as a constant is what forces a caller

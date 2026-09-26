@@ -3,7 +3,7 @@
 #
 # The stubs live in `src/` so that `plot_solution` is a documented name whether or not a Makie
 # backend is loaded — the convention across this ecosystem (`GeometricProblems`,
-# `ChargedParticleDynamics`, `ElectromagneticFields`, `PoincareInvariants`, `PoissonBrackets`).
+# `ChargedParticleDynamics`, `ElectromagneticFields`, `PoincareInvariants`, `GeometricBrackets`).
 # The docstrings of the implementations live in the extension, beside them.
 #
 # What is here is everything about a figure that does not need Makie: how it is named, how its
