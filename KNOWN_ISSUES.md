@@ -2,9 +2,6 @@
 
 ## Environment
 
-The first four are described in full under [0.2.0] → *Known issues*; they are listed here only
-so that this section is the complete index.
-
 ### K1 · Julia 1.12 spends hours in type inference
 
 - location: —
@@ -12,7 +9,7 @@ so that this section is the complete index.
   methods. Unlike the two above it does not clear itself, and it is the only one of that trio
   that is a genuine defect rather than a consequence of depending on an unregistered package.
 - kind: defect
-- found: 2026-08-14
+- found: 2026-08-14; described in full under [0.2.0] → *Known issues* in `CHANGELOG.md`
 
 ### K2 · The Julia 1.13 CI test phase roughly doubled
 
@@ -118,7 +115,7 @@ All of these predate the move to GeometricOptimizers; none is a regression.
 - evidence: , where the `DenseNet` one does.
   That may well be deliberate, but the asymmetry is undocumented.
 - kind: docs
-- found: 2026-08-14
+- found: 2026-08-16
 
 ### K10 · `box_init_plain` defaults to `Float32`
 
@@ -138,7 +135,7 @@ All of these predate the move to GeometricOptimizers; none is a regression.
   `ShallowNet` passes the bare model, so the loss closure captures more than it needs. Both
   work; they should agree.
 - kind: defect
-- found: 2026-08-14
+- found: 2026-08-16
 
 ## Loops and allocation
 
@@ -459,3 +456,23 @@ exactly `NP`), which is the check now in `test/unit/dispatch_variants_unit.jl`.
   almost nothing.
 - kind: missing test
 - found: 2026-08-15
+
+## Found while moving the section out of the CHANGELOG
+
+### K31 · Several moved entries refer to text that is not in this file.
+
+- location: `KNOWN_ISSUES.md`
+- evidence: K1 says "Unlike the two above … that trio", but the two entries it means were closed and
+  did not move. K17 cites "[0.4.1]". K25 and K28 cite "the *0.3 → 0.4* entry above", and K27 cites
+  "the *Added* entry above". These are in `CHANGELOG.md`, and `[0.2.0]` and `[0.4.1]` have no link
+  definition in this file. The text moved word for word, so it was not changed.
+- kind: docs
+- found: critic round 1 of the move, 2026-09-26
+
+### K32 · The evidence of K17 starts with `—`, which reads as an empty field.
+
+- location: `KNOWN_ISSUES.md`, K17
+- evidence: The old text is `** — [#98](…)`, so the dash is part of the entry, and the evidence
+  continues on the next line. The field convention uses `—` alone for "nothing remains".
+- kind: docs
+- found: critic round 1 of the move, 2026-09-26
