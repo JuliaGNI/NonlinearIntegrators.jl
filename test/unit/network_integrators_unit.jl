@@ -13,7 +13,7 @@
 
 # ---- the linear solver every network integrator gets ------------------------
 #
-# `default_options` hands these methods `SimpleSolvers.PivotedQR()`, because their Newton
+# `initsolver` hands these methods `SimpleSolvers.PivotedQR()`, because their Newton
 # Jacobian is *exactly* rank deficient — see the docstring in `network_integrator_core.jl` and
 # `scripts/newton_jacobian_rank.jl`, which measures rank 5 of 13 unknowns at `S = 4` with a gap
 # of fourteen orders in the spectrum. An LU raises `SingularException` on such a matrix, and
@@ -48,8 +48,8 @@
     @test !(lsm(int16) isa SimpleSolvers.RankRevealingMethod)
     @test lsm(int16) isa SimpleSolvers.LU
 
-    # It is a default, not a decision taken away from the caller: `default_options` is merged
-    # *under* the options passed to `GeometricIntegrator`, so one keyword restores an LU.
+    # It is a default, not a decision taken away from the caller: a `linear_solver_method` passed
+    # to `GeometricIntegrator` wins, so one keyword restores an LU.
     T = Float64
     m = NETWORK_INTEGRATORS[1].make(T)
     @test lsm(GeometricIntegrator(ho_problem(T), m;
@@ -57,11 +57,22 @@
     @test lsm(GeometricIntegrator(ho_problem(T), m;
         linear_solver_method = SimpleSolvers.SVDSolver())) isa SimpleSolvers.SVDSolver
 
-    # and the framework's own solver options survive the merge rather than being replaced
+    # Only the solvers that solve a linear system get the default. `Picard` takes no
+    # `linear_solver_method`, so handing it one raises a `MethodError` at construction.
+    @test GeometricIntegrator(ho_problem(T), m; solver = SimpleSolvers.Picard()) isa
+          GeometricIntegrator
+    @test lsm(GeometricIntegrator(ho_problem(T), m; solver = SimpleSolvers.QuasiNewton())) isa
+          SimpleSolvers.PivotedQR
+    @test lsm(GeometricIntegrator(ho_problem(T), m; solver = SimpleSolvers.DogLeg())) isa
+          SimpleSolvers.PivotedQR
+
+    # and the framework's own solver options still reach the solver beside it
+    int = GeometricIntegrator(ho_problem(T), m)
     opts = GeometricIntegratorsBase.default_options(
-        GeometricIntegratorsBase.initmethod(m, ho_problem(T)), ho_problem(T))
-    for k in (:min_iterations, :f_abstol, :f_stall_window, :linear_solver_method)
-        @test haskey(opts, k)
+        GeometricIntegratorsBase.method(int), ho_problem(T))
+    cfg = SimpleSolvers.config(GeometricIntegratorsBase.solver(int))
+    for k in (:min_iterations, :f_abstol, :f_stall_window)
+        @test getfield(cfg, k) == opts[k]
     end
 
     # `PivotedQR` is ambiguous in this package: the exported one is the OGA fit, a different
