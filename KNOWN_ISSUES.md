@@ -244,6 +244,21 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   run, a quarantined case is reported as broken rather than passing, and the catch prints the cell
   it absorbed so the spread stays measurable from a CI log.
 
+  **Half closed.** The reading above — LU on a matrix that is *sometimes* singular — was too
+  generous to the problem. The Jacobian is **exactly rank deficient**, at every converged point,
+  by construction rather than by rounding: `scripts/newton_jacobian_rank.jl` measures rank 5 of 13
+  unknowns at `S = 4`, with a gap of **fourteen orders** between the fifth and sixth singular
+  values. Nothing about a pivot landing on zero is accidental; what the BLAS decides is only
+  whether the zero pivot is reached before the factorisation ends.
+
+  The exception is now **impossible rather than intermittent**: `default_options` hands every
+  network integrator `SimpleSolvers.PivotedQR`, whose `ldiv!` has no throwing path at all (see
+  *Changed* under `[Unreleased]`). What is **not** closed is the deficiency itself — the solve
+  now steps around a null space instead of falling into it, but the null space is still there,
+  and `3S + 1` unknowns still carry far fewer degrees of freedom than that. The quarantine
+  therefore stays until the rank half of the fix lands: the dictionary change that puts the
+  activation kinks inside the element, and the gauge fixing that removes the scaling redundancy.
+
   The catch is bounded by the largest zero pivot an OGA fit could report. The greedy fit solves a
   `k × k` Gram matrix with `k ≤ S = 4` (`src/oga/normal_equations.jl`), while the Newton systems
   in this loop carry 9 or 13 unknowns and #98's pivots are 11/12/13 — so a rank-deficient *fit*
