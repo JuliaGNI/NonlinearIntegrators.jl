@@ -77,8 +77,8 @@
 
 ### K33 · `fatou lint` reports false `parse-error` findings
 
-- location: `test/quality/inference_and_allocations.jl:76-79`
-- evidence: Measured with fatou 0.20.0: 6 findings, all in
+- location: `test/quality/inference_and_allocations.jl:77-79`
+- evidence: Measured with fatou 0.20.0: 6 `parse-error` findings, all in
   `test/quality/inference_and_allocations.jl`. fatou reads `(` followed by a macro call with a
   `for` body, e.g. `(@allocated for _ in 1:n … end) ÷ n`, as an unclosed generator, and one site
   then cascades into several findings ("unclosed comprehension", "trailing tokens after
