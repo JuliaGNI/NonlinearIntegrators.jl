@@ -75,6 +75,20 @@
 - kind: upstream
 - found: 2026-08-16
 
+### K33 · `fatou lint` reports false `parse-error` findings
+
+- location: `test/quality/inference_and_allocations.jl:77-79`
+- evidence: Measured with fatou 0.20.0: 6 `parse-error` findings, all in
+  `test/quality/inference_and_allocations.jl`. fatou reads `(` followed by a macro call with a
+  `for` body, e.g. `(@allocated for _ in 1:n … end) ÷ n`, as an unclosed generator, and one site
+  then cascades into several findings ("unclosed comprehension", "trailing tokens after
+  statement", "unexpected block keyword", "expected `end`"). Julia parses the file without error
+  and the suite runs it. The finding has severity `error` and a `# fatou-ignore` comment does not
+  suppress it, so the pre-commit hook shows it on each commit that stages this file. The code is
+  correct; do not rewrite it to satisfy the linter.
+- kind: upstream
+- found: 2026-09-13
+
 ## Training loops and losses
 
 All of these predate the move to GeometricOptimizers; none is a regression.
