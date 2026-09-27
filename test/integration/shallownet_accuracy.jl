@@ -5,6 +5,7 @@
 # seed, so a moderate dictionary already reaches < 1e-12 (a dict_amount of 400 000
 # only slows the seed build without improving accuracy). Solver options are passed
 # through integrate(...).
+
 using Test
 using NonlinearIntegrators
 include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))

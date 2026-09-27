@@ -16,6 +16,10 @@
 # accuracy guard, so its rows carry `tol = nothing` and assert dispatch, element type and
 # finiteness only — a converged DenseNet solve is not something CI can rely on.
 
+using Test
+using NonlinearIntegrators
+include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
+
 # ---- the linear solver every network integrator gets ------------------------
 #
 # `initsolver` hands these methods `SimpleSolvers.PivotedQR()`, because their Newton
@@ -29,10 +33,6 @@
 # cross product below raises nothing locally on any BLAS tested here, so "no exception was
 # thrown" is not evidence that the plumbing works. What can be checked everywhere is that the
 # solver the integrator actually holds is the rank-revealing one.
-using Test
-using NonlinearIntegrators
-include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
-
 @testset "the Newton solve uses a rank-revealing linear solver" begin
     function lsm(int)
         SimpleSolvers.method(

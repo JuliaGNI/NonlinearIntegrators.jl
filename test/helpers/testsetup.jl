@@ -17,6 +17,7 @@ using Logging
 # are still reported through the @test machinery. Set JULIA_DEBUG=NonlinearIntegrators
 # or lower the disable_logging level to see @debug output from the test files.
 Logging.disable_logging(Logging.Warn)
+
 # `import`, not `using`: only `NeuralNetwork` and `params` are needed (to call the compiled
 # derivative kernels directly in dispatch_variants_unit.jl), and importing the module keeps the rest
 # of its exports out of the way of the Geometric* ones. `NetworkParameters` comes from its own
@@ -190,7 +191,7 @@ const EXTRAPOLATIONS = [
 #
 # The five network integrators and what genuinely differs between them. Lives here, not in
 # `nvi/network_integrators_unit.jl`, because `quality/inference_and_allocations.jl` drives the
-# same rows: keeping it in a unit file made `quality/` silently depend on `unit/` having been
+# same rows: keeping it in a unit file made `quality/` silently depend on `nvi/` having been
 # included first.
 #
 #   name   — used in testset names and to look up the allocation budget

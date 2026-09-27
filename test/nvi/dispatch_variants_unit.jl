@@ -9,14 +9,14 @@
 #   (a) the run stays at the working element type (no silent upcast), and
 #   (b) the final position is finite.
 
-# The 2-D dictionaries cross weight magnitudes with the bias grid, so `dict_amount` counts
-# bias points per weight magnitude and the atom count is a multiple of it. Kept small: this
-# asserts that the adapter, the symmetry mapping and the incremental QR compose end to end,
-# not that the seed is accurate.
 using Test
 using NonlinearIntegrators
 include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
 
+# The 2-D dictionaries cross weight magnitudes with the bias grid, so `dict_amount` counts
+# bias points per weight magnitude and the atom count is a multiple of it. Kept small: this
+# asserts that the adapter, the symmetry mapping and the incremental QR compose end to end,
+# not that the seed is accurate.
 @testset "$name ShallowNet ($T)" for (seed, name) in [
         (OGA2d(), "OGA2d"), (OGASphere(), "OGASphere")],
     T in TEST_TYPES
