@@ -2,7 +2,7 @@
 #
 #     julia --startup-file=no --project=scripts scripts/newton_jacobian_rank.jl
 #
-# This is the check behind issue #98 and behind the `default_options` docstring in
+# This is the check behind issue #98 and behind the `initsolver` docstring in
 # `src/nvi/network_integrator_core.jl`. The claim it establishes is *not* "the Jacobian is
 # ill-conditioned" but the stronger and quite different one that it is **exactly rank
 # deficient**: the spectrum has a gap of many orders rather than a decay, so the deficiency is a

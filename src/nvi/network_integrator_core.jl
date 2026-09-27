@@ -92,9 +92,15 @@ end
 default_solver(::NetworkIntegratorMethod) = Newton()
 
 """
-    default_options(method::NetworkIntegratorMethod, problem)
+    initsolver(solvermethod::Union{Newton, SimpleSolvers.DogLeg},
+        method::NetworkIntegratorMethod, caches::CacheDict; kwargs...)
 
-The framework's solver options, plus `linear_solver_method = SimpleSolvers.PivotedQR()`.
+The framework's nonlinear solver, with `linear_solver_method = SimpleSolvers.PivotedQR()` as
+the default linear solve.
+
+Only the solver methods that solve a linear system get the default: `Newton`, which
+`QuasiNewton()` also constructs, and `DogLeg`. Any other solver method, `Picard()` among them,
+takes no `linear_solver_method` and is built with the caller's options unchanged.
 
 !!! warning "Two different `PivotedQR`s"
     Written out in full because this package exports a `PivotedQR` of its own — the
@@ -127,10 +133,9 @@ the rank here is a means to a stable step rather than the quantity of interest, 
 `SVDSolver` is the more trustworthy one for. Ask `SVDSolver` when the spectrum itself is the
 question — the measurement script `scripts/newton_jacobian_rank.jl` does.
 
-This is a *default*, not a decision taken away from the caller: `default_options` is merged
-under the options passed to `GeometricIntegrator`, so
-`linear_solver_method = SimpleSolvers.LapackLU()` gives an LU solve to anyone who wants a singular
-Jacobian reported rather than solved.
+This is a *default*, not a decision taken away from the caller: a `linear_solver_method` passed
+to `GeometricIntegrator` wins, so `linear_solver_method = SimpleSolvers.LapackLU()` gives an LU
+solve to anyone who wants a singular Jacobian reported rather than solved.
 
 **`Float16` is left alone**, and keeps whatever `SimpleSolvers.default_linear_solver_method`
 picks for it — the generic `LU`. Both rank-revealing methods are LAPACK-backed (`geqp3`/`tzrzf`
@@ -142,10 +147,14 @@ narrower gap than it sounds — the Jacobian is ill-conditioned at half precisio
 there is not a contract — but it is not closed, and closing it would need a rank-revealing method
 that does not go through LAPACK.
 """
-function default_options(method::NetworkIntegratorMethod, problem::GeometricProblem)
-    base = invoke(default_options, Tuple{GeometricMethod, GeometricProblem}, method, problem)
-    datatype(problem) <: LinearAlgebra.BlasFloat || return base
-    merge(base, (; linear_solver_method = SimpleSolvers.PivotedQR()))
+function initsolver(solvermethod::Union{Newton, SimpleSolvers.DogLeg},
+        method::NetworkIntegratorMethod, caches::CacheDict; kwargs...)
+    options = datatype(caches.problem) <: LinearAlgebra.BlasFloat ?
+              merge((; linear_solver_method = SimpleSolvers.PivotedQR()), values(kwargs)) :
+              values(kwargs)
+    invoke(initsolver,
+        Tuple{SimpleSolvers.NonlinearSolverMethod, GeometricMethod, CacheDict},
+        solvermethod, method, caches; options...)
 end
 # `initial_trajectory!` below integrates a LODE sub-problem and reads both `q` and `p` back out, so
 # this needs the `IODEProblem`/`LODEProblem` methods of `ImplicitMidpoint` rather than an

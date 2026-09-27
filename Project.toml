@@ -42,19 +42,17 @@ Makie = "0.24"
 NeuralNetworkParameters = "0.3"
 QuadratureRules = "0.2"
 Random = "1"
-# 0.13.3, 0.14 and not "0.12.1, 0.13": `GeometricOptimizers` 0.7.0 requires 0.13.2, so the lower halves of
-# that range are no longer reachable from here. 0.13.2 is also where `GradientAutodiff`,
-# `GradientFunction` and `alloc_h` for a parameter set live, as an extension on
-# `NeuralNetworkParameters` -- they were `GeometricOptimizers`' type piracy until 0.7.0. Nothing here
-# calls them; this package hands the solver a flat `Vector`.
+# "0.13.3" admits 0.13.3 and later 0.13 releases, and not 0.14.
 #
-# The floor moves to 0.13.3 because this package now *names* something only that release has:
-# `PivotedQR`, which `default_options` hands every network integrator as its `linear_solver_method`
-# (`src/nvi/network_integrator_core.jl`). This is a bound about what runs, not a bound about what
-# is measured -- and it has to be a bound rather than a graceful fallback because the name sits in a
-# function body, so on 0.13.2 the package still precompiles and loads cleanly and the missing
-# binding surfaces only as an `UndefVarError` the first time a network integrator is constructed.
-SimpleSolvers = "0.13.3, 0.14"
+# The floor is 0.13.3 because `initsolver` in `src/nvi/network_integrator_core.jl` names
+# `SimpleSolvers.PivotedQR`, which no earlier release has. The name sits in a function body, so on
+# 0.13.2 the package still precompiles and loads, and the missing binding raises an `UndefVarError`
+# only when a network integrator is constructed. That is why this is a bound and not a fallback.
+#
+# The cap is 0.13 because 0.14 changes what `PivotedQR` is. In 0.13 it is LAPACK-backed and refuses
+# `Float16`; in 0.14 it accepts `Float16`, and the LAPACK-backed method is `LapackPivotedQR`. The
+# `BlasFloat` guard in `initsolver`, and its docstring, describe the 0.13 method.
+SimpleSolvers = "0.13.3"
 StaticArrays = "1"
 Statistics = "1"
 SymbolicNeuralNetworks = "0.8"

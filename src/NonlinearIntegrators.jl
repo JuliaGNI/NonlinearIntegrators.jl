@@ -2,7 +2,7 @@ module NonlinearIntegrators
 
 using GeometricEquations
 using GeometricIntegratorsBase
-import GeometricIntegratorsBase: default_solver, default_options, initsolver, CacheDict,
+import GeometricIntegratorsBase: default_solver, initsolver, CacheDict,
                                  Cache, cache, CacheType, solutionstep, reset!,
                                  default_iguess, iguess
 import GeometricIntegratorsBase: problem, method, parameters, SolverMethod, history, solver,
@@ -39,7 +39,7 @@ using SimpleSolvers: Newton, solve_with_status!
 # `OGAFit` in `src/oga/fits.jl`, which is a different type at a different layer — it truncates the
 # Gram solve of a greedy dictionary fit, where SimpleSolvers' `PivotedQR` is a `LinearSolverMethod`
 # for the Newton system. Bringing the second one in unqualified is not a shadowing question, it is
-# an error: the name is already a constant here. So `default_options` says
+# an error: the name is already a constant here. So `initsolver` says
 # `SimpleSolvers.PivotedQR()` in full, and a caller who wants to pass one writes the same.
 import SimpleSolvers
 # `import`, not `using`: `GeometricOptimizers.Newton` is a *different type* from the `Newton` on the
