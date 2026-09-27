@@ -64,7 +64,7 @@ scripts sat in a talk directory, all carrying much the same code.
   `GeometricProblems` problem submodule exports and `plot_convergence` one that its `Diagnostics`
   does, so exporting them from this package's top level makes both ambiguous in any scope that also
   wrote `using GeometricProblems.HarmonicOscillator` — which is what a script integrating a problem
-  naturally writes, and what this package's own `test/testsetup.jl` does. So they sit behind
+  naturally writes, and what this package's own `test/helpers/testsetup.jl` does. So they sit behind
   `NonlinearIntegrators.Diagnostics`, exactly as `GeometricProblems.Diagnostics` does, and the top
   level stays clear. The submodule gets its own `@autodocs` block in the manual, because
   `@autodocs` does not descend into a submodule while Documenter's `checkdocs` does — without it

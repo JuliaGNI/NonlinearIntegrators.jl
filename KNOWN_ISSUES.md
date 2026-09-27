@@ -219,7 +219,7 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
 - evidence: Measured by running the symbolic integrators under both
   code-generation settings, which compute the same derivative to machine epsilon (≤8e-17 at
   Float64, verified in `benchmark/results/derivative_backends_codegen_agreement.csv` and in
-  `test/unit/dispatch_variants_unit.jl`): end to end, 3 of 8 paired `ShallowNet` cases and 4
+  `test/nvi/dispatch_variants_unit.jl`): end to end, 3 of 8 paired `ShallowNet` cases and 4
   of 8 `ShallowNetReversible` cases stop after a different number of iterations, and `ref_err`
   moves by up to 200×. On the harmonic oscillator at Float64, `dt = 1`, both autodiff
   integrators run the full 1000-iteration budget to a residual of 5e-12 / 1e-11 and are
@@ -250,7 +250,7 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   `OGA1dStable` and `OGA1dNormalized` have both raised it, at `Float64` as well as `Float32`, on all
   three extrapolation variants.
 
-  `test/unit/network_integrators_unit.jl` therefore catches `SingularException` in that loop and
+  `test/nvi/network_integrators_unit.jl` therefore catches `SingularException` in that loop and
   records `@test_broken`, rather than skipping a named list of cells that one run happened to
   produce. **This is a deliberate loss of assertion strength**, taken because those matrix entries
   are required status checks and an intermittent failure in them left no pull request able to
@@ -418,7 +418,7 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.5.
   is an honest consequence of the Jacobian of a scalar-in/scalar-out network being 1×1, but it
   carries no information: the one integrator that consumes it (`src/nvi/densenet.jl:440`)
   strips it with `[1]`, and so do both kernel testsets in
-  `test/unit/dispatch_variants_unit.jl`, one with `vec` and one with `[1]`.
+  `test/nvi/dispatch_variants_unit.jl`, one with `vec` and one with `[1]`.
   `ShallowNetBasis` builds the slot as well, and no integrator reads that one at all. Either
   build it from `VNN[1,1]` like the two gradients now are, which would make it return a scalar
   — `build_nn_function` does accept a scalar expression — or leave it and note why; but the
@@ -432,7 +432,7 @@ Surfaced while reviewing the `SymbolicNeuralNetworks` 0.5 update, after the fixe
 did make. None of these is a defect in the update: the compiled kernels were checked against
 `ForwardDiff` off the integrator and agree to round-off at both bases, both codegen settings
 and both precisions (≤ 7.2e-16 at Float64, ≤ 9.4e-8 at Float32, with `dvdθ` flattening to
-exactly `NP`), which is the check now in `test/unit/dispatch_variants_unit.jl`.
+exactly `NP`), which is the check now in `test/nvi/dispatch_variants_unit.jl`.
 
 ### K27 · The `29 ns` that the `symbolic = false` build is measured at is a measurement of nothing.
 
