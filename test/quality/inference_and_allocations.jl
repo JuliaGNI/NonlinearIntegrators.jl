@@ -12,6 +12,10 @@
 # an exact byte count. Update them deliberately, with the measurement, when the hot path
 # legitimately changes.
 
+using Test
+using NonlinearIntegrators
+include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
+
 using GeometricIntegratorsBase: solutionstep, nlsolution, residual!, initial_guess!, current
 using GeometricSolutions: timesteps
 

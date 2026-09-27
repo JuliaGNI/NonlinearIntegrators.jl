@@ -447,6 +447,22 @@ gets rediscovered:
   what makes an exact null space look merely "suppressed", and it is how #98 came to be read as
   ill-conditioning twice.
 
+- **The suite follows the shared test layout.** Every file runs in its own module through
+  `@safetestset`, and `runtests.jl` holds only the groups: `core`, and `slow` for
+  `nvi/network_integrators_unit.jl` and `nvi/dispatch_variants_unit.jl`, which each take more than
+  60 s after compilation. `julia --project -e 'using Pkg; Pkg.test(test_args = ["core"])'` runs
+  the fast group alone. `SafeTestsets` is a new test dependency.
+  - The shared setup is `test/helpers/testsetup.jl`, and each test file includes it. The unit
+    tests moved from `test/unit/` and `test/smoke/` to the directory of the source they test:
+    `test/nvi/`, `test/oga/` and `test/vise/`, and the two smoke files to `test/`.
+  - `test/quality/aqua_jet.jl` is now `test/quality/aqua.jl`. The `NI_STATIC_ANALYSIS`
+    environment variable is gone; Aqua runs on stable Julia from 1.12, as before.
+  - `test/quality/jet_residual.jl` was never run by the suite; it is a script, and it is now
+    `scripts/jet_residual.jl`.
+  - Each `@test_broken` names its issue: #98, and
+    [#117](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/117) for
+    `plot_energy_error`.
+
 ## [0.4.3] - 2026-08-30
 
 The de-piracy wave, taken as a set of compat bounds. Nothing in this package's exported surface

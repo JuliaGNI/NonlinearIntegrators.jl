@@ -168,7 +168,7 @@ signed. Since the greedy step is linear in `N`, trim `bias_amount` to compensate
 
 *When.* ELU, GELU, tanh — any non-homogeneous activation. Setting
 `octaves = (0, 0), weight_amount = 0` recovers [`BiasGrid1d`](@ref) *exactly* (asserted in
-`test/unit/oga_kernels.jl`), so this is a strict generalisation: neutral for the homogeneous
+`test/oga/oga_kernels.jl`), so this is a strict generalisation: neutral for the homogeneous
 activations and enabling for the smooth ones. Pair with
 [`NormalizedProjection`](@ref) — with raw projection the large-``\lvert w\rvert`` atoms
 would be ranked by amplitude rather than by fit.

@@ -65,7 +65,7 @@ Note the activation field of `ShallowNetBasis` is untyped, so the activation is 
 `Any` and a `Float64`-returning one would not be caught by inference. Hence a value-level
 check.
 
-**Value-level assertions in the test suite.** `test/unit/oga_kernels.jl` asserts
+**Value-level assertions in the test suite.** `test/oga/oga_kernels.jl` asserts
 `eltype === T` on every array [`oga_fit`](@ref) returns, for every dictionary × selection ×
 fit combination, at `Float16`, `Float32` and `Float64` — with `@inferred` on top to catch the
 type instability that would let a promotion through. The existing `assert_no_upcast` helper
