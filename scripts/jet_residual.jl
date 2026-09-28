@@ -1,6 +1,6 @@
 # JET optimisation analysis of the Newton hot path, run as a *standalone script*.
 #
-# Not part of the suite: `test/quality/aqua.jl` skips JET and points here. Analysing this in-process,
+# The suite runs the same analysis in `test/quality/jet.jl`. Analysing this in-process,
 # or through `JET.test_package`, does not give a usable answer:
 #
 #   * In-process, this runs after ~1800 other tests have instantiated a large number of

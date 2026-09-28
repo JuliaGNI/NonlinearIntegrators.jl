@@ -1,10 +1,7 @@
 # Aqua.jl static checks. JET's analysis is in `jet.jl`.
 #
-# Gated on the Julia version. JET's analysis output moves between Julia releases and the CI
-# matrix includes `nightly` and a `^1.13.0-0` prerelease, so running it everywhere would turn
-# an upstream change into a red build here. Restricting it to stable releases from 1.12 on
-# means exactly one CI job runs it, which still catches a regression introduced in this
-# package.
+# Gated on the Julia version: Aqua runs on stable releases from 1.12 on. The gate has no reason
+# of its own; see issue #119.
 
 using Test
 using NonlinearIntegrators
@@ -19,7 +16,7 @@ end
 
 @testset "Aqua" begin
     if !RUN_STATIC_ANALYSIS
-        @test_skip "Aqua static analysis runs on stable Julia ≥ 1.12"
+        @test_skip "Aqua static analysis runs on stable Julia ≥ 1.12"  # #119
     else
         # `piracies = false`: this package extends ~15 `GeometricIntegratorsBase` generics
         # (`components!`, `residual!`, `update!`, `Cache`, `CacheType`, `initial_guess!`,
