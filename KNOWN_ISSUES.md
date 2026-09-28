@@ -96,27 +96,9 @@
   watcher runs out of file handles. The full suite, `Pkg.test()` on Julia 1.13.1, logged 8
   `UNHANDLED TASK ERROR` blocks, all `FolderMonitor` EMFILE, with the `quality/jet.jl` testset
   added, and 0 on `origin/main` eb124b7, where JET 0.10 has Revise only as a weak dependency. The
-  per-file totals are the same on both trees.
+  per-file totals are the same on both trees, except for the new `JET` testset (4 pass) and the
+  `Aqua` testset, whose skipped JET test left it (10 pass, 1 broken on the base; 10 pass here).
 - kind: upstream
-- found: 2026-09-28
-
-### K35 · `test/quality/jet.jl` builds its own problem and bases
-
-- location: `test/quality/jet.jl:23-42`
-- evidence: it defines `relu_k` again (also in `test/helpers/testsetup.jl:60`, `benchmark/` and
-  three `scripts/`), and repeats the problem and basis builders of `testsetup.jl` (`ho_problem`,
-  `gauss`, `NETWORK_INTEGRATORS[i].make`). An `include("../helpers/testsetup.jl")` would remove
-  about 15 lines. Found by the J7 critic, round 1.
-- kind: defect (size)
-- found: 2026-09-28
-
-### K36 · The header of `scripts/jet_residual.jl` contradicts itself
-
-- location: `scripts/jet_residual.jl:3-10`
-- evidence: line 3 says that the suite runs the same analysis in `test/quality/jet.jl`; lines 3-10
-  say that an in-process analysis does not give a usable answer. The full suite on Julia 1.13.1
-  passes the four `jet.jl` lines inside the `Pkg.test` process. Found by the J7 critic, round 1.
-- kind: docs
 - found: 2026-09-28
 
 ## Training loops and losses
