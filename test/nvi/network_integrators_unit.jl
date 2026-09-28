@@ -10,6 +10,15 @@
 #
 # The `Float16` OGA dictionary regression below is *not* part of the cross-product and keeps
 # its own testset.
+#
+# NOTE: DenseNet is exercised end to end here, but only on two-step runs with
+# `training_epochs = 3`. Its Training/LSGD initial-guess methods are not stable enough for an
+# accuracy guard, so its rows carry `tol = nothing` and assert dispatch, element type and
+# finiteness only — a converged DenseNet solve is not something CI can rely on.
+
+using Test
+using NonlinearIntegrators
+include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
 
 # ---- the linear solver every network integrator gets ------------------------
 #
@@ -142,11 +151,11 @@ for row in NETWORK_INTEGRATORS,
             dispatch_case(row.name, row.make, T, extrap; initial_guess_method = seed)
         catch e
             (e isa SingularException && e.info > MAX_FIT_PIVOT) || rethrow()
-            # `println` and not `@warn`: `runtests.jl` disables logging below error level, so a
+            # `println` and not `@warn`: `helpers/testsetup.jl` disables logging below error level, so a
             # warning here would be invisible. Naming the cell is what keeps #98's spread
             # measurable from a CI log, and what makes a newly absorbed failure noticeable at all.
             println("quarantined (#98): $(row.name) $seed_name × $extrap_name ($T): $e")
-            @test_broken false
+            @test_broken false  # issue #98
         end
     end
 end

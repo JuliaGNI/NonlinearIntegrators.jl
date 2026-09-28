@@ -64,7 +64,7 @@ scripts sat in a talk directory, all carrying much the same code.
   `GeometricProblems` problem submodule exports and `plot_convergence` one that its `Diagnostics`
   does, so exporting them from this package's top level makes both ambiguous in any scope that also
   wrote `using GeometricProblems.HarmonicOscillator` — which is what a script integrating a problem
-  naturally writes, and what this package's own `test/testsetup.jl` does. So they sit behind
+  naturally writes, and what this package's own `test/helpers/testsetup.jl` does. So they sit behind
   `NonlinearIntegrators.Diagnostics`, exactly as `GeometricProblems.Diagnostics` does, and the top
   level stays clear. The submodule gets its own `@autodocs` block in the manual, because
   `@autodocs` does not descend into a submodule while Documenter's `checkdocs` does — without it
@@ -446,6 +446,22 @@ gets rediscovered:
   of a function whose argument has `‖x‖ ≈ 1.6e4` cannot resolve anything of that size. That is
   what makes an exact null space look merely "suppressed", and it is how #98 came to be read as
   ill-conditioning twice.
+
+- **The suite follows the shared test layout.** Every file runs in its own module through
+  `@safetestset`, and `runtests.jl` holds only the groups: `core`, and `slow` for
+  `nvi/network_integrators_unit.jl` and `nvi/dispatch_variants_unit.jl`, which each take more than
+  60 s after compilation. `julia --project -e 'using Pkg; Pkg.test(test_args = ["core"])'` runs
+  the fast group alone. `SafeTestsets` is a new test dependency.
+  - The shared setup is `test/helpers/testsetup.jl`, and each test file includes it. The unit
+    tests moved from `test/unit/` and `test/smoke/` to the directory of the source they test:
+    `test/nvi/`, `test/oga/` and `test/vise/`, and the two smoke files to `test/`.
+  - `test/quality/aqua_jet.jl` is now `test/quality/aqua.jl`. The `NI_STATIC_ANALYSIS`
+    environment variable is gone; Aqua runs on stable Julia from 1.12, as before.
+  - `test/quality/jet_residual.jl` was never run by the suite; it is a script, and it is now
+    `scripts/jet_residual.jl`.
+  - Each `@test_broken` names its issue: #98, and
+    [#117](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/117) for
+    `plot_energy_error`.
 
 ## [0.4.3] - 2026-08-30
 
