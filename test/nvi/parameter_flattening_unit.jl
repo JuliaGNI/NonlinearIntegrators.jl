@@ -12,6 +12,8 @@
 # reads it. These are upstream functions, so this file pins the contract this package relies on
 # rather than the implementation.
 
+using Test
+import ForwardDiff
 using NeuralNetworkParameters: NetworkParameters, flatten, unflatten, unflatten!, flatlength
 
 nested_params() = (L1 = (W = [1.0 2.0; 3.0 4.0], b = [5.0, 6.0]),

@@ -4,9 +4,12 @@
 # matrix includes `nightly` and a `^1.13.0-0` prerelease, so running it everywhere would turn
 # an upstream change into a red build here. Restricting it to stable releases from 1.12 on
 # means exactly one CI job runs it, which still catches a regression introduced in this
-# package. Set `NI_STATIC_ANALYSIS=true` to force it on locally.
-const RUN_STATIC_ANALYSIS = get(ENV, "NI_STATIC_ANALYSIS", "") == "true" ||
-                            (isempty(VERSION.prerelease) && VERSION >= v"1.12")
+# package.
+
+using Test
+using NonlinearIntegrators
+
+const RUN_STATIC_ANALYSIS = isempty(VERSION.prerelease) && VERSION >= v"1.12"
 
 if RUN_STATIC_ANALYSIS
     using Aqua
@@ -50,7 +53,7 @@ end
 end
 
 @testset "JET" begin
-    # Deliberately not asserted in the suite. `test/quality/jet_residual.jl` analyses
+    # Deliberately not asserted in the suite. `scripts/jet_residual.jl` analyses
     # `residual!` for runtime dispatch and reports **clean** for all four integrators in every
     # environment that can be constructed by hand — a plain session, a `Pkg.test`-equivalent
     # environment, with and without `--check-bounds=yes`, `--pkgimages=no`, `-O0`, `-g1`,
@@ -66,5 +69,5 @@ end
     #
     # Run the analysis by hand; the exact command is in that file's header (it needs a temp
     # environment, because `test/Project.toml` does not carry the package itself).
-    @test_skip "JET: run test/quality/jet_residual.jl by hand; see the note above"
+    @test_skip "JET: run scripts/jet_residual.jl by hand; see the note above"
 end

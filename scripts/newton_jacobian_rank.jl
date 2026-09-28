@@ -63,7 +63,7 @@ const T = Float64
 # the `solver` column is the rank that `PivotedQR` acts on.
 const RTOL = sqrt(eps(T))
 
-# Defined here rather than imported: `relu_k` lives in `test/testsetup.jl`, and a script in
+# Defined here rather than imported: `relu_k` lives in `test/helpers/testsetup.jl`, and a script in
 # `scripts/` that reaches into the test suite would break the moment the suite is reorganised.
 # This is the same one line, and it is the activation the whole of #98 is about.
 relu_k(k::Int = 3) = x -> max(zero(x), x)^k

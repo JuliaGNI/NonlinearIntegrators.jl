@@ -12,6 +12,10 @@
 # finiteness — which is what it used to do, on a single time step, making it the weakest guard
 # in the suite and no basis at all for the type-stability work on `VISECache`/`VISEBasis`.
 
+using Test
+using NonlinearIntegrators
+include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
+
 function vise_method(; kwargs...)
     VISE(build_vise_basis(Float64), gauss(Float64, 4),
         [Float64[0.5, sqrt(0.5), 0.0]]; kwargs...)

@@ -3,6 +3,10 @@
 # whose coefficient arrays carry the requested element type. The (symbolic) bases
 # are built once per T and shared across the network methods to keep this fast.
 
+using Test
+using NonlinearIntegrators
+include(joinpath(@__DIR__, "helpers", "testsetup.jl"))
+
 @testset "method smoke ($T)" for T in TEST_TYPES
     @debug "method smoke: element type = $T"
     net = build_shallownet_basis(T; S = 4)

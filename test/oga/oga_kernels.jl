@@ -12,6 +12,7 @@
 using NonlinearIntegrators
 using LinearAlgebra
 using Test
+include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
 
 const OGA_TYPES = (Float16, TEST_TYPES...)   # `NI` comes from testsetup.jl
 
