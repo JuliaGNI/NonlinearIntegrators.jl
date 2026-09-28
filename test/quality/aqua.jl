@@ -1,4 +1,4 @@
-# Aqua.jl and JET.jl static checks.
+# Aqua.jl static checks. JET's analysis is in `jet.jl`.
 #
 # Gated on the Julia version. JET's analysis output moves between Julia releases and the CI
 # matrix includes `nightly` and a `^1.13.0-0` prerelease, so running it everywhere would turn
@@ -13,7 +13,6 @@ const RUN_STATIC_ANALYSIS = isempty(VERSION.prerelease) && VERSION >= v"1.12"
 
 if RUN_STATIC_ANALYSIS
     using Aqua
-    using JET
     # `GeometricBase.update!` is the generic the ambiguity exclusion below names.
     using GeometricBase
 end
@@ -50,24 +49,4 @@ end
                 exclude = [GeometricBase.update!])
         end
     end
-end
-
-@testset "JET" begin
-    # Deliberately not asserted in the suite. `scripts/jet_residual.jl` analyses
-    # `residual!` for runtime dispatch and reports **clean** for all four integrators in every
-    # environment that can be constructed by hand — a plain session, a `Pkg.test`-equivalent
-    # environment, with and without `--check-bounds=yes`, `--pkgimages=no`, `-O0`, `-g1`,
-    # `--depwarn`, `--code-coverage=none`. Inside the `Pkg.test` process itself, and in a
-    # subprocess spawned from it, the same analysis reports twelve dispatches whose shape
-    # (`view(r, :, d)` inferring as `SubArray{Float64,N,Matrix{Float64},I,true} where {N,I}`)
-    # is inference widening under accumulated specialisations, not a property of the code.
-    #
-    # A gate that fails only inside the harness, for a reason that cannot be reproduced or
-    # explained, is worse than no gate: it trains people to ignore it. What is asserted instead
-    # is the *behaviour* that the type stability buys — the `@allocated` budgets and `@inferred`
-    # in `inference_and_allocations.jl`, both of which do run in the suite.
-    #
-    # Run the analysis by hand; the exact command is in that file's header (it needs a temp
-    # environment, because `test/Project.toml` does not carry the package itself).
-    @test_skip "JET: run scripts/jet_residual.jl by hand; see the note above"
 end
