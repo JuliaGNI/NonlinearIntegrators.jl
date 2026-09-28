@@ -471,8 +471,9 @@ gets rediscovered:
   [#121](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/121). It records one
   `@test_skip` where JET does not work on the running Julia. The skipped `JET` testset and
   `using JET` leave `test/quality/aqua.jl`. The test bound on JET admits 0.11 and 0.12 as well as
-  0.9 and 0.10. The Aqua version gate keeps its condition, and its `@test_skip` now names [#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119): with JET gone from
-  that file, the gate has no reason of its own.
+  0.9 and 0.10. The Aqua version gate keeps its condition, and its `@test_skip` now names
+  [#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119): with JET gone from that
+  file, the gate has no reason of its own.
 
 ## [0.4.3] - 2026-08-30
 
