@@ -336,6 +336,9 @@ exists on one machine only.
   `benchmark/Project.toml` beside it is correct (`[sources] path = ".."`), so deleting the manifest
   is the whole fix.
 
+- Unused locals in the network integrators (`DenseNet` and the four `ShallowNet` variants) and in
+  `VISE`, which fatou reported as `unused-binding`. No change in behaviour.
+
 ### Layout
 
 Every figure is **2:1** — `FIGURE_WIDTH / FIGURE_ASPECT`, 1200×600 — whatever its panel count, so

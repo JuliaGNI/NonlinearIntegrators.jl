@@ -193,11 +193,11 @@ end
     method = ShallowNet(cached_shallownet_basis(Float16; S = 4), gauss(Float16, 8);
         show_status = false, bias_interval = [-Float16(pi), Float16(pi)], dict_amount = 70000)
 
-    err = nothing
-    try
+    err = try
         integrate(prob, method; regularization_factor = Float16(1e-3), max_iterations = 100)
+        nothing
     catch e
-        err = e
+        e
     end
     @test !(err isa ArgumentError)                 # the range-step regression is fixed
     # Written as `typeof(err) <: Union{...}` rather than `err isa ...` so that a failure names

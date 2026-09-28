@@ -186,7 +186,6 @@ end
 function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:DenseNet},
         initial_trajectory_method::HermiteExtrapolation)
     local D = length(cache(int).q̃)
-    local S = nbasis(method(int))
     local x = nlsolution(int)
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
@@ -230,7 +229,6 @@ function initial_trajectory!(sol, history, params, int::GeometricIntegrator{<:De
     local extrapolation_substep = method(int).extrapolation_substep
     local D = length(cache(int).q̃)
     local problem = int.problem
-    local S = method(int).basis.S
     local x = nlsolution(int)
     local NP = method(int).basis.NP
 
@@ -258,7 +256,6 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::Tr
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
-    local backend = method(int).basis.backend
     local NP = method(int).basis.NP
 
     Random.seed!(42)
@@ -319,7 +316,6 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::LS
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
     local nepochs = method(int).training_epochs
-    local backend = method(int).basis.backend
     local NP = method(int).basis.NP
 
     Random.seed!(42)
@@ -391,8 +387,6 @@ function GeometricIntegratorsBase.components!(
     local D = length(cache(int).q̃)
     local S₁ = int.method.basis.S₁
     local S = int.method.basis.S
-    local σ = int.method.basis.activation
-    local R = length(method(int).c)
     local NP = method(int).basis.NP
 
     local quad_nodes = QuadratureRules.nodes(int.method.quadrature)
@@ -488,8 +482,6 @@ end
 function GeometricIntegratorsBase.residual!(
         b::Vector{ST}, sol, params, int::GeometricIntegrator{<:DenseNet}) where {ST}
     local D = length(cache(int).q̃)
-    local S = int.method.basis.S
-    local S₁ = int.method.basis.S₁
     local R = length(method(int).c)
 
     local q̄ = sol.q
@@ -497,7 +489,6 @@ function GeometricIntegratorsBase.residual!(
     local p̃ = cache(int, ST).p̃ #initial guess for p[t_{n+1}]
     local P = cache(int, ST).P # p at internal stages/quad_nodes
     local F = cache(int, ST).F
-    local X = cache(int, ST).X
 
     local g0_params = cache(int, ST).g0_params
     local g1_params = cache(int, ST).g1_params

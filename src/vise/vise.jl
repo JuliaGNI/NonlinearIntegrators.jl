@@ -226,7 +226,6 @@ function GeometricIntegratorsBase.components!(
     local D = length(cache(int).q̃)
     local S = sum(method(int).basis.W_sizes)
     local W_sizes = method(int).basis.W_sizes
-    local C = cache(int, ST)
 
     local quad_nodes = int.method.quadrature.nodes
 
