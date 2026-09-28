@@ -463,6 +463,18 @@ gets rediscovered:
     [#117](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/117) for
     `plot_energy_error`.
 
+- **JET checks the Newton hot path in the suite.** `test/quality/jet.jl` runs in `core`, directly
+  after Aqua, and asserts that `JET.report_opt` finds no runtime dispatch in `residual!` for
+  `ShallowNet`, `ShallowNetReversible`, `ShallowNetAutodiff` and `ShallowNetAutodiffReversible`,
+  at the argument types of `scripts/jet_residual.jl`. On Julia before 1.12 JET reports on each of
+  them, so the four lines are `@test_skip` there, with
+  [#121](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/121). It records one
+  `@test_skip` where JET does not work on the running Julia. The skipped `JET` testset and
+  `using JET` leave `test/quality/aqua.jl`. The test bound on JET admits 0.11 and 0.12 as well as
+  0.9 and 0.10. The Aqua version gate keeps its condition, and its `@test_skip` now names
+  [#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119): with JET gone from that
+  file, the gate has no reason of its own.
+
 ## [0.4.3] - 2026-08-30
 
 The de-piracy wave, taken as a set of compat bounds. Nothing in this package's exported surface

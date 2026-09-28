@@ -89,6 +89,18 @@
 - kind: upstream
 - found: 2026-09-13
 
+### K34 · Revise prints EMFILE errors in the test log
+
+- location: `test/quality/jet.jl`
+- evidence: JET 0.12 loads Revise, which stays loaded for the rest of the process, and its file
+  watcher runs out of file handles. The full suite, `Pkg.test()` on Julia 1.13.1, logged 8
+  `UNHANDLED TASK ERROR` blocks, all `FolderMonitor` EMFILE, with the `quality/jet.jl` testset
+  added, and 0 on `origin/main` eb124b7, where JET 0.10 has Revise only as a weak dependency. The
+  per-file totals are the same on both trees, except for the new `JET` testset (4 pass) and the
+  `Aqua` testset, whose skipped JET test left it (10 pass, 1 broken on the base; 10 pass here).
+- kind: upstream
+- found: 2026-09-28
+
 ## Training loops and losses
 
 All of these predate the move to GeometricOptimizers; none is a regression.
