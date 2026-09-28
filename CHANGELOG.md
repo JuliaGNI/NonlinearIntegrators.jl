@@ -159,6 +159,9 @@ scripts sat in a talk directory, all carrying much the same code.
 
 ### Changed
 
+- **`test/methods_smoke.jl` asserts `isexplicit` and `issymmetric` directly**, not `== false` and
+  `== true`, so a non-`Bool` result fails the test. No source file changes.
+
 - **The Newton solve of every network integrator now uses a rank-revealing linear solver**, so a
   rank-deficient Jacobian is solved rather than reported —
   [#98](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/98).
