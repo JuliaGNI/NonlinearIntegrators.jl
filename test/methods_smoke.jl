@@ -20,7 +20,7 @@ include(joinpath(@__DIR__, "helpers", "testsetup.jl"))
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test GeometricIntegratorsBase.isexplicit(m) == false
+        @test !GeometricIntegratorsBase.isexplicit(m)
         @debug "ShallowNet{$T} ok" extrapolation_substep=m.extrapolation_substep training_epochs=m.training_epochs
     end
 
@@ -41,7 +41,7 @@ include(joinpath(@__DIR__, "helpers", "testsetup.jl"))
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test GeometricIntegratorsBase.issymmetric(m) == true
+        @test GeometricIntegratorsBase.issymmetric(m)
         @debug "ShallowNetReversible{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 
@@ -52,7 +52,7 @@ include(joinpath(@__DIR__, "helpers", "testsetup.jl"))
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test GeometricIntegratorsBase.issymmetric(m) == true
+        @test GeometricIntegratorsBase.issymmetric(m)
         @debug "ShallowNetAutodiffReversible{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 

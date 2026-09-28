@@ -422,6 +422,9 @@ gets rediscovered:
 
 ### Tests
 
+- **`test/methods_smoke.jl` asserts `isexplicit` and `issymmetric` directly**, not `== false` and
+  `== true`, so a non-`Bool` result fails the test.
+
 - **The network-integrator cross product now under-reports.** A `SingularException` from the
   Newton solve is recorded as `@test_broken` rather than failing the run, so a green suite no
   longer means all 54 cells of that cross product passed — read the `Broken` count and the
