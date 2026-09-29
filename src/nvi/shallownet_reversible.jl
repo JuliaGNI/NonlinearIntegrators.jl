@@ -86,8 +86,6 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     local p = cache(int, ST).p̃
     local Q = cache(int, ST).Q
     local V = cache(int, ST).V
-    local P = cache(int, ST).P
-    local F = cache(int, ST).F
     local X = cache(int, ST).X
 
     local NN = method(int).basis.NN
@@ -229,7 +227,6 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params,
     local dvdWc = cache(int, ST).dvdWc
     local dvdbc = cache(int, ST).dvdbc
     local dqdWr₁ = cache(int, ST).dqdWr₁
-    local dqdWr₀ = cache(int, ST).dqdWr₀
     local dqdbr₁ = cache(int, ST).dqdbr₁
     local dqdbr₀ = cache(int, ST).dqdbr₀
     # compute b = - [(P-AF)], the residual in actual action, vatiation with respect to Q_{n,i}

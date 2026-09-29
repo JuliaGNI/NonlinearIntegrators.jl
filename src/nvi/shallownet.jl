@@ -85,7 +85,6 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::
 
     local x = nlsolution(int)
     local NN = method(int).basis.NN
-    local ps = cache(int).ps
     local extrapolation_substep = method(int).extrapolation_substep
     local network_inputs = method(int).network_inputs
     local network_labels = cache(int).network_labels
@@ -161,8 +160,6 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     local p = cache(int, ST).p̃
     local Q = cache(int, ST).Q
     local V = cache(int, ST).V
-    local P = cache(int, ST).P
-    local F = cache(int, ST).F
     local X = cache(int, ST).X
 
     local NN = method(int).basis.NN
@@ -307,7 +304,6 @@ function GeometricIntegratorsBase.residual!(
     local dvdWc = cache(int, ST).dvdWc
     local dvdbc = cache(int, ST).dvdbc
     local dqdWr₁ = cache(int, ST).dqdWr₁
-    local dqdWr₀ = cache(int, ST).dqdWr₀
     local dqdbr₁ = cache(int, ST).dqdbr₁
     local dqdbr₀ = cache(int, ST).dqdbr₀
 

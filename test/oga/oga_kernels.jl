@@ -192,13 +192,11 @@ end
         ŷ = sw .* y
 
         A = NI.oga_atoms(BiasGrid1d(), [-pi, pi], 400, T)
-        best, besti = Inf, 0
-        for i in axes(A, 1)
+        best, besti = findmin(axes(A, 1)) do i
             g = σ.(A[i, 1] .* nodes .+ A[i, 2]) .* sw
             n² = sum(abs2, g)
-            n² == 0 && continue
-            nr = norm(ŷ .- (dot(g, ŷ) / n²) .* g)
-            nr < best && ((best, besti) = (nr, i))
+            n² == 0 && return Inf
+            norm(ŷ .- (dot(g, ŷ) / n²) .* g)
         end
 
         for sel in (NormalizedProjection(), OrthogonalProjection())
