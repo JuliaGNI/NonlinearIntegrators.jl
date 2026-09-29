@@ -481,6 +481,10 @@ gets rediscovered:
   [#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119): with JET gone from that
   file, the gate has no reason of its own.
 
+- **Two unused destructured locals in the test suite are now `_`**, as fatou 0.21.0 reports
+  them: `layout` in `test/nvi/parameter_flattening_unit.jl` and `V` in `test/oga/oga_kernels.jl`.
+  Behaviour does not change.
+
 ## [0.4.3] - 2026-08-30
 
 The de-piracy wave, taken as a set of compat bounds. Nothing in this package's exported surface

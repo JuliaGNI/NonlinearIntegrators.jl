@@ -22,7 +22,7 @@ nested_params() = (L1 = (W = [1.0 2.0; 3.0 4.0], b = [5.0, 6.0]),
 @testset "parameter flattening" begin
     @testset "flattening" begin
         ps = nested_params()
-        v, layout = flatten(ps)
+        v, _ = flatten(ps)
 
         # Depth first in declaration order, which is the order `_param_arrays` walks too.
         @test v == [1.0, 3.0, 2.0, 4.0, 5.0, 6.0, 7.0, 8.0]
