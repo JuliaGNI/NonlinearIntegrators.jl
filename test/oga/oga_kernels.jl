@@ -71,7 +71,7 @@ end
         # Column norms ≈ 33 and 66, so `α ≈ 1100` and `γ ≈ 4400` and `α*γ` is well past the
         # 65504 ceiling — the configuration that makes a `sqrt(α*γ)` threshold vacuous.
         A = Float16[20 40; 20.5 41.5; 19 38; 1 3]
-        σ, U, V = NI.jacobi_svd(A)
+        σ, U, _ = NI.jacobi_svd(A)
         @test norm(Float64.(U)' * Float64.(U) - I) < 0.05      # columns really orthogonal
         @test sort(Float64.(σ), rev = true) ≈ svd(Float64.(A)).S rtol = 0.05
     end
