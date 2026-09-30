@@ -12,6 +12,7 @@
 using NonlinearIntegrators
 using LinearAlgebra
 using Test
+include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
 
 const OGA_TYPES = (Float16, TEST_TYPES...)   # `NI` comes from testsetup.jl
 
@@ -70,7 +71,7 @@ end
         # Column norms ≈ 33 and 66, so `α ≈ 1100` and `γ ≈ 4400` and `α*γ` is well past the
         # 65504 ceiling — the configuration that makes a `sqrt(α*γ)` threshold vacuous.
         A = Float16[20 40; 20.5 41.5; 19 38; 1 3]
-        σ, U, V = NI.jacobi_svd(A)
+        σ, U, _ = NI.jacobi_svd(A)
         @test norm(Float64.(U)' * Float64.(U) - I) < 0.05      # columns really orthogonal
         @test sort(Float64.(σ), rev = true) ≈ svd(Float64.(A)).S rtol = 0.05
     end
@@ -191,13 +192,11 @@ end
         ŷ = sw .* y
 
         A = NI.oga_atoms(BiasGrid1d(), [-pi, pi], 400, T)
-        best, besti = Inf, 0
-        for i in axes(A, 1)
+        best, besti = findmin(axes(A, 1)) do i
             g = σ.(A[i, 1] .* nodes .+ A[i, 2]) .* sw
             n² = sum(abs2, g)
-            n² == 0 && continue
-            nr = norm(ŷ .- (dot(g, ŷ) / n²) .* g)
-            nr < best && ((best, besti) = (nr, i))
+            n² == 0 && return Inf
+            norm(ŷ .- (dot(g, ŷ) / n²) .* g)
         end
 
         for sel in (NormalizedProjection(), OrthogonalProjection())

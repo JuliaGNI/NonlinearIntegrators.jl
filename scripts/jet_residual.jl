@@ -1,9 +1,9 @@
 # JET optimisation analysis of the Newton hot path, run as a *standalone script*.
 #
-# Not part of the suite: `aqua_jet.jl` skips JET and points here. Analysing this in-process,
-# or through `JET.test_package`, does not give a usable answer:
+# The suite runs the same analysis in `test/quality/jet.jl`, directly after Aqua. Analysing this
+# later in the suite process, or through `JET.test_package`, does not give a usable answer:
 #
-#   * In-process, this runs after ~1800 other tests have instantiated a large number of
+#   * Later in the suite, this runs after ~1800 other tests have instantiated a large number of
 #     specialisations of the same functions, and Julia's inference widens under that load —
 #     `view(r₀, :, d)` comes back as `SubArray{Float64,N,Matrix{Float64},I,true} where {N,I}`
 #     rather than the concrete type it infers in a clean session. The reports that follow are
@@ -24,7 +24,7 @@
 #     julia -e 'using Pkg; Pkg.activate(temp = true); Pkg.develop(path = "."); \
 #               Pkg.add(["JET", "GeometricProblems", "QuadratureRules", \
 #                        "GeometricIntegratorsBase", "GeometricSolutions"]); \
-#               include("test/quality/jet_residual.jl")'
+#               include("scripts/jet_residual.jl")'
 
 using NonlinearIntegrators
 using QuadratureRules

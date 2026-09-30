@@ -10,6 +10,10 @@
 # the duplicated step boundary and the assumed grid size — so it gets real assertions, including
 # against a non-default `record_grid_points`, which is the case a re-hardcoded 41 would fail.
 
+using Test
+using NonlinearIntegrators
+include(joinpath(@__DIR__, "helpers", "testsetup.jl"))
+
 using CairoMakie
 using GeometricSolutions: GeometricSolution
 import GeometricSolutions
@@ -245,7 +249,7 @@ import GeometricProblems.Diagnostics as GPD
         # Two assertions rather than one `@test_broken`: the first records the symptom, the second
         # pins the cause, so a fix upstream flips the `@test_broken` to a pass and the second one
         # says why. Measured on GeometricProblems 0.8.3 / GeometricSolutions 0.6.5.
-        @test_broken GPD.plot_energy_error(sol; energy = ham) isa Figure
+        @test_broken GPD.plot_energy_error(sol; energy = ham) isa Figure  # issue #117
         @test !(sol isa GeometricSolutions.SolutionPODE)   # the cause; should become `false`
         @test typeof(sol.problem) <: GeometricEquations.LODEProblem
     end

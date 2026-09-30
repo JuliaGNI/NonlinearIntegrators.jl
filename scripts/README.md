@@ -5,8 +5,9 @@ CI — these are for investigating one question at a time.
 
 **Code here, data in `runs/`, figures in `results/`.** Both output directories are at the
 repository root and git-ignored; the rule is in `Packages/CLAUDE.md` and the reasoning in
-`Knowledge/AI/Folder-Structure.md`. Every driver takes `--runs-dir` and `--results-dir`, so the
-same script can write into a paper's or a talk's figure directory without being copied there.
+`Environment/Harness/Folder-Structure.md`. Every driver takes `--runs-dir` and `--results-dir`,
+so the same script can write into a paper's or a talk's figure directory without being copied
+there.
 
 ```sh
 julia --project=scripts -e 'using Pkg; Pkg.instantiate()'

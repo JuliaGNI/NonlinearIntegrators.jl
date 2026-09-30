@@ -12,6 +12,10 @@
 # an exact byte count. Update them deliberately, with the measurement, when the hot path
 # legitimately changes.
 
+using Test
+using NonlinearIntegrators
+include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
+
 using GeometricIntegratorsBase: solutionstep, nlsolution, residual!, initial_guess!, current
 using GeometricSolutions: timesteps
 
@@ -99,7 +103,7 @@ end
                 # `Nothing` — which it can do with runtime dispatch throughout the body. What
                 # it does catch is the call becoming uninferable altogether, e.g. a cache
                 # lookup that stops folding. The allocation budget above is the assertion that
-                # actually bites; `jet_residual.jl` is the one that checks dispatch directly.
+                # actually bites; `jet.jl` is the one that checks dispatch directly.
                 @test (@inferred residual!(p.b, p.x, p.s, p.params, p.int)) isa Any
             end
         end

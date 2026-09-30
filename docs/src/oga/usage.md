@@ -200,6 +200,6 @@ guarantee. A new dictionary inherits the no-op [`NonlinearIntegrators.oga_refine
 unless wrapped in [`Refined`](@ref).
 
 Whatever you add must respect the precision discipline — see [Precision](@ref). The
-`eltype === T` and `@inferred` assertions in `test/unit/oga_kernels.jl` sweep every
+`eltype === T` and `@inferred` assertions in `test/oga/oga_kernels.jl` sweep every
 dictionary × selection × fit combination at three precisions, so a new component is covered
 by adding it to the lists there.

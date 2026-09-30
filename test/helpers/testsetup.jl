@@ -9,6 +9,15 @@
 
 using Test
 using NonlinearIntegrators
+using Logging
+
+# The network-based integrators run many nonlinear solves, often with very tight
+# solver tolerances, which emit a large volume of line-search / iteration warnings.
+# Silence everything below error level so the test output stays readable; failures
+# are still reported through the @test machinery. Set JULIA_DEBUG=NonlinearIntegrators
+# or lower the disable_logging level to see @debug output from the test files.
+Logging.disable_logging(Logging.Warn)
+
 # `import`, not `using`: only `NeuralNetwork` and `params` are needed (to call the compiled
 # derivative kernels directly in dispatch_variants_unit.jl), and importing the module keeps the rest
 # of its exports out of the way of the Geometric* ones. `NetworkParameters` comes from its own
@@ -34,6 +43,10 @@ import GeometricProblems.CoupledHarmonicOscillator
 using GeometricSolutions: relative_maximum_error
 using LinearAlgebra: SingularException
 using SimpleSolvers: NonlinearSolverException
+# `import`, not `using`: SimpleSolvers exports a `PivotedQR` and so does this package, and they
+# are different types — the linear solver against the OGA fit. Every reference to the solver one
+# is written `SimpleSolvers.PivotedQR` for that reason.
+import SimpleSolvers
 using Symbolics: @variables
 
 const TEST_TYPES = (Float64, Float32)
@@ -137,7 +150,7 @@ assert_no_upcast(q, ::Type{T}) where {T} = @test eltype(q[end]) == T
 # a new class.
 #
 # `Float32` and `Float64` are not uniformly well conditioned either: the extrapolation cross
-# product in `unit/network_integrators_unit.jl` raises `SingularException` from the Newton Jacobian
+# product in `nvi/network_integrators_unit.jl` raises `SingularException` from the Newton Jacobian
 # on some BLAS builds and not others, which is issue #98. That loop absorbs a `SingularException`
 # whose zero pivot is past any the OGA fit could produce, which is wider than #98 alone — see the
 # note there. Every other integration calls `integrate` directly, where a give-up is a real
@@ -177,8 +190,8 @@ const EXTRAPOLATIONS = [
 # ---- the integrator table ---------------------------------------------------
 #
 # The five network integrators and what genuinely differs between them. Lives here, not in
-# `unit/network_integrators_unit.jl`, because `quality/inference_and_allocations.jl` drives the
-# same rows: keeping it in a unit file made `quality/` silently depend on `unit/` having been
+# `nvi/network_integrators_unit.jl`, because `quality/inference_and_allocations.jl` drives the
+# same rows: keeping it in a unit file made `quality/` silently depend on `nvi/` having been
 # included first.
 #
 #   name   — used in testset names and to look up the allocation budget
@@ -190,7 +203,7 @@ const EXTRAPOLATIONS = [
 #            pair reaches 1e-8; the autodiff pair is limited to 1e-4 by the Newton floor of
 #            the hand-written ansatz. `DenseNet` has no guard at all: its Training/LSGD seeds
 #            are not stable enough for one, so its rows assert dispatch and finiteness only
-#            (this is deliberate — see the note in runtests.jl).
+#            (this is deliberate — see the note in nvi/network_integrators_unit.jl).
 
 function shallow_kw(::Type{T}) where {T}
     (; show_status = false, bias_interval = [-T(pi), T(pi)],

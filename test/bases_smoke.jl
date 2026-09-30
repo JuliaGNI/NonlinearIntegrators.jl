@@ -2,6 +2,10 @@
 # These only *construct* the objects (no integration) and check that they carry
 # the requested element type and print without error, at every TEST_TYPE.
 
+using Test
+using NonlinearIntegrators
+include(joinpath(@__DIR__, "helpers", "testsetup.jl"))
+
 @testset "basis smoke ($T)" for T in TEST_TYPES
     @debug "basis smoke: element type = $T"
 

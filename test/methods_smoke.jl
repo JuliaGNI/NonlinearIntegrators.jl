@@ -3,6 +3,10 @@
 # whose coefficient arrays carry the requested element type. The (symbolic) bases
 # are built once per T and shared across the network methods to keep this fast.
 
+using Test
+using NonlinearIntegrators
+include(joinpath(@__DIR__, "helpers", "testsetup.jl"))
+
 @testset "method smoke ($T)" for T in TEST_TYPES
     @debug "method smoke: element type = $T"
     net = build_shallownet_basis(T; S = 4)
@@ -16,7 +20,7 @@
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test GeometricIntegratorsBase.isexplicit(m) == false
+        @test !GeometricIntegratorsBase.isexplicit(m)
         @debug "ShallowNet{$T} ok" extrapolation_substep=m.extrapolation_substep training_epochs=m.training_epochs
     end
 
@@ -37,7 +41,7 @@
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test GeometricIntegratorsBase.issymmetric(m) == true
+        @test GeometricIntegratorsBase.issymmetric(m)
         @debug "ShallowNetReversible{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 
@@ -48,7 +52,7 @@
         @test m isa GeometricIntegratorsBase.LODEMethod
         @test eltype(m.b) == T && eltype(m.c) == T
         @test eltype(m.bias_interval) == T
-        @test GeometricIntegratorsBase.issymmetric(m) == true
+        @test GeometricIntegratorsBase.issymmetric(m)
         @debug "ShallowNetAutodiffReversible{$T} ok" extrapolation_substep=m.extrapolation_substep
     end
 

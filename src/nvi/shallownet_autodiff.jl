@@ -232,8 +232,6 @@ function GeometricIntegratorsBase.components!(x::AbstractVector{ST}, sol, params
     local q = cache(int, ST).q̃
     local Q = cache(int, ST).Q
     local V = cache(int, ST).V
-    local P = cache(int, ST).P
-    local F = cache(int, ST).F
 
     local ps = cache(int, ST).ps
     local ps_vec = cache(int, ST).ps_vec
@@ -326,9 +324,7 @@ function GeometricIntegratorsBase.residual!(b::Vector{ST}, sol, params,
         int::GeometricIntegrator{<:ShallowNetAutodiff}) where {ST}
     local D = length(cache(int).q̃)
     local S = nbasis(method(int))
-    local q̄ = sol.q
     local p̄ = sol.p
-    local p̃ = cache(int, ST).p̃
     local P = cache(int, ST).P
     local F = cache(int, ST).F
 

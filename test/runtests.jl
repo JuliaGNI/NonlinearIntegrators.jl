@@ -1,62 +1,21 @@
-using Test
-using Logging
+using SafeTestsets
 
-# The network-based integrators run many nonlinear solves, often with very tight
-# solver tolerances, which emit a large volume of line-search / iteration warnings.
-# Silence everything below error level so the test output stays readable; failures
-# are still reported through the @test machinery. Set JULIA_DEBUG=NonlinearIntegrators
-# or lower the disable_logging level to see @debug output from the test files.
-Logging.disable_logging(Logging.Warn)
+const GROUPS = isempty(ARGS) ? ["core", "slow"] : ARGS
 
-# Shared constants (TEST_TYPES), builders and the no-upcast assertion.
-include("testsetup.jl")
-
-# The suite is ordered fastest-first: construction-only smoke tests, then short
-# per-type integration unit tests (the "no silent upcast" gate), then the slow
-# high-fidelity accuracy guard. Every phase is parametrized over TEST_TYPES so the
-# whole package is exercised at both Float64 and Float32.
-#
-# NOTE: DenseNet is exercised end to end in network_integrators_unit.jl, but only on two-step
-# runs with `training_epochs = 3`. Its Training/LSGD initial-guess methods are not stable
-# enough for an accuracy guard, so its rows carry `tol = nothing` and assert dispatch, element
-# type and finiteness only — a converged DenseNet solve is not something CI can rely on.
-@testset "NonlinearIntegrators.jl" begin
-    @testset "smoke" begin
-        include("smoke/bases_smoke.jl")
-        include("smoke/methods_smoke.jl")
-    end
-
-    @testset "unit" begin
-        include("unit/parameter_flattening_unit.jl")
-        include("unit/oga_kernels.jl")
-        # All five network integrators, table-driven; replaces the five near-identical
-        # per-integrator files that used to sit here.
-        include("unit/network_integrators_unit.jl")
-        include("unit/dispatch_variants_unit.jl")
-        include("unit/vise_unit.jl")
-    end
-
-    # The shared layer under `scripts/`. Pure functions over strings and dictionaries — no solve,
-    # no archive written — so it costs a load and nothing else.
-    @testset "scripts" begin
-        include("scripts_archives_tests.jl")
-    end
-
-    # Inference and allocation regression gates, plus Aqua/JET. Last, because they are the
-    # slowest to compile and the least informative when something more basic is broken.
-    @testset "quality" begin
-        include("quality/inference_and_allocations.jl")
-        include("quality/aqua_jet.jl")
-    end
-
-    # The plotting API. After `quality` and before `integration` because loading CairoMakie —
-    # which is what activates the `Makie` weakdep, and with it the extension — is a large
-    # precompile that nothing earlier in the suite needs.
-    @testset "plots" begin
-        include("plots_tests.jl")
-    end
-
-    @testset "integration" begin
-        include("integration/shallownet_accuracy.jl")
-    end
+if "core" in GROUPS
+    @safetestset "Aqua" include("quality/aqua.jl")
+    @safetestset "JET" include("quality/jet.jl")
+    @safetestset "Basis smoke" include("bases_smoke.jl")
+    @safetestset "Method smoke" include("methods_smoke.jl")
+    @safetestset "Parameter flattening" include("nvi/parameter_flattening_unit.jl")
+    @safetestset "OGA kernels" include("oga/oga_kernels.jl")
+    @safetestset "VISE" include("vise/vise_unit.jl")
+    @safetestset "Scripts archives" include("scripts_archives_tests.jl")
+    @safetestset "Inference and allocations" include("quality/inference_and_allocations.jl")
+    @safetestset "Plots" include("plots_tests.jl")
+    @safetestset "ShallowNet accuracy" include("integration/shallownet_accuracy.jl")
+end
+if "slow" in GROUPS
+    @safetestset "Network integrators" include("nvi/network_integrators_unit.jl")
+    @safetestset "Dispatch variants" include("nvi/dispatch_variants_unit.jl")
 end

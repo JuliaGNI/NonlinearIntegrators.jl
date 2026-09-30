@@ -10,6 +10,88 @@
 #
 # The `Float16` OGA dictionary regression below is *not* part of the cross-product and keeps
 # its own testset.
+#
+# NOTE: DenseNet is exercised end to end here, but only on two-step runs with
+# `training_epochs = 3`. Its Training/LSGD initial-guess methods are not stable enough for an
+# accuracy guard, so its rows carry `tol = nothing` and assert dispatch, element type and
+# finiteness only — a converged DenseNet solve is not something CI can rely on.
+
+using Test
+using NonlinearIntegrators
+include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
+
+# ---- the linear solver every network integrator gets ------------------------
+#
+# `initsolver` hands these methods `SimpleSolvers.PivotedQR()`, because their Newton
+# Jacobian is *exactly* rank deficient — see the docstring in `network_integrator_core.jl` and
+# `scripts/newton_jacobian_rank.jl`, which measures rank 5 of 13 unknowns at `S = 4` with a gap
+# of fourteen orders in the spectrum. An LU raises `SingularException` on such a matrix, and
+# which pivot it reaches first is decided by the BLAS build rather than by the problem, which is
+# issue #98.
+#
+# These assertions are here because the failure they guard against is *invisible on macOS*: the
+# cross product below raises nothing locally on any BLAS tested here, so "no exception was
+# thrown" is not evidence that the plumbing works. What can be checked everywhere is that the
+# solver the integrator actually holds is the rank-revealing one.
+@testset "the Newton solve uses a rank-revealing linear solver" begin
+    function lsm(int)
+        SimpleSolvers.method(
+            SimpleSolvers.linearsolver(GeometricIntegratorsBase.solver(int)))
+    end
+
+    for row in NETWORK_INTEGRATORS, T in TEST_TYPES
+
+        int = GeometricIntegrator(ho_problem(T), row.make(T))
+        @test lsm(int) isa SimpleSolvers.PivotedQR
+    end
+
+    # `Float16` is deliberately excluded: both rank-revealing methods are LAPACK-backed and
+    # refuse a half-precision matrix by name, so offering one there replaces #98 with an
+    # `ArgumentError` before the first step. It keeps the generic `LU` that
+    # `SimpleSolvers.default_linear_solver_method` picks — which means it is still exposed to
+    # #98, and that is recorded rather than papered over.
+    int16 = GeometricIntegrator(
+        HarmonicOscillator.lodeproblem([Float16(0.5)], [Float16(0.0)];
+            timespan = (Float16(0.0), Float16(0.2)), timestep = Float16(0.1)),
+        NETWORK_INTEGRATORS[1].make(Float16))
+    @test !(lsm(int16) isa SimpleSolvers.RankRevealingMethod)
+    @test lsm(int16) isa SimpleSolvers.LU
+
+    # It is a default, not a decision taken away from the caller: a `linear_solver_method` passed
+    # to `GeometricIntegrator` wins, so one keyword restores an LU.
+    T = Float64
+    m = NETWORK_INTEGRATORS[1].make(T)
+    @test lsm(GeometricIntegrator(ho_problem(T), m;
+        linear_solver_method = SimpleSolvers.LapackLU())) isa SimpleSolvers.LapackLU
+    @test lsm(GeometricIntegrator(ho_problem(T), m;
+        linear_solver_method = SimpleSolvers.SVDSolver())) isa SimpleSolvers.SVDSolver
+
+    # Only the solvers that solve a linear system get the default. `Picard` takes no
+    # `linear_solver_method`, so handing it one raises a `MethodError` at construction.
+    @test GeometricIntegrator(ho_problem(T), m; solver = SimpleSolvers.Picard()) isa
+          GeometricIntegrator
+    @test lsm(GeometricIntegrator(ho_problem(T), m; solver = SimpleSolvers.QuasiNewton())) isa
+          SimpleSolvers.PivotedQR
+    @test lsm(GeometricIntegrator(ho_problem(T), m; solver = SimpleSolvers.DogLeg())) isa
+          SimpleSolvers.PivotedQR
+
+    # and the framework's own solver options still reach the solver beside it
+    int = GeometricIntegrator(ho_problem(T), m)
+    opts = GeometricIntegratorsBase.default_options(
+        GeometricIntegratorsBase.method(int), ho_problem(T))
+    cfg = SimpleSolvers.config(GeometricIntegratorsBase.solver(int))
+    for k in (:min_iterations, :f_abstol, :f_stall_window)
+        @test getfield(cfg, k) == opts[k]
+    end
+
+    # `PivotedQR` is ambiguous in this package: the exported one is the OGA fit, a different
+    # type at a different layer. Pinned so that a future `using SimpleSolvers` here cannot change
+    # what the unqualified name means. Two exporting modules do not silently rebind it — Julia
+    # makes the name ambiguous, so every unqualified use raises `UndefVarError` — and that is
+    # exactly what these two assertions turn into a named failure.
+    @test PivotedQR() isa NonlinearIntegrators.OGAFit
+    @test PivotedQR !== SimpleSolvers.PivotedQR
+end
 
 # ---- accuracy guards: default seed, ten steps, analytic reference ------------
 for row in NETWORK_INTEGRATORS, T in TEST_TYPES
@@ -69,11 +151,11 @@ for row in NETWORK_INTEGRATORS,
             dispatch_case(row.name, row.make, T, extrap; initial_guess_method = seed)
         catch e
             (e isa SingularException && e.info > MAX_FIT_PIVOT) || rethrow()
-            # `println` and not `@warn`: `runtests.jl` disables logging below error level, so a
+            # `println` and not `@warn`: `helpers/testsetup.jl` disables logging below error level, so a
             # warning here would be invisible. Naming the cell is what keeps #98's spread
             # measurable from a CI log, and what makes a newly absorbed failure noticeable at all.
             println("quarantined (#98): $(row.name) $seed_name × $extrap_name ($T): $e")
-            @test_broken false
+            @test_broken false  # issue #98
         end
     end
 end
@@ -111,11 +193,11 @@ end
     method = ShallowNet(cached_shallownet_basis(Float16; S = 4), gauss(Float16, 8);
         show_status = false, bias_interval = [-Float16(pi), Float16(pi)], dict_amount = 70000)
 
-    err = nothing
-    try
+    err = try
         integrate(prob, method; regularization_factor = Float16(1e-3), max_iterations = 100)
+        nothing
     catch e
-        err = e
+        e
     end
     @test !(err isa ArgumentError)                 # the range-step regression is fixed
     # Written as `typeof(err) <: Union{...}` rather than `err isa ...` so that a failure names
