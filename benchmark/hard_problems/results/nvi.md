@@ -5,6 +5,19 @@ with [-π, π], and ShallowNet(tanh) with S = R = 4 and S = R = 8. DogLeg, regul
 ≤ 1000 iterations per step. Step classes are counted per step and degree of freedom. "Linear
 front at that time": the smallest q error of an accurate linear run that took at most as long.
 
+## P1_eps0.001
+
+| network | h Ω | status | unconv. steps | max residual | q error | J | wall time [s] | P₃-equiv / spline / degen | diff to CGVI(P₃) | linear front at that time |
+|---|---|---|---|---|---|---|---|---|---|---|
+| N1 ReLU3 kinkfree S=4 | 0.1 | ok | 0 | 1.95e-13 | 1.38e-07 | 4.24e-04 | 266 | 62831 / 0 / 0 | 3.34e-12 | 1.75e-13 |
+| N2 ReLU3 S=4 | 0.1 | unconverged | 4 | 6.02e-06 | 2.47e-05 | 4.72e-04 | 266 | 62827 / 4 / 0 | 2.47e-05 | 1.75e-13 |
+| N2 tanh S=4 | 0.1 | unconverged | 62774 | 9.14e-04 | 3.23e-01 | 5.76e-01 | 970 | — | 3.23e-01 | 1.75e-13 |
+
+- N1 ReLU3 kinkfree S=4: 1 runs, 0 not converged (0 %), 0 better than the linear front by 3×
+- N2 ReLU3 S=4: 1 runs, 1 not converged (100 %), 0 better than the linear front by 3×
+- N2 tanh S=4: 1 runs, 1 not converged (100 %), 0 better than the linear front by 3×
+- N1 with every step P₃-equivalent and converged: 1 runs, max diff to CGVI(P₃) 3.34e-12
+
 ## P1_eps0.01
 
 | network | h Ω | status | unconv. steps | max residual | q error | J | wall time [s] | P₃-equiv / spline / degen | diff to CGVI(P₃) | linear front at that time |
