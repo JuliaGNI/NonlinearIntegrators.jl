@@ -1,0 +1,136 @@
+# Linear baselines (hard problems, phase 1)
+
+L1 = CGVI(P_s, R = s + 1), s = 2..6, with m = 1..4 substeps of h/m; L2 = Gauss(s), s = 1..6,
+without substeps. h Ω ∈ {0.1, 0.3, 1, 3, 10}, Ω = 1 (ω ≈ 1 for P1 and P4, the mean motion for
+P3). q error: max over the grid n h (t ≤ Terr) of the relative ∞-norm error. A run is
+converged if no solve gave up or threw and, for P3, the angular momentum (preserved exactly by
+both families) is conserved to 1.0e-10. Wall times include no
+compilation; runs under 0.1 s are the minimum of 3 repeats.
+
+## P1_eps0.001
+
+Reference self-check (dt vs dt/2): 2.46e-13. Errors below 10× this value (†) are not resolved by the reference.
+
+- CGVI: 100 runs, 1 not converged (1.0 %), 23 converged with q error ≥ 1
+- Gauss: 30 runs, 0 not converged (0.0 %), 14 converged with q error ≥ 1
+
+Pareto front of all linear methods (converged runs with q error < 1.0):
+
+| method | h Ω | q error | wall time [s] | Newton iterations |
+|---|---|---|---|---|
+| Gauss(5) | 3 | 4.20e-01 | 0.0573 | 2886 |
+| Gauss(6) | 3 | 1.48e-02 | 0.0637 | 2988 |
+| CGVI(P6, m=1) | 3 | 7.60e-03 | 0.127 | 5694 |
+| Gauss(4) | 1 | 2.06e-03 | 0.141 | 6283 |
+| Gauss(5) | 1 | 1.07e-05 | 0.156 | 6283 |
+| Gauss(6) | 1 | 3.91e-08 | 0.171 | 6283 |
+| CGVI(P6, m=3) | 3 | 1.96e-08 | 0.353 | 14542 |
+| CGVI(P6, m=4) | 3 | 6.32e-10 | 0.459 | 18442 |
+| Gauss(5) | 0.3 | 6.67e-11 | 0.527 | 20943 |
+| Gauss(6) | 0.3 | 4.38e-13 † | 0.572 | 20943 |
+| Gauss(5) | 0.1 | 1.75e-13 † | 1.59 | 62831 |
+
+## P1_eps0.01
+
+Reference self-check (dt vs dt/2): 1.67e-13. Errors below 10× this value (†) are not resolved by the reference.
+
+- CGVI: 100 runs, 0 not converged (0.0 %), 16 converged with q error ≥ 1
+- Gauss: 30 runs, 0 not converged (0.0 %), 12 converged with q error ≥ 1
+
+Pareto front of all linear methods (converged runs with q error < 1.0):
+
+| method | h Ω | q error | wall time [s] | Newton iterations |
+|---|---|---|---|---|
+| Gauss(4) | 3 | 7.50e-01 | 0.00602 | 270 |
+| Gauss(5) | 3 | 4.23e-02 | 0.00691 | 287 |
+| Gauss(6) | 3 | 1.49e-03 | 0.00758 | 289 |
+| CGVI(P6, m=1) | 3 | 7.65e-04 | 0.0136 | 573 |
+| Gauss(4) | 1 | 2.06e-04 | 0.0147 | 628 |
+| CGVI(P6, m=4) | 10 | 1.01e-04 | 0.016 | 677 |
+| Gauss(5) | 1 | 1.07e-06 | 0.0162 | 628 |
+| Gauss(6) | 1 | 3.91e-09 | 0.0178 | 628 |
+| CGVI(P6, m=3) | 3 | 1.96e-09 | 0.036 | 1458 |
+| CGVI(P6, m=1) | 1 | 1.96e-09 | 0.0361 | 1458 |
+| CGVI(P6, m=4) | 3 | 6.34e-11 | 0.0465 | 1850 |
+| Gauss(5) | 0.3 | 6.77e-12 | 0.0522 | 2094 |
+| Gauss(6) | 0.3 | 1.28e-13 † | 0.0571 | 2094 |
+| Gauss(5) | 0.1 | 1.01e-13 † | 0.158 | 6283 |
+
+## P3_e0.99
+
+- CGVI: 100 runs, 14 not converged (14.0 %), 86 converged with q error ≥ 1
+- Gauss: 30 runs, 0 not converged (0.0 %), 30 converged with q error ≥ 1
+
+Pareto front of all linear methods (converged runs with q error < 1.0):
+
+| method | h Ω | q error | wall time [s] | Newton iterations |
+|---|---|---|---|---|
+
+## P3_e0.9
+
+- CGVI: 100 runs, 31 not converged (31.0 %), 52 converged with q error ≥ 1
+- Gauss: 30 runs, 10 not converged (33.3 %), 20 converged with q error ≥ 1
+
+Pareto front of all linear methods (converged runs with q error < 1.0):
+
+| method | h Ω | q error | wall time [s] | Newton iterations |
+|---|---|---|---|---|
+| CGVI(P6, m=1) | 0.1 | 6.35e-01 | 0.0624 | 2056 |
+| CGVI(P6, m=4) | 0.3 | 3.45e-01 | 0.0769 | 2479 |
+| CGVI(P4, m=2) | 0.1 | 3.31e-01 | 0.0829 | 3339 |
+| CGVI(P5, m=2) | 0.1 | 5.61e-02 | 0.0994 | 3558 |
+| CGVI(P6, m=2) | 0.1 | 2.22e-03 | 0.117 | 3736 |
+| CGVI(P5, m=3) | 0.1 | 3.52e-04 | 0.157 | 5669 |
+| CGVI(P6, m=3) | 0.1 | 6.66e-05 | 0.181 | 5814 |
+| CGVI(P5, m=4) | 0.1 | 5.21e-05 | 0.213 | 7815 |
+| CGVI(P6, m=4) | 0.1 | 1.51e-06 | 0.246 | 7945 |
+
+## P4_E0.02
+
+Reference self-check (dt vs dt/2): 2.23e-13. Errors below 10× this value (†) are not resolved by the reference.
+
+- CGVI: 100 runs, 11 not converged (11.0 %), 2 converged with q error ≥ 1
+- Gauss: 30 runs, 0 not converged (0.0 %), 9 converged with q error ≥ 1
+
+Pareto front of all linear methods (converged runs with q error < 1.0):
+
+| method | h Ω | q error | wall time [s] | Newton iterations |
+|---|---|---|---|---|
+| Gauss(4) | 3 | 2.72e-02 | 0.0175 | 1396 |
+| Gauss(5) | 3 | 2.62e-03 | 0.0206 | 1334 |
+| Gauss(6) | 3 | 1.30e-04 | 0.0227 | 1315 |
+| Gauss(4) | 1 | 1.14e-05 | 0.0397 | 2734 |
+| CGVI(P6, m=4) | 10 | 1.01e-05 | 0.0488 | 1592 |
+| Gauss(5) | 1 | 9.03e-08 | 0.0526 | 2723 |
+| Gauss(6) | 1 | 7.24e-10 | 0.0559 | 2705 |
+| CGVI(P6, m=3) | 3 | 2.63e-10 | 0.0942 | 3107 |
+| CGVI(P6, m=4) | 3 | 8.80e-12 | 0.12 | 3955 |
+| Gauss(5) | 0.3 | 5.10e-13 † | 0.128 | 6666 |
+| Gauss(6) | 0.3 | 9.38e-14 † | 0.148 | 6666 |
+| CGVI(P6, m=2) | 1 | 8.47e-14 † | 0.167 | 5014 |
+| Gauss(4) | 0.1 | 7.98e-14 † | 0.245 | 10000 |
+| CGVI(P5, m=4) | 1 | 7.03e-14 † | 0.355 | 10951 |
+
+## P4_E0.135
+
+Reference self-check (dt vs dt/2): 1.23e-10. Errors below 10× this value (†) are not resolved by the reference.
+
+- CGVI: 100 runs, 15 not converged (15.0 %), 9 converged with q error ≥ 1
+- Gauss: 30 runs, 0 not converged (0.0 %), 13 converged with q error ≥ 1
+
+Pareto front of all linear methods (converged runs with q error < 1.0):
+
+| method | h Ω | q error | wall time [s] | Newton iterations |
+|---|---|---|---|---|
+| Gauss(5) | 3 | 6.44e-01 | 0.0229 | 1783 |
+| Gauss(6) | 3 | 4.71e-03 | 0.0274 | 1749 |
+| Gauss(4) | 1 | 4.50e-03 | 0.0384 | 2992 |
+| Gauss(5) | 1 | 1.21e-04 | 0.0456 | 2995 |
+| Gauss(6) | 1 | 1.69e-06 | 0.0535 | 2991 |
+| CGVI(P6, m=1) | 1 | 9.65e-07 | 0.104 | 3797 |
+| Gauss(4) | 0.3 | 6.37e-08 | 0.104 | 6666 |
+| Gauss(5) | 0.3 | 2.17e-10 † | 0.12 | 6666 |
+| Gauss(6) | 0.3 | 5.01e-11 † | 0.142 | 6666 |
+| CGVI(P6, m=2) | 1 | 2.75e-11 † | 0.195 | 6870 |
+| CGVI(P4, m=1) | 0.1 | 2.16e-11 † | 0.69 | 30686 |
+| CGVI(P5, m=3) | 0.1 | 4.25e-12 † | 1.96 | 65871 |
