@@ -2,16 +2,19 @@
 #
 #   julia --project=benchmark benchmark/hard_problems/report.jl
 #
-# Reads every results/<case>_baselines.csv and writes, per case,
+# Reads every results/<case>_baselines.csv, and <case>_nvi.csv where present, and writes per case
 #   results/<case>_pareto.png       q error against wall time of the converged runs with q error
-#                                   below MAX_ERR, with the Pareto front of each family and of all
-#                                   linear methods together
-#   results/<case>_invariants.png   invariant errors of the converged runs against h Ω, one panel
-#                                   per family and invariant, one line per s (m = 1)
+#                                   below MAX_ERR, with the Pareto front of each linear family and
+#                                   of all linear methods together, and the network runs on top
+#   results/<case>_invariants.png   invariant errors of the converged linear runs against h Ω, one
+#                                   panel per family and invariant, one line per s (m = 1)
+# and results/baselines.md (linear methods: Pareto-optimal runs, failure counts) and
+# results/nvi.md (networks per run, failure rates, the N1 ≡ CGVI(P₃) check, and the "better"
+# criterion of PLAN.md).
 #
-# A run counts as converged if its status is ok and, for the problems in EXACT_INVARIANTS, the
-# error of an invariant that the methods preserve exactly stays below EXACT_TOL.
-# and results/baselines.md with the Pareto-optimal runs and the failure counts.
+# A run counts as converged if its status is ok, i.e. the residual of every step is at most
+# RES_TOL; for the problems in EXACT_INVARIANTS the summary cross-checks this criterion against an
+# invariant that the methods preserve exactly.
 
 using CairoMakie
 using Printf
@@ -21,6 +24,11 @@ const RESULTS_DIR = joinpath(@__DIR__, "results")
 # categorical slots 1–2 of the reference palette (dataviz skill), validated for all pairs
 const FAMILY_COLORS = Dict("CGVI" => "#2a78d6", "Gauss" => "#eb6834")
 const FRONT_COLOR = "#0b0b0b"
+# the networks: categorical slot 3, told apart by the marker
+const NVI_COLOR = "#1baf7a"
+const NVI_MARKERS = Dict("N1 ReLU3 kinkfree S=4" => :utriangle, "N2 ReLU3 S=4" => :dtriangle,
+    "N2 tanh S=4" => :diamond, "N2 tanh S=8" => :star5)
+nvi_label(d, i) = "$(d["method"][i]) $(d["activation"][i]) S=$(Int(d["S"][i]))"
 
 # ---- reading -----------------------------------------------------------------------------------
 
@@ -33,21 +41,20 @@ function read_csv(path)
     Dict(String(h) => parsecol([r[i] for r in rows]) for (i, h) in enumerate(header))
 end
 
-const FIXED_COLUMNS = ["case", "c", "h", "family", "s", "m", "steps", "status", "floor",
-    "unconverged", "q_err", "iterations", "secs"]
+const FIXED_COLUMNS = ["case", "c", "h", "family", "s", "m", "steps", "status", "unconverged",
+    "max_res", "warnings", "q_err", "iterations", "secs", "method", "activation", "S", "R",
+    "n_equiv", "n_spline", "n_degen", "diff_cgvi3", "secs_cgvi3"]
 invariant_columns(d) = sort(filter(k -> k ∉ FIXED_COLUMNS, collect(keys(d))))
+
+# A run converged iff every step's residual is at most RES_TOL (status ok, see integration.jl).
+converged(d) = d["status"] .== "ok"
 
 # Invariants that both CGVI and Gauss preserve exactly for an exact solution of their step
 # equations (the angular momentum of the Kepler problem is quadratic and a Noether invariant). A
-# larger error than EXACT_TOL shows that the solver accepted steps that do not solve them.
+# converged run with a larger error than EXACT_TOL would contradict the residual criterion; their
+# number is reported as a cross-check.
 const EXACT_INVARIANTS = Dict("P3" => "L")
 const EXACT_TOL = 1E-10
-
-function converged(d)
-    ok = d["status"] .== "ok"
-    inv = get(EXACT_INVARIANTS, first(split(d["case"][1], "_")), nothing)
-    inv === nothing ? ok : ok .& (d[inv] .< EXACT_TOL)
-end
 
 # Runs that converged and whose q error is below 1; a larger relative error is no solution, so
 # these runs are left out of the fronts and figures.
@@ -68,7 +75,7 @@ label(d, i) = d["family"][i] == "Gauss" ? "Gauss($(Int(d["s"][i])))" :
 
 # ---- figures -----------------------------------------------------------------------------------
 
-function pareto_figure(d, name)
+function pareto_figure(d, name, nvi)
     ok = accurate(d)
     fig = Figure(size = (640, 520))
     ax = Axis(fig[1, 1]; xscale = log10, yscale = log10, xlabel = "wall time [s]",
@@ -85,8 +92,15 @@ function pareto_figure(d, name)
     f = pareto(d["secs"], d["q_err"], ok)
     isempty(f) || stairs!(ax, d["secs"][f], d["q_err"][f]; step = :post, color = FRONT_COLOR,
         linewidth = 1, linestyle = :dash, label = "linear front")
+    if nvi !== nothing
+        for i in accurate(nvi)
+            scatter!(ax, [nvi["secs"][i]], [nvi["q_err"][i]]; color = NVI_COLOR, markersize = 12,
+                marker = NVI_MARKERS[nvi_label(nvi, i)], strokecolor = :white, strokewidth = 1,
+                label = nvi_label(nvi, i))
+        end
+    end
     isempty(ok) || Legend(fig[2, 1], ax; orientation = :horizontal, framevisible = false,
-        nbanks = 2)
+        nbanks = 3, merge = true)
     fig
 end
 
@@ -138,6 +152,12 @@ function summary(io, d, name)
         @printf(io, "- %s: %d runs, %d not converged (%.1f %%), %d converged with q error ≥ %g\n",
             fam, length(idx), bad, 100 * bad / length(idx), inaccurate, MAX_ERR)
     end
+    inv = get(EXACT_INVARIANTS, first(split(name, "_")), nothing)
+    if inv !== nothing
+        n = count(i -> converged(d)[i] && !(d[inv][i] ≤ EXACT_TOL), eachindex(d["status"]))
+        @printf(io, "- cross-check: %d converged runs with an error of %s above %g\n", n, inv,
+            EXACT_TOL)
+    end
     println(io, "\nPareto front of all linear methods (converged runs with q error < $(MAX_ERR)):\n")
     println(io, "| method | h Ω | q error | wall time [s] | Newton iterations |")
     println(io, "|---|---|---|---|---|")
@@ -149,21 +169,84 @@ function summary(io, d, name)
     nothing
 end
 
+# ---- networks ----------------------------------------------------------------------------------
+
+"""
+Error of the linear Pareto front at wall time `t`: the smallest q error of an accurate linear run
+that is at most as expensive (Inf if there is none).
+"""
+front_error(d, t) = minimum((d["q_err"][i] for i in accurate(d) if d["secs"][i] ≤ t); init = Inf)
+
+# PLAN.md: a network is "better" iff its error is FACTOR times below the linear front at equal cost
+const FACTOR = 3
+
+fmt(x) = isfinite(x) ? @sprintf("%.2e", x) : "—"
+
+function nvi_summary(io, nvi, d, name)
+    println(io, "\n## $(name)\n")
+    invs = invariant_columns(nvi)
+    println(io, "| network | h Ω | status | unconv. steps | max residual | q error | ",
+        join(invs, " | "), " | wall time [s] | P₃-equiv / spline / degen | diff to CGVI(P₃) | ",
+        "linear front at that time |")
+    println(io, "|", repeat("---|", 10 + length(invs)))
+    for i in eachindex(nvi["status"])
+        @printf(io, "| %s | %g | %s | %d | %s | %s | %s | %.3g | %s | %s | %s |\n",
+            nvi_label(nvi, i), nvi["c"][i], nvi["status"][i], nvi["unconverged"][i],
+            fmt(nvi["max_res"][i]), fmt(nvi["q_err"][i]), join(fmt.(nvi[k][i] for k in invs), " | "),
+            nvi["secs"][i], nvi["activation"][i] == "tanh" ? "—" :
+                            "$(Int(nvi["n_equiv"][i])) / $(Int(nvi["n_spline"][i])) / $(Int(nvi["n_degen"][i]))",
+            fmt(nvi["diff_cgvi3"][i]), fmt(front_error(d, nvi["secs"][i])))
+    end
+    println(io)
+    acc = accurate(nvi)
+    for lab in unique(nvi_label(nvi, i) for i in eachindex(nvi["status"]))
+        idx = findall(i -> nvi_label(nvi, i) == lab, eachindex(nvi["status"]))
+        conv = converged(nvi)
+        bad = count(i -> !conv[i], idx)
+        better = count(i -> i in acc && isfinite(front_error(d, nvi["secs"][i])) &&
+                            nvi["q_err"][i] * FACTOR < front_error(d, nvi["secs"][i]), idx)
+        @printf(io, "- %s: %d runs, %d not converged (%.0f %%), %d better than the linear front by %d×\n",
+            lab, length(idx), bad, 100 * bad / length(idx), better, FACTOR)
+    end
+    # N1 ≡ CGVI(P₃) whenever every step is P₃-equivalent and converged (Theorem 1)
+    eq = findall(i -> nvi["method"][i] == "N1" && conv_all_equiv(nvi, i), eachindex(nvi["status"]))
+    isempty(eq) || @printf(io, "- N1 with every step P₃-equivalent and converged: %d runs, max diff to CGVI(P₃) %s\n",
+        length(eq), fmt(maximum(nvi["diff_cgvi3"][eq])))
+    nothing
+end
+
+conv_all_equiv(nvi, i) = nvi["status"][i] == "ok" && nvi["n_spline"][i] == 0 &&
+                         nvi["n_degen"][i] == 0 && nvi["n_equiv"][i] > 0
+
 function main()
     files = sort(filter(f -> endswith(f, "_baselines.csv"), readdir(RESULTS_DIR)))
+    nvifile(name) = joinpath(RESULTS_DIR, "$(name)_nvi.csv")
+    open(joinpath(RESULTS_DIR, "nvi.md"), "w") do io
+        println(io, "# Networks of the package on the hard problems (phase 2)\n")
+        println(io, """
+        N1 = ShallowNet(ReLU³, S = 4, R = 4) with the kink-free bias interval [1.1, π]; N2 = the same
+        with [-π, π], and ShallowNet(tanh) with S = R = 4 and S = R = 8. DogLeg, regularisation 1e-5,
+        ≤ 1000 iterations per step. Step classes are counted per step and degree of freedom. "Linear
+        front at that time": the smallest q error of an accurate linear run that took at most as long.""")
+        for f in files
+            name = replace(f, "_baselines.csv" => "")
+            isfile(nvifile(name)) || continue
+            nvi_summary(io, read_csv(nvifile(name)), read_csv(joinpath(RESULTS_DIR, f)), name)
+        end
+    end
     open(joinpath(RESULTS_DIR, "baselines.md"), "w") do io
         println(io, "# Linear baselines (hard problems, phase 1)\n")
         println(io, """
         L1 = CGVI(P_s, R = s + 1), s = 2..6, with m = 1..4 substeps of h/m; L2 = Gauss(s), s = 1..6,
         without substeps. h Ω ∈ {0.1, 0.3, 1, 3, 10}, Ω = 1 (ω ≈ 1 for P1 and P4, the mean motion for
         P3). q error: max over the grid n h (t ≤ Terr) of the relative ∞-norm error. A run is
-        converged if no solve gave up or threw and, for P3, the angular momentum (preserved exactly by
-        both families) is conserved to $(EXACT_TOL). Wall times include no
-        compilation; runs under 0.1 s are the minimum of 3 repeats.""")
+        converged if no solve threw and the residual ∞-norm of every step is at most 1e-10. Wall
+        times include no compilation; runs under 0.1 s are the minimum of 3 repeats.""")
         for f in files
             name = replace(f, "_baselines.csv" => "")
             d = read_csv(joinpath(RESULTS_DIR, f))
-            save(joinpath(RESULTS_DIR, "$(name)_pareto.png"), pareto_figure(d, name))
+            nvi = isfile(nvifile(name)) ? read_csv(nvifile(name)) : nothing
+            save(joinpath(RESULTS_DIR, "$(name)_pareto.png"), pareto_figure(d, name, nvi))
             save(joinpath(RESULTS_DIR, "$(name)_invariants.png"), invariants_figure(d, name))
             summary(io, d, name)
         end
