@@ -52,7 +52,7 @@ Random = "1"
 # The cap is 0.13 because 0.14 changes what `PivotedQR` is. In 0.13 it is LAPACK-backed and refuses
 # `Float16`; in 0.14 it accepts `Float16`, and the LAPACK-backed method is `LapackPivotedQR`. The
 # `BlasFloat` guard in `initsolver`, and its docstring, describe the 0.13 method.
-SimpleSolvers = "0.13.3"
+SimpleSolvers = "0.13.3, 0.14"
 StaticArrays = "1"
 Statistics = "1"
 SymbolicNeuralNetworks = "0.8"
