@@ -8,7 +8,7 @@
 # N3 (VISE) of the plan is left out: it is a separate study.
 #
 #   julia --project=benchmark benchmark/hard_problems/run_nvi.jl            # quick cases
-#   julia --project=benchmark benchmark/hard_problems/run_nvi.jl full --cases=P1_eps0.01
+#   julia --project=benchmark benchmark/hard_problems/run_nvi.jl full --cases=FrequencyModulatedOscillator_eps0.01
 #
 # The networks run on the same cases, steps and metrics as run_baselines.jl (see its header),
 # with the nonlinear solver of benchmark/theory/relu_k_sweep.jl (DogLeg, regularisation 1e-5,

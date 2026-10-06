@@ -25,8 +25,8 @@ end
 
 # A step converged iff the ∞-norm of the residual of its nonlinear system at the accepted iterate
 # is at most RES_TOL. The solver's own warnings are no criterion: it accepts steps with residual
-# O(1) through its relative tolerance without a warning (Gauss(2) on P3, e = 0.9, h = 0.3), and
-# DogLeg warns about an underflowing trust region at residuals of 2e-15.
+# O(1) through its relative tolerance without a warning (Gauss(2) on the Kepler problem,
+# e = 0.9, h = 0.3), and DogLeg warns about an underflowing trust region at residuals of 2e-15.
 const RES_TOL = 1E-10
 
 "Discards all log records of a run, and counts those at level ≥ Warn."

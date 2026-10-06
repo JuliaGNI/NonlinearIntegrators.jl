@@ -1,12 +1,13 @@
 # Linear baselines (hard problems, phase 1)
 
 L1 = CGVI(P_s, R = s + 1), s = 2..6, with m = 1..4 substeps of h/m; L2 = Gauss(s), s = 1..6,
-without substeps. h Ω ∈ {0.1, 0.3, 1, 3, 10}, Ω = 1 (ω ≈ 1 for P1 and P4, the mean motion for
-P3). q error: max over the grid n h (t ≤ Terr) of the relative ∞-norm error. A run is
+without substeps. h Ω ∈ {0.1, 0.3, 1, 3, 10}, Ω = 1 (ω ≈ 1 for the frequency-modulated
+oscillator and Hénon–Heiles, the mean motion for the Kepler problem). q error: max over the
+grid n h (t ≤ Terr) of the relative ∞-norm error. A run is
 converged if no solve threw and the residual ∞-norm of every step is at most 1e-10. Wall
 times include no compilation; runs under 0.1 s are the minimum of 3 repeats.
 
-## P1_eps0.001
+## FrequencyModulatedOscillator_eps0.001
 
 Reference self-check (dt vs dt/2): 2.46e-13. Errors below 10× this value (†) are not resolved by the reference.
 
@@ -31,7 +32,7 @@ Pareto front of all linear methods (converged runs with q error < 1.0):
 | Gauss(6) | 0.3 | 4.38e-13 † | 0.951 | 20943 |
 | Gauss(5) | 0.1 | 1.75e-13 † | 2.75 | 62831 |
 
-## P1_eps0.01
+## FrequencyModulatedOscillator_eps0.01
 
 Reference self-check (dt vs dt/2): 1.67e-13. Errors below 10× this value (†) are not resolved by the reference.
 
@@ -57,7 +58,7 @@ Pareto front of all linear methods (converged runs with q error < 1.0):
 | Gauss(6) | 0.3 | 1.28e-13 † | 0.0949 | 2094 |
 | Gauss(5) | 0.1 | 1.01e-13 † | 0.261 | 6283 |
 
-## P3_e0.99
+## KeplerProblem_e0.99
 
 - CGVI: 100 runs, 13 not converged (13.0 %), 87 converged with q error ≥ 1
 - Gauss: 30 runs, 0 not converged (0.0 %), 30 converged with q error ≥ 1
@@ -68,7 +69,7 @@ Pareto front of all linear methods (converged runs with q error < 1.0):
 | method | h Ω | q error | wall time [s] | Newton iterations |
 |---|---|---|---|---|
 
-## P3_e0.9
+## KeplerProblem_e0.9
 
 - CGVI: 100 runs, 31 not converged (31.0 %), 52 converged with q error ≥ 1
 - Gauss: 30 runs, 9 not converged (30.0 %), 21 converged with q error ≥ 1
@@ -89,7 +90,7 @@ Pareto front of all linear methods (converged runs with q error < 1.0):
 | CGVI(P5, m=4) | 0.1 | 5.21e-05 | 0.35 | 7815 |
 | CGVI(P6, m=4) | 0.1 | 1.51e-06 | 0.405 | 7945 |
 
-## P4_E0.02
+## HenonHeiles_E0.02
 
 Reference self-check (dt vs dt/2): 2.23e-13. Errors below 10× this value (†) are not resolved by the reference.
 
@@ -117,7 +118,7 @@ Pareto front of all linear methods (converged runs with q error < 1.0):
 | Gauss(4) | 0.1 | 7.98e-14 † | 0.404 | 10000 |
 | CGVI(P5, m=4) | 1 | 7.03e-14 † | 0.477 | 10951 |
 
-## P4_E0.135
+## HenonHeiles_E0.135
 
 Reference self-check (dt vs dt/2): 1.23e-10. Errors below 10× this value (†) are not resolved by the reference.
 

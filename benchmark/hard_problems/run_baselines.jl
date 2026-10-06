@@ -5,7 +5,7 @@
 #
 #   julia --project=benchmark benchmark/hard_problems/run_baselines.jl            # quick
 #   julia --project=benchmark benchmark/hard_problems/run_baselines.jl full
-#   julia --project=benchmark benchmark/hard_problems/run_baselines.jl full --cases=P1_eps0.001
+#   julia --project=benchmark benchmark/hard_problems/run_baselines.jl full --cases=FrequencyModulatedOscillator_eps0.001
 #
 # For every case and step h = c / Ω, c ∈ STEP_FACTORS, each method integrates (0, T) with the
 # time step h / m, and is evaluated on the grid n h. Recorded per run:

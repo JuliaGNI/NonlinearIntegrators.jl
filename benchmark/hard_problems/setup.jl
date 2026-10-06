@@ -1,14 +1,15 @@
 # Problems, reference solutions and invariants of the hard-problems benchmark (PLAN.md §1, §3).
 #
-# Only builds on GeometricProblems; no problem is redefined here. P2 (charged particle) is
+# Only builds on GeometricProblems; no problem is redefined here. The charged particle in 2D is
 # skipped for now, see the Obsidian note "GeometricProblems/Phase 0 follow-ups".
 #
 # A case is a NamedTuple
-#   name        file stem of the results, e.g. "P1_eps0.01"
-#   problem     "P1", "P3", "P4"
+#   name        file stem of the results, e.g. "FrequencyModulatedOscillator_eps0.01"
+#   problem     "FrequencyModulatedOscillator", "KeplerProblem", "HenonHeiles"
 #   quick       part of the quick preset
-#   Ω           time-scale normalisation: h = c / Ω for c ∈ STEP_FACTORS (ω ≈ 1 for P1 and P4,
-#               the mean motion for P3, as in the plan)
+#   Ω           time-scale normalisation: h = c / Ω for c ∈ STEP_FACTORS (ω ≈ 1 for the
+#               frequency-modulated oscillator and Hénon–Heiles, the mean motion for the Kepler
+#               problem, as in the plan)
 #   T, Terr     final time, and the final time of the q error (Terr ≤ T)
 #   build       (timespan, timestep) -> LODEProblem
 #   reference   :gauss (Gauss(8) with dt = h_min / 50 and dt / 2; the latter is the reference,
@@ -29,25 +30,27 @@ import GeometricProblems.KeplerProblem as kepler
 const STEP_FACTORS = [0.1, 0.3, 1.0, 3.0, 10.0]   # h Ω
 const REF_FACTOR = 50                             # dt_ref = h_min / REF_FACTOR
 
-# ---- P1: frequency-modulated oscillator --------------------------------------------------------
+# ---- frequency-modulated oscillator ------------------------------------------------------------
 
-function p1_case(ε; quick)
+function fmo_case(ε; quick)
     params = merge(fmo.default_parameters(), (ε = ε,))
-    (name = "P1_eps$(ε)", problem = "P1", quick = quick, Ω = 1.0, T = 2π / ε, Terr = 2π / ε,
+    (name = "FrequencyModulatedOscillator_eps$(ε)", problem = "FrequencyModulatedOscillator",
+        quick = quick, Ω = 1.0, T = 2π / ε, Terr = 2π / ε,
         build = (ts, h) -> fmo.lodeproblem([1.0], [0.0]; timespan = ts, timestep = h,
             parameters = params),
         reference = :gauss,
         invariants = (J = fmo.adiabatic_invariant,), angles = ())
 end
 
-# ---- P3: Kepler problem ------------------------------------------------------------------------
+# ---- Kepler problem ----------------------------------------------------------------------------
 
 kepler_perihelion(t, q, p, params) = (R = kepler.runge_lenz_vector(t, q, p, params); atan(R[2], R[1]))
 
-function p3_case(e; quick)
+function kepler_case(e; quick)
     q₀, p₀ = kepler.initial_condition(e)
     params = kepler.default_parameters()
-    (name = "P3_e$(e)", problem = "P3", quick = quick, Ω = 1.0, T = 20π, Terr = 20π,
+    (name = "KeplerProblem_e$(e)", problem = "KeplerProblem", quick = quick, Ω = 1.0, T = 20π,
+        Terr = 20π,
         build = (ts, h) -> kepler.lodeproblem(q₀, p₀; timespan = ts, timestep = h,
             parameters = params),
         reference = t -> first(kepler.exact_solution(t, 0.0, q₀, p₀, params)),
@@ -56,10 +59,11 @@ function p3_case(e; quick)
         angles = (:ϖ,))
 end
 
-# ---- P4: Hénon–Heiles --------------------------------------------------------------------------
+# ---- Hénon–Heiles ------------------------------------------------------------------------------
 
-function p4_case(label, q₀, p₀; quick)
-    (name = "P4_$(label)", problem = "P4", quick = quick, Ω = 1.0, T = 1000.0, Terr = 100.0,
+function henon_heiles_case(label, q₀, p₀; quick)
+    (name = "HenonHeiles_$(label)", problem = "HenonHeiles", quick = quick, Ω = 1.0, T = 1000.0,
+        Terr = 100.0,
         build = (ts, h) -> hh.lodeproblem(q₀, p₀; timespan = ts, timestep = h,
             parameters = hh.default_parameters()),
         reference = :gauss,
@@ -67,12 +71,12 @@ function p4_case(label, q₀, p₀; quick)
 end
 
 const CASES = [
-    p1_case(1E-2; quick = true),
-    p1_case(1E-3; quick = false),
-    p3_case(0.9; quick = true),
-    p3_case(0.99; quick = false),
-    p4_case("E0.02", [0.1, 0.1], [0.1, 0.1]; quick = true),
-    p4_case("E0.135", [0.2, 0.2], [0.3, 0.3]; quick = false)
+    fmo_case(1E-2; quick = true),
+    fmo_case(1E-3; quick = false),
+    kepler_case(0.9; quick = true),
+    kepler_case(0.99; quick = false),
+    henon_heiles_case("E0.02", [0.1, 0.1], [0.1, 0.1]; quick = true),
+    henon_heiles_case("E0.135", [0.2, 0.2], [0.3, 0.3]; quick = false)
 ]
 
 step_sizes(case) = STEP_FACTORS ./ case.Ω

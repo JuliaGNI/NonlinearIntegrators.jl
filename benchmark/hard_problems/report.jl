@@ -53,7 +53,7 @@ converged(d) = d["status"] .== "ok"
 # equations (the angular momentum of the Kepler problem is quadratic and a Noether invariant). A
 # converged run with a larger error than EXACT_TOL would contradict the residual criterion; their
 # number is reported as a cross-check.
-const EXACT_INVARIANTS = Dict("P3" => "L")
+const EXACT_INVARIANTS = Dict("KeplerProblem" => "L")
 const EXACT_TOL = 1E-10
 
 # Runs that converged and whose q error is below 1; a larger relative error is no solution, so
@@ -238,8 +238,9 @@ function main()
         println(io, "# Linear baselines (hard problems, phase 1)\n")
         println(io, """
         L1 = CGVI(P_s, R = s + 1), s = 2..6, with m = 1..4 substeps of h/m; L2 = Gauss(s), s = 1..6,
-        without substeps. h Ω ∈ {0.1, 0.3, 1, 3, 10}, Ω = 1 (ω ≈ 1 for P1 and P4, the mean motion for
-        P3). q error: max over the grid n h (t ≤ Terr) of the relative ∞-norm error. A run is
+        without substeps. h Ω ∈ {0.1, 0.3, 1, 3, 10}, Ω = 1 (ω ≈ 1 for the frequency-modulated
+        oscillator and Hénon–Heiles, the mean motion for the Kepler problem). q error: max over the
+        grid n h (t ≤ Terr) of the relative ∞-norm error. A run is
         converged if no solve threw and the residual ∞-norm of every step is at most 1e-10. Wall
         times include no compilation; runs under 0.1 s are the minimum of 3 repeats.""")
         for f in files

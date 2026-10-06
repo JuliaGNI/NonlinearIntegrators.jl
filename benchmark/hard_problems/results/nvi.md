@@ -5,7 +5,7 @@ with [-π, π], and ShallowNet(tanh) with S = R = 4 and S = R = 8. DogLeg, regul
 ≤ 1000 iterations per step. Step classes are counted per step and degree of freedom. "Linear
 front at that time": the smallest q error of an accurate linear run that took at most as long.
 
-## P1_eps0.001
+## FrequencyModulatedOscillator_eps0.001
 
 | network | h Ω | status | unconv. steps | max residual | q error | J | wall time [s] | P₃-equiv / spline / degen | diff to CGVI(P₃) | linear front at that time |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -18,7 +18,7 @@ front at that time": the smallest q error of an accurate linear run that took at
 - N2 tanh S=4: 1 runs, 1 not converged (100 %), 0 better than the linear front by 3×
 - N1 with every step P₃-equivalent and converged: 1 runs, max diff to CGVI(P₃) 3.34e-12
 
-## P1_eps0.01
+## FrequencyModulatedOscillator_eps0.01
 
 | network | h Ω | status | unconv. steps | max residual | q error | J | wall time [s] | P₃-equiv / spline / degen | diff to CGVI(P₃) | linear front at that time |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -49,7 +49,7 @@ front at that time": the smallest q error of an accurate linear run that took at
 - N2 tanh S=8: 5 runs, 5 not converged (100 %), 0 better than the linear front by 3×
 - N1 with every step P₃-equivalent and converged: 1 runs, max diff to CGVI(P₃) 2.78e-13
 
-## P3_e0.99
+## KeplerProblem_e0.99
 
 | network | h Ω | status | unconv. steps | max residual | q error | H | L | ϖ | wall time [s] | P₃-equiv / spline / degen | diff to CGVI(P₃) | linear front at that time |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -80,7 +80,7 @@ front at that time": the smallest q error of an accurate linear run that took at
 - N2 tanh S=8: 5 runs, 5 not converged (100 %), 0 better than the linear front by 3×
 - N1 with every step P₃-equivalent and converged: 3 runs, max diff to CGVI(P₃) 1.19e-15
 
-## P3_e0.9
+## KeplerProblem_e0.9
 
 | network | h Ω | status | unconv. steps | max residual | q error | H | L | ϖ | wall time [s] | P₃-equiv / spline / degen | diff to CGVI(P₃) | linear front at that time |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -111,7 +111,7 @@ front at that time": the smallest q error of an accurate linear run that took at
 - N2 tanh S=8: 5 runs, 5 not converged (100 %), 0 better than the linear front by 3×
 - N1 with every step P₃-equivalent and converged: 2 runs, max diff to CGVI(P₃) 1.01e+00
 
-## P4_E0.02
+## HenonHeiles_E0.02
 
 | network | h Ω | status | unconv. steps | max residual | q error | H | wall time [s] | P₃-equiv / spline / degen | diff to CGVI(P₃) | linear front at that time |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -142,7 +142,7 @@ front at that time": the smallest q error of an accurate linear run that took at
 - N2 tanh S=8: 5 runs, 4 not converged (80 %), 0 better than the linear front by 3×
 - N1 with every step P₃-equivalent and converged: 4 runs, max diff to CGVI(P₃) 4.10e-11
 
-## P4_E0.135
+## HenonHeiles_E0.135
 
 | network | h Ω | status | unconv. steps | max residual | q error | H | wall time [s] | P₃-equiv / spline / degen | diff to CGVI(P₃) | linear front at that time |
 |---|---|---|---|---|---|---|---|---|---|---|
