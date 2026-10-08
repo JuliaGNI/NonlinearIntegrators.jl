@@ -159,6 +159,9 @@ scripts sat in a talk directory, all carrying much the same code.
 
 ### Changed
 
+- **CI uploads coverage from the `Julia 1 - ubuntu-latest` job instead of `Julia min`**, and a test
+  job saves the Julia cache only when it succeeds.
+
 - **The Newton solve of every network integrator now uses a rank-revealing linear solver**, so a
   rank-deficient Jacobian is solved rather than reported —
   [#98](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/98).
