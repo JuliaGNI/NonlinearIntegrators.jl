@@ -10,6 +10,7 @@ if "core" in GROUPS
     @safetestset "Parameter flattening" include("nvi/parameter_flattening_unit.jl")
     @safetestset "OGA kernels" include("oga/oga_kernels.jl")
     @safetestset "VISE" include("vise/vise_unit.jl")
+    @safetestset "VISplineFree" include("vi_spline/free_knot_vi_unit.jl")
     @safetestset "Scripts archives" include("scripts_archives_tests.jl")
     @safetestset "Inference and allocations" include("quality/inference_and_allocations.jl")
     @safetestset "Plots" include("plots_tests.jl")

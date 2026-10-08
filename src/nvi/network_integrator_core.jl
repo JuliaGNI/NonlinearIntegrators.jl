@@ -95,19 +95,21 @@ default_solver(::NetworkIntegratorMethod) = Newton()
     initsolver(solvermethod::Union{Newton, SimpleSolvers.DogLeg},
         method::NetworkIntegratorMethod, caches::CacheDict; kwargs...)
 
-The framework's nonlinear solver, with `linear_solver_method = SimpleSolvers.PivotedQR()` as
+The framework's nonlinear solver, with `linear_solver_method = SimpleSolvers.LapackPivotedQR()` as
 the default linear solve.
 
 Only the solver methods that solve a linear system get the default: `Newton`, which
 `QuasiNewton()` also constructs, and `DogLeg`. Any other solver method, `Picard()` among them,
 takes no `linear_solver_method` and is built with the caller's options unchanged.
 
-!!! warning "Two different `PivotedQR`s"
+!!! warning "Three `PivotedQR`s"
     Written out in full because this package exports a `PivotedQR` of its own — the
     [`PivotedQR`](@ref) `OGAFit` that truncates the Gram solve of a greedy dictionary fit. That
     one is an `initial_guess_method` ingredient; this one is a `LinearSolverMethod` for the
-    Newton system. Under `using NonlinearIntegrators` the unqualified name is the fit, so a
-    caller overriding this option has to write `SimpleSolvers.PivotedQR()` too.
+    Newton system. SimpleSolvers has two of those: `LapackPivotedQR`, used here, and
+    `PivotedQR`, the same factorization in plain Julia. Under `using NonlinearIntegrators` the
+    unqualified `PivotedQR` is the fit, so a caller overriding this option writes the qualified
+    `SimpleSolvers.` name too.
 
 **The Newton Jacobian of a network integrator is exactly rank deficient, and no amount of
 conditioning care changes that.** Two mechanisms stack. The activation `relu_k(k)` is
@@ -127,7 +129,7 @@ failed on Linux (issue
 converges to `3e-12` whenever it does not throw. That is exactly the situation a minimum-norm
 solve is defined for, so the deficient directions are dropped instead of divided by.
 
-`SimpleSolvers.PivotedQR` and not `SimpleSolvers.SVDSolver` because a Newton step is one solve
+`SimpleSolvers.LapackPivotedQR` and not `SimpleSolvers.SVDSolver` because a Newton step is one solve
 per factorization, which is the ratio the complete orthogonal factorization wins on by 2–3×; and
 the rank here is a means to a stable step rather than the quantity of interest, which is the case
 `SVDSolver` is the more trustworthy one for. Ask `SVDSolver` when the spectrum itself is the
@@ -138,19 +140,19 @@ to `GeometricIntegrator` wins, so `linear_solver_method = SimpleSolvers.LapackLU
 solve to anyone who wants a singular Jacobian reported rather than solved.
 
 **`Float16` is left alone**, and keeps whatever `SimpleSolvers.default_linear_solver_method`
-picks for it — the generic `LU`. Both rank-revealing methods are LAPACK-backed (`geqp3`/`tzrzf`
-and `gesdd`), so they accept only `Float32`, `Float64`, `ComplexF32` and `ComplexF64` and refuse
-anything else by name; handing one a half-precision Jacobian raises `ArgumentError` before the
-first step. The consequence to be honest about: **`Float16` is still exposed to #98.** That is a
+picks for it — the generic `LU`. `LapackPivotedQR` and `SVDSolver` are LAPACK-backed
+(`geqp3`/`tzrzf` and `gesdd`), so they accept only `Float32`, `Float64`, `ComplexF32` and
+`ComplexF64` and refuse anything else by name; handing one a half-precision Jacobian raises
+`ArgumentError` before the first step. The consequence to be honest about: **`Float16` is still exposed to #98.** That is a
 narrower gap than it sounds — the Jacobian is ill-conditioned at half precision anyway, and
 `test/unit/network_integrators_unit.jl` already records that whether the Newton solve converges
-there is not a contract — but it is not closed, and closing it would need a rank-revealing method
-that does not go through LAPACK.
+there is not a contract — but it is not closed. SimpleSolvers 0.14's plain-Julia `PivotedQR`
+accepts `Float16` and could close it; it is not the default here yet.
 """
 function initsolver(solvermethod::Union{Newton, SimpleSolvers.DogLeg},
         method::NetworkIntegratorMethod, caches::CacheDict; kwargs...)
     options = datatype(caches.problem) <: LinearAlgebra.BlasFloat ?
-              merge((; linear_solver_method = SimpleSolvers.PivotedQR()), values(kwargs)) :
+              merge((; linear_solver_method = SimpleSolvers.LapackPivotedQR()), values(kwargs)) :
               values(kwargs)
     invoke(initsolver,
         Tuple{SimpleSolvers.NonlinearSolverMethod, GeometricMethod, CacheDict},

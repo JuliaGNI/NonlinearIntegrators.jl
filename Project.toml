@@ -17,6 +17,7 @@ NeuralNetworkParameters = "67f4d93a-60e9-472b-8cdd-1ccf6005724a"
 QuadratureRules = "a08977f5-a20d-4b99-b11f-f5ea535e0575"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SimpleSolvers = "36b790f5-6434-4fbe-b711-1f64a1e2f6a2"
+SimpleSplines = "ac480f6c-9a94-4d53-a283-9db69f109154"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 SymbolicNeuralNetworks = "aed23131-dcd0-47ca-8090-d21e605652e3"
@@ -25,34 +26,29 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 [weakdeps]
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
+[sources]
+GeometricOptimizers = {path = "../GeometricOptimizers.jl"}
+SymbolicNeuralNetworks = {path = "../SymbolicNeuralNetworks.jl"}
+
 [extensions]
 NonlinearIntegratorsPlots = "Makie"
 
 [compat]
-AbstractNeuralNetworks = "0.8"
+AbstractNeuralNetworks = "0.9"
 CompactBasisFunctions = "0.3, 0.4"
 ForwardDiff = "1"
-GeometricBase = "0.14.9"
+GeometricBase = "0.15"
 GeometricEquations = "0.21"
 GeometricIntegratorsBase = "0.6.3"
-GeometricOptimizers = "0.7"
+GeometricOptimizers = "0.8"
 GeometricSolutions = "0.6"
 LinearAlgebra = "1"
 Makie = "0.24"
-NeuralNetworkParameters = "0.3"
+NeuralNetworkParameters = "0.4.2"
 QuadratureRules = "0.2"
 Random = "1"
-# "0.13.3" admits 0.13.3 and later 0.13 releases, and not 0.14.
-#
-# The floor is 0.13.3 because `initsolver` in `src/nvi/network_integrator_core.jl` names
-# `SimpleSolvers.PivotedQR`, which no earlier release has. The name sits in a function body, so on
-# 0.13.2 the package still precompiles and loads, and the missing binding raises an `UndefVarError`
-# only when a network integrator is constructed. That is why this is a bound and not a fallback.
-#
-# The cap is 0.13 because 0.14 changes what `PivotedQR` is. In 0.13 it is LAPACK-backed and refuses
-# `Float16`; in 0.14 it accepts `Float16`, and the LAPACK-backed method is `LapackPivotedQR`. The
-# `BlasFloat` guard in `initsolver`, and its docstring, describe the 0.13 method.
-SimpleSolvers = "0.13.3"
+SimpleSolvers = "0.14.1"
+SimpleSplines = "0.3.2"
 StaticArrays = "1"
 Statistics = "1"
 SymbolicNeuralNetworks = "0.8"

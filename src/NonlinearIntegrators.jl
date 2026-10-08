@@ -136,6 +136,12 @@ include("vise/vise.jl")
 include("vise/vise_basis.jl")
 export VISE, VISEBasis
 
+# The free-knot B-spline variational integrator and the network-to-spline conversion. The
+# fixed-knot one is GeometricIntegrators' `CGVI` on a SimpleSplines basis, see the file.
+using SimpleSplines: SimpleSplines, BSplineBasis, GeneralMesh
+include("vi_spline/vi_spline.jl")
+export VISplineFree
+
 # The plotting API. The data layer — `continuous_solution`, `Trajectory`, the error reductions —
 # and the figure naming scheme are implemented in `src/` rather than in the extension because
 # neither is plotting: every caller of a network or symbolic integrator needs them, whether or not

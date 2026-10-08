@@ -275,9 +275,9 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::Tr
         ps_flat, layout = NeuralNetworkParameters.flatten(PNN.params)
         loss(p) = mae_loss(network_inputs, labels, PNN,
             NeuralNetworkParameters.unflatten(layout, p))
-        algorithm = GeometricOptimizers.Adam(PT)
+        algorithm = GeometricOptimizers.Adam()
         opt = GeometricOptimizers.Optimizer(ps_flat, loss; algorithm = algorithm,
-            linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
+            linesearch = GeometricOptimizers.DecayingStatic(; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
         state = GeometricOptimizers.OptimizerState(algorithm, ps_flat)
         err = zero(PT)
         for ep in 1:nepochs

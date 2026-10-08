@@ -22,7 +22,7 @@ include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
 
 # ---- the linear solver every network integrator gets ------------------------
 #
-# `initsolver` hands these methods `SimpleSolvers.PivotedQR()`, because their Newton
+# `initsolver` hands these methods `SimpleSolvers.LapackPivotedQR()`, because their Newton
 # Jacobian is *exactly* rank deficient — see the docstring in `network_integrator_core.jl` and
 # `scripts/newton_jacobian_rank.jl`, which measures rank 5 of 13 unknowns at `S = 4` with a gap
 # of fourteen orders in the spectrum. An LU raises `SingularException` on such a matrix, and
@@ -42,10 +42,10 @@ include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
     for row in NETWORK_INTEGRATORS, T in TEST_TYPES
 
         int = GeometricIntegrator(ho_problem(T), row.make(T))
-        @test lsm(int) isa SimpleSolvers.PivotedQR
+        @test lsm(int) isa SimpleSolvers.LapackPivotedQR
     end
 
-    # `Float16` is deliberately excluded: both rank-revealing methods are LAPACK-backed and
+    # `Float16` is deliberately excluded: `LapackPivotedQR` and `SVDSolver` are LAPACK-backed and
     # refuse a half-precision matrix by name, so offering one there replaces #98 with an
     # `ArgumentError` before the first step. It keeps the generic `LU` that
     # `SimpleSolvers.default_linear_solver_method` picks — which means it is still exposed to
@@ -71,9 +71,9 @@ include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
     @test GeometricIntegrator(ho_problem(T), m; solver = SimpleSolvers.Picard()) isa
           GeometricIntegrator
     @test lsm(GeometricIntegrator(ho_problem(T), m; solver = SimpleSolvers.QuasiNewton())) isa
-          SimpleSolvers.PivotedQR
+          SimpleSolvers.LapackPivotedQR
     @test lsm(GeometricIntegrator(ho_problem(T), m; solver = SimpleSolvers.DogLeg())) isa
-          SimpleSolvers.PivotedQR
+          SimpleSolvers.LapackPivotedQR
 
     # and the framework's own solver options still reach the solver beside it
     int = GeometricIntegrator(ho_problem(T), m)
