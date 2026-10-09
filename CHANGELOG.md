@@ -159,6 +159,15 @@ scripts sat in a talk directory, all carrying much the same code.
 
 ### Changed
 
+- **Four test files moved off the top level of `test/`**, because the test convention keeps a test
+  file there only where it mirrors `src/<name>.jl`. `test/plots_tests.jl` tests `src/plots.jl` and
+  is now `test/plots.jl`. The other three reach source files in more than one directory, or none
+  under `src/`, so they are now under `test/integration/`: `test/bases_smoke.jl` and
+  `test/methods_smoke.jl` (`src/methods.jl`, `src/nvi/`, `src/oga/`, `src/vise/`) are
+  `test/integration/bases_smoke.jl` and `test/integration/methods_smoke.jl`, and
+  `test/scripts_archives_tests.jl` (`scripts/archives.jl`) is
+  `test/integration/scripts_archives_tests.jl`.
+
 - **CI uploads coverage from the `Julia 1 - ubuntu-latest` job instead of `Julia min`**, and a test
   job saves the Julia cache only when it succeeds.
 

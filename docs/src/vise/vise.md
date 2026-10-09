@@ -88,7 +88,7 @@ package does not duplicate any of it:
     `(t, q, p, params)` is called with three arguments.
 
     Measured on GeometricProblems 0.8.3 / GeometricSolutions 0.6.5, and guarded by a `@test_broken`
-    in `test/plots_tests.jl` so that a fix upstream is noticed here.
+    in `test/plots.jl` so that a fix upstream is noticed here.
 
     Until then, take the relative Hamiltonian error from the third panel of
     [`Diagnostics.plot_solution`](@ref NonlinearIntegrators.Diagnostics.plot_solution), which

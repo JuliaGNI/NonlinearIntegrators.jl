@@ -12,7 +12,7 @@ module ScriptsArchivesTests
 
 using Test
 
-include(joinpath(@__DIR__, "..", "scripts", "archives.jl"))
+include(joinpath(@__DIR__, "..", "..", "scripts", "archives.jl"))
 
 @testset "scripts/archives.jl" begin
     @testset "parse_arguments" begin
