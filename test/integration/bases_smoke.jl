@@ -4,7 +4,7 @@
 
 using Test
 using NonlinearIntegrators
-include(joinpath(@__DIR__, "helpers", "testsetup.jl"))
+include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
 
 @testset "basis smoke ($T)" for T in TEST_TYPES
     @debug "basis smoke: element type = $T"

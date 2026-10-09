@@ -5,14 +5,14 @@ const GROUPS = isempty(ARGS) ? ["core", "slow"] : ARGS
 if "core" in GROUPS
     @safetestset "Aqua" include("quality/aqua.jl")
     @safetestset "JET" include("quality/jet.jl")
-    @safetestset "Basis smoke" include("bases_smoke.jl")
-    @safetestset "Method smoke" include("methods_smoke.jl")
+    @safetestset "Basis smoke" include("integration/bases_smoke.jl")
+    @safetestset "Method smoke" include("integration/methods_smoke.jl")
     @safetestset "Parameter flattening" include("nvi/parameter_flattening_unit.jl")
     @safetestset "OGA kernels" include("oga/oga_kernels.jl")
     @safetestset "VISE" include("vise/vise_unit.jl")
-    @safetestset "Scripts archives" include("scripts_archives_tests.jl")
+    @safetestset "Scripts archives" include("integration/scripts_archives_tests.jl")
     @safetestset "Inference and allocations" include("quality/inference_and_allocations.jl")
-    @safetestset "Plots" include("plots_tests.jl")
+    @safetestset "Plots" include("plots.jl")
     @safetestset "ShallowNet accuracy" include("integration/shallownet_accuracy.jl")
 end
 if "slow" in GROUPS

@@ -83,7 +83,7 @@ decide whether to pass `p` to the invariant, and that test is `false` for a `Geo
 `probType` both as a parameter and in its `where` clause, so the constraint does not apply as it
 reads. The `q`-only branch is therefore always taken and a Hamiltonian expecting
 `(t, q, p, params)` is called with three arguments. Measured on GeometricProblems 0.8.3 /
-GeometricSolutions 0.6.5, and guarded by a `@test_broken` in `test/plots_tests.jl` with a second
+GeometricSolutions 0.6.5, and guarded by a `@test_broken` in `test/plots.jl` with a second
 assertion pinning the cause, so a fix upstream is noticed rather than silently changing figures.
 
 ### Naming
