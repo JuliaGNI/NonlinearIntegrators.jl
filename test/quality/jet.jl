@@ -5,9 +5,6 @@
 # test calls `residual!` with directly: only the `@allocated` and `@inferred` calls in
 # `inference_and_allocations.jl`, at `Float64`. The `Float32` and `Float16` runs of
 # `nvi/network_integrators_unit.jl` reach `residual!` only through `integrate`, so they get no line.
-#
-# On Julia before 1.12 (JET 0.9) every line reports runtime dispatch, and on 1.12 and 1.13 (JET
-# 0.12) none does, so the lines are `@test_skip` before 1.12: issue #121.
 
 using Test
 using JET
@@ -55,10 +52,6 @@ else
     @testset "residual! $name" for (name, make) in CASES
         types = residual_types(make)
         tm = (NonlinearIntegrators,)
-        if VERSION < v"1.12"
-            @test_skip isempty(JET.get_reports(JET.report_opt(residual!, types; target_modules = tm)))  # #121
-        else
-            @test isempty(JET.get_reports(JET.report_opt(residual!, types; target_modules = tm)))
-        end
+        @test isempty(JET.get_reports(JET.report_opt(residual!, types; target_modules = tm)))
     end
 end

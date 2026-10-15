@@ -159,6 +159,16 @@ scripts sat in a talk directory, all carrying much the same code.
 
 ### Changed
 
+- **Julia 1.12 is the floor** (`[compat] julia = "1.12"`, from 1.11). A compat-only change for
+  callers on 1.12 and later; nothing in the package's code changes. The reason is the test
+  dependency JET: from 0.10 it requires Julia 1.12, so on a Dependabot pull request, where CI
+  resolves the newest compatible versions, the `Julia min` jobs on 1.11 could not install the
+  test environment at all, and every bump went red on a required check. JET 0.9, the last for
+  1.11, also reported runtime dispatch in `residual!` that 0.12 does not
+  ([#121](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/121)), so the JET gate is
+  gone. The Aqua version gate, which had no reason of its own, is gone too
+  ([#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119)).
+
 - **Four test files moved off the top level of `test/`**, because the test convention keeps a test
   file there only where it mirrors `src/<name>.jl`. `test/plots_tests.jl` tests `src/plots.jl` and
   is now `test/plots.jl`. The other three reach source files in more than one directory, or none
@@ -474,7 +484,8 @@ gets rediscovered:
     tests moved from `test/unit/` and `test/smoke/` to the directory of the source they test:
     `test/nvi/`, `test/oga/` and `test/vise/`, and the two smoke files to `test/`.
   - `test/quality/aqua_jet.jl` is now `test/quality/aqua.jl`. The `NI_STATIC_ANALYSIS`
-    environment variable is gone; Aqua runs on stable Julia from 1.12, as before.
+    environment variable is gone, and so is the version gate: Aqua runs on every Julia, closing
+    [#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119).
   - `test/quality/jet_residual.jl` was never run by the suite; it is a script, and it is now
     `scripts/jet_residual.jl`.
   - Each `@test_broken` names its issue: #98, and
@@ -484,14 +495,12 @@ gets rediscovered:
 - **JET checks the Newton hot path in the suite.** `test/quality/jet.jl` runs in `core`, directly
   after Aqua, and asserts that `JET.report_opt` finds no runtime dispatch in `residual!` for
   `ShallowNet`, `ShallowNetReversible`, `ShallowNetAutodiff` and `ShallowNetAutodiffReversible`,
-  at the argument types of `scripts/jet_residual.jl`. On Julia before 1.12 JET reports on each of
-  them, so the four lines are `@test_skip` there, with
+  at the argument types of `scripts/jet_residual.jl`. The four lines assert on every supported
+  Julia; JET 0.9 on Julia 1.11 reported runtime dispatch in each of them, which the 1.12 floor
+  removes —
   [#121](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/121). It records one
   `@test_skip` where JET does not work on the running Julia. The skipped `JET` testset and
-  `using JET` leave `test/quality/aqua.jl`. The test bound on JET admits 0.11 and 0.12 as well as
-  0.9 and 0.10. The Aqua version gate keeps its condition, and its `@test_skip` now names
-  [#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119): with JET gone from that
-  file, the gate has no reason of its own.
+  `using JET` leave `test/quality/aqua.jl`. The test bound on JET is 0.10, 0.11 and 0.12.
 
 - **Two unused destructured locals in the test suite are now `_`**, as fatou 0.21.0 reports
   them: `layout` in `test/nvi/parameter_flattening_unit.jl` and `V` in `test/oga/oga_kernels.jl`.
