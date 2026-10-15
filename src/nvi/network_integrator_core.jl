@@ -139,7 +139,7 @@ solve to anyone who wants a singular Jacobian reported rather than solved.
 
 The default holds at every element type, `Float16` included: `SimpleSolvers.PivotedQR` is a
 pure-Julia Businger–Golub QR, not a LAPACK call, so it accepts any `AbstractFloat`. Whether the
-Newton solve converges at half precision is still not a contract, because the Jacobian is
+Newton solve converges at half precision is not a contract, because the Jacobian is
 ill-conditioned there anyway.
 """
 function initsolver(solvermethod::Union{Newton, SimpleSolvers.DogLeg},

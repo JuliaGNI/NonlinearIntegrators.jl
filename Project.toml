@@ -30,17 +30,17 @@ NonlinearIntegratorsPlots = "Makie"
 
 [compat]
 AbstractNeuralNetworks = "0.9.1"
-CompactBasisFunctions = "0.3, 0.4"
+CompactBasisFunctions = "0.4.2"
 ForwardDiff = "1"
 GeometricBase = "0.15"
-GeometricEquations = "0.21"
-GeometricIntegratorsBase = "0.6.3"
+GeometricEquations = "0.21.5"
+GeometricIntegratorsBase = "0.6.9"
 GeometricOptimizers = "0.9"
 GeometricSolutions = "0.6.7"
 LinearAlgebra = "1"
 Makie = "0.24"
 NeuralNetworkParameters = "0.5"
-QuadratureRules = "0.2"
+QuadratureRules = "0.2.2"
 Random = "1"
 # The floor is 0.14 because `initsolver` in `src/nvi/network_integrator_core.jl` gives every element
 # type `SimpleSolvers.PivotedQR`, which is the pure-Julia QR that accepts `Float16` from 0.14 on. In

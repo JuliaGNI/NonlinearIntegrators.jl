@@ -170,12 +170,21 @@ scripts sat in a talk directory, all carrying much the same code.
   | package | from | to |
   |:--|:--|:--|
   | `AbstractNeuralNetworks` | `0.8` | `0.9.1` |
+  | `CompactBasisFunctions` | `0.3, 0.4` | `0.4.2` |
   | `GeometricBase` | `0.14.9` | `0.15` |
+  | `GeometricEquations` | `0.21` | `0.21.5` |
+  | `GeometricIntegratorsBase` | `0.6.3` | `0.6.9` |
   | `GeometricOptimizers` | `0.7` | `0.9` |
   | `NeuralNetworkParameters` | `0.3` | `0.5` |
+  | `QuadratureRules` | `0.2` | `0.2.2` |
   | `SimpleSolvers` | `0.13.3` | `0.14.2` |
   | `SymbolicNeuralNetworks` | `0.8` | `0.9` |
   | `GeometricProblems` (test only) | `0.8` | `0.9.1` |
+  | `GeometricIntegrators` (`scripts/` only) | `0.18.4` | `0.18.6` |
+
+  `CompactBasisFunctions`, `GeometricEquations`, `GeometricIntegratorsBase` and `QuadratureRules`
+  move only to their first release that admits `GeometricBase` 0.15, so that each floor can be
+  installed.
 
   Two call sites change with them, and neither changes a result. `GeometricOptimizers.Adam` and
   `DecayingStatic` take no element type any more, because the `Optimizer` converts them to the

@@ -268,8 +268,8 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::Tr
         PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
         # The optimizer works in the flat vector; see the same construction in `ShallowNet`'s
         # `initial_params!` for why it is given one directly rather than a flat `NamedTuple`.
-        # `Adam` and the line search are built at the parameter element type, and supply direction
-        # and learning rate respectively — the rate decaying from 1e-3 to 5e-5 over the epoch
+        # `Optimizer` converts `Adam` and the line search to the parameter element type. They
+        # supply direction and learning rate — the rate decaying from 1e-3 to 5e-5 over the epoch
         # budget. Nothing aliases, so `PNN.params` is refreshed from `ps_flat` inside the loop.
         local PT = eltype(PNN.params[1].W)
         ps_flat, layout = NeuralNetworkParameters.flatten(PNN.params)

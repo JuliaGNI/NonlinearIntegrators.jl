@@ -97,10 +97,10 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::
         labels = reshape(network_labels[:, k], 1, extrapolation_substep + 1)
 
         PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
-        # `Adam` and the line search are built at the parameter element type: `Optimizer` does not
-        # convert `Adam`, so an `Adam{Float64}` handed `Float32` parameters would not dispatch.
-        # `Adam` supplies only a direction, so the learning rate is the line search, decaying from
-        # 1e-3 to 5e-5 over the epoch budget.
+        # `Optimizer` converts `Adam` and the line search to the parameter element type, so
+        # neither has to name one and one construction serves every precision. `Adam` supplies
+        # only a direction, so the learning rate is the line search, decaying from 1e-3 to 5e-5
+        # over the epoch budget.
         #
         # The optimizer is given the *flat vector*, which is what it works in anyway: handed a
         # `NamedTuple`, `GeometricOptimizers` flattens it itself inside the `Gradient` it builds
