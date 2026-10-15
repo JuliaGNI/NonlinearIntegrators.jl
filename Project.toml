@@ -29,7 +29,7 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 NonlinearIntegratorsPlots = "Makie"
 
 [compat]
-AbstractNeuralNetworks = "0.8"
+AbstractNeuralNetworks = "0.8, 0.9"
 CompactBasisFunctions = "0.3, 0.4"
 ForwardDiff = "1"
 GeometricBase = "0.14.9"
