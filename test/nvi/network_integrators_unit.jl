@@ -45,17 +45,13 @@ include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
         @test lsm(int) isa SimpleSolvers.PivotedQR
     end
 
-    # `Float16` is deliberately excluded: both rank-revealing methods are LAPACK-backed and
-    # refuse a half-precision matrix by name, so offering one there replaces #98 with an
-    # `ArgumentError` before the first step. It keeps the generic `LU` that
-    # `SimpleSolvers.default_linear_solver_method` picks — which means it is still exposed to
-    # #98, and that is recorded rather than papered over.
+    # `Float16` gets the same default: `SimpleSolvers.PivotedQR` is a pure-Julia QR, not a
+    # LAPACK call, so it accepts a half-precision matrix.
     int16 = GeometricIntegrator(
         HarmonicOscillator.lodeproblem([Float16(0.5)], [Float16(0.0)];
             timespan = (Float16(0.0), Float16(0.2)), timestep = Float16(0.1)),
         NETWORK_INTEGRATORS[1].make(Float16))
-    @test !(lsm(int16) isa SimpleSolvers.RankRevealingMethod)
-    @test lsm(int16) isa SimpleSolvers.LU
+    @test lsm(int16) isa SimpleSolvers.PivotedQR
 
     # It is a default, not a decision taken away from the caller: a `linear_solver_method` passed
     # to `GeometricIntegrator` wins, so one keyword restores an LU.

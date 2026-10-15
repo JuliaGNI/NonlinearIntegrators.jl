@@ -208,32 +208,24 @@ scripts sat in a talk directory, all carrying much the same code.
   solved. Solver methods that do not solve a linear system — `Picard` among them — are built with
   the caller's options unchanged and receive no `linear_solver_method`.
 
-  ⚠️ **`Float16` is excluded and is still exposed to #98.** Both rank-revealing methods are
-  LAPACK-backed, so they accept only `Float32`, `Float64`, `ComplexF32` and `ComplexF64` and
-  refuse anything else by name. The default is therefore added only for a BLAS element type, and
-  half precision keeps the generic `LU` that `SimpleSolvers.default_linear_solver_method` picks
-  for it. Offering it unconditionally instead replaced #98 at `Float16` with an `ArgumentError`
-  raised before the first step — caught by the dictionary regression test, which asserts that the
-  only failures reachable there are the two documented ones. This is a narrower gap than it
-  sounds, since that test already records that whether the Newton solve converges at half
-  precision is not a contract; but it is a gap, and closing it needs a rank-revealing method that
-  does not go through LAPACK.
+  **`Float16` gets the same default.** `SimpleSolvers.PivotedQR` is the pure-Julia
+  Businger–Golub QR from SimpleSolvers 0.14 on, which accepts any `AbstractFloat`, so the
+  half-precision Newton solve no longer falls back to an LU and is no longer exposed to the
+  `SingularException` of #98. Whether the Newton solve converges at half precision is still not a
+  contract; the dictionary regression test records that.
 
   ⚠️ **Two different `PivotedQR`s.** This package exports one of its own — the `OGAFit` that
   truncates the Gram solve of a greedy dictionary fit. Under `using NonlinearIntegrators` the
   unqualified name is that one, so the linear solver is always written
   `SimpleSolvers.PivotedQR` here, and a caller overriding the option has to write it out too.
 
-- **`[compat]` for `SimpleSolvers` moves to `0.13.3`**, a bound about what *runs* rather than
-  what is measured. The floor is 0.13.3, the release that introduced `PivotedQR` and `SVDSolver`.
-  The name sits in a function body, so on 0.13.2 this package still precompiles and loads cleanly,
-  and the missing binding surfaces only as an `UndefVarError` the first time a network integrator
-  is constructed — which is why this is a bound and not a graceful fallback.
-
-  The cap is 0.13 because 0.14 changes what `PivotedQR` is. In 0.13 it is LAPACK-backed and
-  refuses `Float16`; in 0.14 it accepts `Float16`, and the LAPACK-backed method is renamed
-  `LapackPivotedQR`. The `BlasFloat` guard in `initsolver`, and its docstring, describe the 0.13
-  method.
+- **`[compat]` for `SimpleSolvers` moves to `0.14`**, a bound about what *runs* rather than
+  what is measured. 0.14 is the release in which `PivotedQR` is the pure-Julia rank-revealing QR
+  that accepts `Float16`; in 0.13.3 the same name is LAPACK-backed and refuses it, and on 0.13.2
+  and earlier it does not exist. The name sits in a function body, so on an older release this
+  package still loads, and the difference surfaces only when a network integrator is constructed
+  — which is why this is a bound and not a fallback. SimpleSolvers 0.14.1 and later require
+  `GeometricBase` 0.15.
 
 - **Output goes to `runs/` (data) and `results/` (figures), at the repository root**, and every
   driver takes `--runs-dir` and `--results-dir`. Previously each script derived its output path from

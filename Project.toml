@@ -29,30 +29,26 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 NonlinearIntegratorsPlots = "Makie"
 
 [compat]
-AbstractNeuralNetworks = "0.8"
+AbstractNeuralNetworks = "0.8, 0.9"
 CompactBasisFunctions = "0.3, 0.4"
 ForwardDiff = "1"
-GeometricBase = "0.14.9"
+GeometricBase = "0.14.9, 0.15"
 GeometricEquations = "0.21"
 GeometricIntegratorsBase = "0.6.3"
-GeometricOptimizers = "0.7"
+GeometricOptimizers = "0.8"
 GeometricSolutions = "0.6"
 LinearAlgebra = "1"
 Makie = "0.24"
-NeuralNetworkParameters = "0.3"
+NeuralNetworkParameters = "0.3, 0.4"
 QuadratureRules = "0.2"
 Random = "1"
-# "0.13.3" admits 0.13.3 and later 0.13 releases, and not 0.14.
-#
-# The floor is 0.13.3 because `initsolver` in `src/nvi/network_integrator_core.jl` names
-# `SimpleSolvers.PivotedQR`, which no earlier release has. The name sits in a function body, so on
-# 0.13.2 the package still precompiles and loads, and the missing binding raises an `UndefVarError`
-# only when a network integrator is constructed. That is why this is a bound and not a fallback.
-#
-# The cap is 0.13 because 0.14 changes what `PivotedQR` is. In 0.13 it is LAPACK-backed and refuses
-# `Float16`; in 0.14 it accepts `Float16`, and the LAPACK-backed method is `LapackPivotedQR`. The
-# `BlasFloat` guard in `initsolver`, and its docstring, describe the 0.13 method.
-SimpleSolvers = "0.13.3"
+# The floor is 0.14 because `initsolver` in `src/nvi/network_integrator_core.jl` gives every element
+# type `SimpleSolvers.PivotedQR`, which is the pure-Julia QR that accepts `Float16` from 0.14 on. In
+# 0.13.3 the same name is LAPACK-backed and refuses `Float16`, and 0.13.2 does not have it. The name
+# sits in a function body, so on an older release the package still loads and the difference
+# surfaces only when a network integrator is constructed. That is why this is a bound and not a
+# fallback.
+SimpleSolvers = "0.14"
 StaticArrays = "1"
 Statistics = "1"
 SymbolicNeuralNetworks = "0.8"
