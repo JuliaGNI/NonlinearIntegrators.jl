@@ -165,8 +165,8 @@ scripts sat in a talk directory, all carrying much the same code.
   resolves the newest compatible versions, the `Julia min` jobs on 1.11 could not install the
   test environment at all, and every bump went red on a required check. JET 0.9, the last for
   1.11, also reported runtime dispatch in `residual!` that 0.12 does not
-  ([#121](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/121)), and the Aqua and JET
-  version gates that 1.11 needed are gone
+  ([#121](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/121)), so the JET gate is
+  gone. The Aqua version gate, which had no reason of its own, is gone too
   ([#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119)).
 
 - **Four test files moved off the top level of `test/`**, because the test convention keeps a test
