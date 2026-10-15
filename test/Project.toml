@@ -46,7 +46,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 [compat]
 Aqua = "0.8"
 CairoMakie = "0.15"
-GeometricProblems = "0.8"
+GeometricProblems = "0.9.1"
 JET = "0.10, 0.11, 0.12"
 Logging = "1"
 Test = "1"

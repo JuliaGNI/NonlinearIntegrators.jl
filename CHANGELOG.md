@@ -161,6 +161,29 @@ scripts sat in a talk directory, all carrying much the same code.
   this package produces. `test/plots.jl` asserts both
   ([#117](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/117)).
 
+- **The package moves to `GeometricBase` 0.15 and the releases built on it**, in one step,
+  because the registry admits no smaller one: `GeometricSolutions` 0.6.7 needs `GeometricBase`
+  0.15, `GeometricOptimizers` 0.7 and 0.8 cap it at 0.14, and `GeometricOptimizers` 0.9 needs
+  `NeuralNetworkParameters` 0.5, which `SymbolicNeuralNetworks` 0.8 and `AbstractNeuralNetworks`
+  0.8 exclude. The `[compat]` entries:
+
+  | package | from | to |
+  |:--|:--|:--|
+  | `AbstractNeuralNetworks` | `0.8` | `0.9.1` |
+  | `GeometricBase` | `0.14.9` | `0.15` |
+  | `GeometricOptimizers` | `0.7` | `0.9` |
+  | `NeuralNetworkParameters` | `0.3` | `0.5` |
+  | `SimpleSolvers` | `0.13.3` | `0.14.2` |
+  | `SymbolicNeuralNetworks` | `0.8` | `0.9` |
+  | `GeometricProblems` (test only) | `0.8` | `0.9.1` |
+
+  Two call sites change with them, and neither changes a result. `GeometricOptimizers.Adam` and
+  `DecayingStatic` take no element type any more, because the `Optimizer` converts them to the
+  element type of the parameters; the `ShallowNet` and `DenseNet` `TrainingMethod` seeding loops
+  now build `Adam()` and `DecayingStatic(; η₁, η₂, n)`. A `NetworkParameters` has one element type
+  from `NeuralNetworkParameters` 0.5 on, so the `DenseNet` `LSGD` loss converts the fixed `L3`
+  layer to the element type of the `ForwardDiff` iterate before it builds the set.
+
 - **Four test files moved off the top level of `test/`**, because the test convention keeps a test
   file there only where it mirrors `src/<name>.jl`. `test/plots_tests.jl` tests `src/plots.jl` and
   is now `test/plots.jl`. The other three reach source files in more than one directory, or none
@@ -211,13 +234,13 @@ scripts sat in a talk directory, all carrying much the same code.
   unqualified name is that one, so the linear solver is always written
   `SimpleSolvers.PivotedQR` here, and a caller overriding the option has to write it out too.
 
-- **`[compat]` for `SimpleSolvers` moves to `0.14`**, a bound about what *runs* rather than
+- **`[compat]` for `SimpleSolvers` moves to `0.14.2`**, a bound about what *runs* rather than
   what is measured. 0.14 is the release in which `PivotedQR` is the pure-Julia rank-revealing QR
   that accepts `Float16`; in 0.13.3 the same name is LAPACK-backed and refuses it, and on 0.13.2
   and earlier it does not exist. The name sits in a function body, so on an older release this
   package still loads, and the difference surfaces only when a network integrator is constructed
-  — which is why this is a bound and not a fallback. SimpleSolvers 0.14.1 and later require
-  `GeometricBase` 0.15.
+  — which is why this is a bound and not a fallback. The patch floor, 0.14.2, is the one that
+  `GeometricOptimizers` 0.9 requires.
 
 - **Output goes to `runs/` (data) and `results/` (figures), at the repository root**, and every
   driver takes `--runs-dir` and `--results-dir`. Previously each script derived its output path from
