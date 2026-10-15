@@ -75,16 +75,8 @@ ecosystem, kept identical to the copy in `GeometricExamples/src/common.jl`, appl
 `figures.jl`. Nothing in the extension sets a size of its own, so changing the theme changes every
 figure.
 
-**`GeometricProblems.Diagnostics.plot_energy_error` cannot be reused here, and this was found the
-hard way.** It does not work on a *partitioned or implicit* solution, which is every solution these
-scripts produce. Its `_invariant_error` branches on `sol isa Union{SolutionPODE, SolutionPDAE}` to
-decide whether to pass `p` to the invariant, and that test is `false` for a `GeometricSolution` of a
-`LODEProblem` — even though `SolutionPODE`'s definition names `LODEProblem`, because the alias binds
-`probType` both as a parameter and in its `where` clause, so the constraint does not apply as it
-reads. The `q`-only branch is therefore always taken and a Hamiltonian expecting
-`(t, q, p, params)` is called with three arguments. Measured on GeometricProblems 0.8.3 /
-GeometricSolutions 0.6.5, and guarded by a `@test_broken` in `test/plots.jl` with a second
-assertion pinning the cause, so a fix upstream is noticed rather than silently changing figures.
+**`GeometricProblems.Diagnostics.plot_energy_error` works on the solution of a `LODEProblem`**, with
+`energy = <function>`, from GeometricSolutions 0.6.7 on. `test/plots.jl` asserts it.
 
 ### Naming
 

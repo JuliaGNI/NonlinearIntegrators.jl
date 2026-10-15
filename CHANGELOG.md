@@ -31,26 +31,12 @@ scripts sat in a talk directory, all carrying much the same code.
   `plot_convergence` draws one series against one slope, which cannot show a neural family against a
   polynomial one.
 
-  **The one exception, found by the test written to assert the opposite.**
-  `GeometricProblems.Diagnostics.plot_energy_error` and `plot_invariant_error` cannot compute the
-  energy of a *partitioned or implicit* solution, which is every solution this package produces, so
-  the invariant error is **not** reused — `plot_solution` computes it from `q` and `p` itself, and
-  `relative_invariant_error` is exported for callers who want the number.
-
-  `_invariant_error` branches on `sol isa Union{SolutionPODE, SolutionPDAE}` to decide whether to
-  pass `p`, and that test is `false` for a `GeometricSolution` of a `LODEProblem` even though
-  `SolutionPODE`'s definition names `LODEProblem`: the alias binds `probType` both as a parameter
-  and in its `where` clause, so the constraint does not apply as it reads. Verified —
-  `sol isa SolutionPODE` is `false` while `typeof(sol.problem) <: LODEProblem` is `true`. The
-  `q`-only branch is always taken and a Hamiltonian expecting `(t, q, p, params)` is called with
-  three arguments; on the harmonic oscillator that reaches the three-argument method, which expects
-  `q = [q, v]`, and raises `BoundsError`. A problem whose three-argument Hamiltonian happened to
-  accept a one-dof `q` would return a **silently wrong** energy instead.
-
-  Measured on GeometricProblems 0.8.3 / GeometricSolutions 0.6.5, and held by a `@test_broken` plus
-  an assertion pinning the cause, so a fix upstream flips the test rather than passing unnoticed.
-
-  A second, independent trap in the same place, which would still bite after that is fixed: a
+  `plot_solution` computes the relative invariant error from `q` and `p` itself, and
+  `relative_invariant_error` is exported for callers who want the number. A single solution's
+  invariant error over time is `GeometricProblems.Diagnostics.plot_energy_error`, which works on
+  the solution of a `LODEProblem` from GeometricSolutions 0.6.7 on: before that release no solution
+  matched `SolutionPODE`, so `plot_energy_error` called a Hamiltonian expecting `(t, q, p, params)`
+  without `p` ([#117](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/117)). A
   `lodeproblem` built by `EulerLagrange` carries `NullInvariants`, so there is no `:h` key and the
   Hamiltonian has to be passed as `energy = <function>`.
 
@@ -168,6 +154,12 @@ scripts sat in a talk directory, all carrying much the same code.
   ([#121](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/121)), so the JET gate is
   gone. The Aqua version gate, which had no reason of its own, is gone too
   ([#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119)).
+
+- **`[compat]` for `GeometricSolutions` is `0.6.7`**, from `0.6`. A compat-only change: 0.6.7 is
+  the release in which the solution of a `LODEProblem` is a `SolutionPODE`, so
+  `GeometricProblems.Diagnostics.plot_energy_error` passes `p` to the invariant for every solution
+  this package produces. `test/plots.jl` asserts both
+  ([#117](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/117)).
 
 - **Four test files moved off the top level of `test/`**, because the test convention keeps a test
   file there only where it mirrors `src/<name>.jl`. `test/plots_tests.jl` tests `src/plots.jl` and
@@ -480,9 +472,7 @@ gets rediscovered:
     [#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119).
   - `test/quality/jet_residual.jl` was never run by the suite; it is a script, and it is now
     `scripts/jet_residual.jl`.
-  - Each `@test_broken` names its issue: #98, and
-    [#117](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/117) for
-    `plot_energy_error`.
+  - Each `@test_broken` names its issue: #98.
 
 - **JET checks the Newton hot path in the suite.** `test/quality/jet.jl` runs in `core`, directly
   after Aqua, and asserts that `JET.report_opt` finds no runtime dispatch in `residual!` for
