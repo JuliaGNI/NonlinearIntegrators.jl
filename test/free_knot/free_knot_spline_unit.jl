@@ -107,7 +107,6 @@ end
         exact(t) = q₀ .* cos.(ωs .* t) .+ p₀ ./ ωs .* sin.(ωs .* t)
         @test maximum(abs, collect(sol.q[2]) .- exact(1.0)) < 1e-11
         τ, c = knots_and_weights(nlsolution(int), 4, 2)
-        @test all(0 .< τ .< 1)
-        @test minimum(diff(vcat(0.0, sort(τ), 1.0))) > 1e-3
+        @test live(τ, c)
     end
 end
