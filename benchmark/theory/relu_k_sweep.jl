@@ -110,8 +110,11 @@ const PROBLEM_NAMES = split(argval("problems", "harmonic_oscillator,pendulum,dou
 const STRICT = "--strict" in ARGS
 # relu before tanh whatever the order given (and in the report, which reads the ReLU error at the same S)
 const ACTS = filter(in(split(argval("act", "relu,tanh"), ",")), ["relu", "tanh"])
-const VARIANTS = (Plain-Shallow-Network = ShallowNet, Time-Reversible = ShallowNetReversible, Fixed-Boundary = ShallowNetAutodiff)
-const VARIANT_NAMES = split(argval("variants", "Plain Shallow Network,Time-Reversible,Fixed-Boundary"), ",")
+# the keys are the variant names of the stems, csv files and --variants; VARIANT_LABELS are the names in the figures
+const VARIANTS = (shallownet = ShallowNet, reversible = ShallowNetReversible, autodiff = ShallowNetAutodiff)
+const VARIANT_LABELS = Dict("shallownet" => "Plain Shallow Network", "reversible" => "Time-Reversible",
+    "autodiff" => "Fixed-Boundary")
+const VARIANT_NAMES = split(argval("variants", "shallownet,reversible,autodiff"), ",")
 all(v -> Symbol(v) in keys(VARIANTS), VARIANT_NAMES) || error("--variants must be among $(keys(VARIANTS))")
 const SOLVER = lowercase(argval("solver", "dogleg"))
 SOLVER in ("dogleg", "newton") || error("--solver must be dogleg or newton, got $SOLVER")
@@ -531,7 +534,7 @@ function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, f
     # Label(fig[0, :], pn; fontsize = 22, font = :bold)
     for (i, v) in enumerate(vs), (j, k) in enumerate(ks)
         ax = Axis(fig[i, j]; width = 330, height = 240, xscale = log10, yscale = log10, xlabel = "h",
-            ylabel = j == 1 ? ylab : "", title = "$v, k = $k", titlesize = 18)
+            ylabel = j == 1 ? ylab : "", title = "$(get(VARIANT_LABELS, v, v)), k = $k", titlesize = 18)
         rk = filter(r -> r.variant == v && r.k == k, rs)
         isempty(rk) && continue
         baseline!(ax, rk, fc; color = :black)
@@ -539,7 +542,7 @@ function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, f
             rm = filter(r -> r.M == M, rk)
             if M > 1
                 baseline!(ax, rm, fcc; color = colors[m], linestyle = :dash, marker = :xcross)
-                baseline!(ax, rm, fsp; color = colors[m], linestyle = :dot, marker = :cross)
+                # baseline!(ax, rm, fsp; color = colors[m], linestyle = :dot, marker = :cross)   # CGVI(S_k), left out with its legend entry
             end
             for act in unique(r.act for r in rs), (w, S) in enumerate(Ss)
                 rr = sort(filter(r -> r.act == act && r.S == S && good(fsn(r)), rm); by = r -> r.h)
