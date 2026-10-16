@@ -466,21 +466,23 @@ gets rediscovered:
 - **`test/methods_smoke.jl` asserts `isexplicit` and `issymmetric` directly**, not `== false` and
   `== true`, so a non-`Bool` result fails the test.
 
-- **The network-integrator cross product now under-reports.** A `SingularException` from the
-  Newton solve is recorded as `@test_broken` rather than failing the run, so a green suite no
-  longer means all 54 cells of that cross product passed — read the `Broken` count and the
-  `quarantined (#98):` lines. The quarantine is bounded so that a rank-deficient OGA fit still
-  fails; see `### Nonlinear solve conditioning` under `## Open Issues` for what it does and does
-  not cover, and remove it once
-  [#98](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/98) is resolved.
+- **Every cell of the network-integrator cross product asserts again**, and any exception in it
+  fails the run — [#98](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/98). The
+  `SingularException` that #98 raised on some BLAS builds came from an LU of the Newton
+  Jacobian; the rank-revealing solver under *Changed* has no throwing path, so that exception
+  cannot occur, and a `SingularException` in this loop now means a real failure elsewhere, such
+  as an OGA Gram solve. This closes K17 of `KNOWN_ISSUES.md`, and K32, which was about K17's
+  form. The Jacobian itself is still rank deficient; K35 records why that is structural and what
+  removing it would take.
 
-  **The exception it absorbs can no longer be raised** — the rank-revealing solver under
-  *Changed* has no throwing path — so the quarantine is now dead code in the sense that it should
-  never fire. It is kept until the *rank* half of #98 lands, for two reasons: it is the tripwire
-  that would show the spread returning through some path not yet understood, and removing the
-  quarantine comes last, after the rank measurement passes. If a
-  `quarantined (#98):` line appears in a CI log from here on, that is new information and not the
-  known issue.
+- **`scripts/free_knot_rank.jl`** tests whether the deficiency can be designed out of the
+  ansatz: the scaling gauge fixed (`w = +1`), an explicit cubic part, and the kinks as free knots
+  inside the element, on the harmonic oscillator at `S = 4, 5, 6` with uniform and OGA-like
+  greedy knot seeds. With ShallowNet's Gauss 8 the knots go dead (`cᵢ ≤ 1e-12`) or fit the
+  quadrature error, and the step is the cubic Galerkin step or worse. With a Gauss rule on each
+  piece between knots there is an accurate stationary point — `S = 4`, endpoint error 1e-13
+  against 6e-10 for the cubic, no gap in the spectrum — but Newton reaches it only from uniform
+  knots; every greedy seed collapses onto the cubic.
 
 - **`scripts/newton_jacobian_rank.jl`** measures the rank of the Newton Jacobian at a converged
   point, at `S = 4, 5, 6` and three OGA seeds, and prints the residual each row was measured at
@@ -504,7 +506,6 @@ gets rediscovered:
     [#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119).
   - `test/quality/jet_residual.jl` was never run by the suite; it is a script, and it is now
     `scripts/jet_residual.jl`.
-  - Each `@test_broken` names its issue: #98.
 
 - **JET checks the Newton hot path in the suite.** `test/quality/jet.jl` runs in `core`, directly
   after Aqua, and asserts that `JET.report_opt` finds no runtime dispatch in `residual!` for
