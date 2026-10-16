@@ -18,4 +18,5 @@ end
 if "slow" in GROUPS
     @safetestset "Network integrators" include("nvi/network_integrators_unit.jl")
     @safetestset "Dispatch variants" include("nvi/dispatch_variants_unit.jl")
+    @safetestset "FreeKnotSpline" include("free_knot/free_knot_spline_unit.jl")
 end
