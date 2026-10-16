@@ -15,9 +15,7 @@ using GeometricProblems.HarmonicOscillator
 
 # The knots and the truncated-cubic coefficients of the last step, from `x = (a, c, τ, p̃)`.
 function knots_and_weights(x, S, D)
-    c = reshape(x[(4D + 1):(4D + S * D)], S, D)
-    τ = x[(4D + S * D + 1):(4D + S * D + S)]
-    τ, c
+    NonlinearIntegrators.spline_τ(x, S, D), NonlinearIntegrators.spline_c(x, S, D)
 end
 
 # A live step: every knot inside (0, 1) and away from its neighbours, every truncated cubic used.
@@ -29,6 +27,23 @@ end
 @testset "FreeKnotSpline" begin
     @testset "S = 0 is rejected" begin
         @test_throws ArgumentError FreeKnotSpline(0)
+    end
+
+    @testset "traits reach the framework" begin
+        for m in (FreeKnotSpline(4), FreeKnotSpline)
+            @test GeometricIntegratorsBase.isexplicit(m) === false
+            @test GeometricIntegratorsBase.isimplicit(m) === true
+            @test GeometricIntegratorsBase.issymmetric(m) === missing
+            @test GeometricIntegratorsBase.issymplectic(m) === missing
+        end
+    end
+
+    @testset "dense_newton" begin
+        newton = NonlinearIntegrators.dense_newton
+        # One step solves a linear system exactly, so a cap of one iteration converges.
+        @test newton(x -> x .- 1, [0.0], 1e-12, 1) == [1.0]
+        # x² + 1 has no real root.
+        @test newton(x -> x .^ 2 .+ 1, [0.5], 1e-12, 50) === nothing
     end
 
     @testset "harmonic oscillator, S = $S" for S in (4, 6)
@@ -66,7 +81,7 @@ end
         k = 0.5
         ϑ(p, t, q, v, params) = (p .= v)
         f(f, t, q, v, params) = (f .= -params.k .* sin.(q))
-        ω(ω, t, q, v, params) = (ω .= [0 -1; 1 0])
+        ω(ω, t, q, v, params) = (ω .= 0)
         l(t, q, v, params) = v[1]^2 / 2 + params.k * cos(q[1])
         v̄(v, t, q, p, params) = (v .= p)
         prob = LODEProblem(ϑ, f, ω, l, (0.0, 1.0), 0.5, [1.0], [0.0];
@@ -74,7 +89,8 @@ end
         sol = integrate(prob, FreeKnotSpline(4))
         q = collect(sol.q[:, 1])
 
-        # RK4 with 40000 steps per call, so at most h/20000: its error, of order (2.5e-5)⁴, is far
+        # RK4 with 40000 steps per call, so at most h/20000. Its truncation error, of order
+        # (2.5e-5)⁴, is below round-off, and against a 256-bit run its error is 4e-15 at most: far
         # below the thresholds.
         function rk4(q, p, T; n = 40000)
             dt = T / n

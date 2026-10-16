@@ -70,7 +70,7 @@ const OSCILLATOR = (name = "oscillator", q₀ = 0.5,
 const PENDULUM = (name = "pendulum", q₀ = 1.0,
     L = (q, v) -> v^2 / 2 + k * cos(q), force = q -> -k * sin(q))
 
-# ---- the exact flow: RK4 at h/40000, error ≈ 1e-18 ----------------------------------------
+# ---- the exact flow: RK4 at h/40000, error ≈ 4e-15, from round-off ------------------------
 
 function flow(P, q, p, T; n = ceil(Int, 40000 * abs(T)))
     dt = T * h / n

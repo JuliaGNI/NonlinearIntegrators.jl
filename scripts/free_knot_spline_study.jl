@@ -50,7 +50,7 @@ t = @elapsed sol = integrate(int)
 q, p = collect(sol.q[:, 1]), collect(sol.p[:, 1])
 ts = collect(range(0.0, 100.0, length(q)))
 x = nlsolution(int)
-τ, c = x[9:12], x[5:8]
+τ, c = NonlinearIntegrators.spline_τ(x, 4, 1), NonlinearIntegrators.spline_c(x, 4, 1)
 @printf("max |H − H₀| = %.2e, max |q − q_exact| = %.2e\n",
     maximum(abs, energy.(q, p) .- energy(q[1], p[1])), maximum(abs, q .- exact.(ts)))
 @printf("last step: knots %s, smallest gap %.3f, min |c| / max |c| = %.3f\n",
@@ -72,8 +72,9 @@ let q = 0.5, p = 0.0
         sol = integrate(int)
         qn, pn = collect(sol.q[:, 1])[end], collect(sol.p[:, 1])[end]
         qe, pe = flow(q, p, 0.5)
+        knots = NonlinearIntegrators.spline_τ(nlsolution(int), 4, 1)
         @printf("%4d %8.4f %8.4f %9.1e %9.1e  %s\n", n, q, p, abs(qn - qe), abs(pn - pe),
-            join(round.(nlsolution(int)[9:12]; digits = 3), " "))
+            join(round.(knots; digits = 3), " "))
         q, p = qn, pn
     end
 end

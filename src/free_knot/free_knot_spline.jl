@@ -51,8 +51,8 @@ the cubic. The step raises an error if stage 4 does not converge.
 # Requirements
 
 The problem must be a Lagrangian problem whose Lagrangian `l(t, q, v, params)` accepts
-`ForwardDiff.Dual` arguments. Only `l` is evaluated, not `ϑ` or `f`, so a wrong `l` gives a
-wrong trajectory.
+`ForwardDiff.Dual` arguments. Of the problem's functions, the step evaluates `l` and the initial
+guess `v̄` only. It does not evaluate `ϑ`, `f` or `ω`, so nothing checks them against `l`.
 
 # Arguments
 
@@ -105,14 +105,6 @@ nknots(method::FreeKnotSpline) = method.S
 
 GeometricIntegratorsBase.isexplicit(::Union{FreeKnotSpline, Type{<:FreeKnotSpline}}) = false
 GeometricIntegratorsBase.isimplicit(::Union{FreeKnotSpline, Type{<:FreeKnotSpline}}) = true
-function GeometricIntegratorsBase.issymmetric(::Union{
-        FreeKnotSpline, Type{<:FreeKnotSpline}})
-    missing
-end
-function GeometricIntegratorsBase.issymplectic(::Union{
-        FreeKnotSpline, Type{<:FreeKnotSpline}})
-    missing
-end
 
 """
     FreeKnotSplineCache{ST}
@@ -236,19 +228,18 @@ ends the solve. `nothing` if neither happens within `iterations`.
 """
 function dense_newton(F, x, tol, iterations)
     r = F(x)
+    ρ = maximum(abs, r)
     for _ in 1:iterations
-        all(isfinite, r) || return nothing
-        ρ = maximum(abs, r)
+        isfinite(ρ) || return nothing
         ρ ≤ tol && return x
         J = ForwardDiff.jacobian!(similar(r, length(r), length(x)), F, x)
         xnew = x - qr(J, ColumnNorm()) \ r
         rnew = F(xnew)
-        if ρ ≤ 10_000 * tol && !(maximum(abs, rnew) < ρ / 2)
-            return maximum(abs, rnew) < ρ ? xnew : x
-        end
-        x, r = xnew, rnew
+        ρnew = maximum(abs, rnew)
+        ρ ≤ 10_000 * tol && !(ρnew < ρ / 2) && return ρnew < ρ ? xnew : x
+        x, r, ρ = xnew, rnew, ρnew
     end
-    nothing
+    ρ ≤ tol ? x : nothing
 end
 
 """
@@ -261,9 +252,9 @@ first-order correction for a residual `∇_z A`.
 function reduced_derivatives(A, z, φ)
     nz = length(z)
     y = vcat(z, φ)
-    g = ForwardDiff.gradient!(similar(y), y -> A(y[1:nz], y[(nz + 1):end]), y)
-    H = ForwardDiff.hessian!(
-        similar(y, length(y), length(y)), y -> A(y[1:nz], y[(nz + 1):end]), y)
+    Ay(y) = A(y[1:nz], y[(nz + 1):end])
+    g = ForwardDiff.gradient!(similar(y), Ay, y)
+    H = ForwardDiff.hessian!(similar(y, length(y), length(y)), Ay, y)
     Hzz, Hzφ = H[1:nz, 1:nz], H[1:nz, (nz + 1):end]
     Hzz⁻¹Hzφ = Hzz \ Hzφ
     gr = g[(nz + 1):end] - Hzz⁻¹Hzφ' * g[1:nz]
@@ -290,7 +281,7 @@ The descent ends when neither test accepts a step of any length.
 """
 function descend_knots(A, z, φ, iterations, newton_iterations, tol)
     inner(z, φ) = dense_newton(
-        z -> ForwardDiff.gradient!(similar(z), z -> A(z, φ), z), z, tol, newton_iterations)
+        y -> ForwardDiff.gradient!(similar(y), w -> A(w, φ), y), z, tol, newton_iterations)
     z = inner(z, φ)
     z === nothing && return nothing
     fφ = A(z, φ)
@@ -302,13 +293,14 @@ function descend_knots(A, z, φ, iterations, newton_iterations, tol)
         s = min(one(eltype(d)), inv(maximum(abs, d)))
         accepted = false
         while s * maximum(abs, d) > eps(eltype(d))
-            ztrial = inner(z, φ + s * d)
+            φtrial = φ + s * d
+            ztrial = inner(z, φtrial)
             if ztrial !== nothing
-                ftrial = A(ztrial, φ + s * d)
-                grtrial, Hrtrial = reduced_derivatives(A, ztrial, φ + s * d)
+                ftrial = A(ztrial, φtrial)
+                grtrial, Hrtrial = reduced_derivatives(A, ztrial, φtrial)
                 if ftrial < fφ + s * dot(gr, d) / 10_000 ||
                    (convex && norm(grtrial) < norm(gr) / 2)
-                    z, φ, fφ, gr, Hr = ztrial, φ + s * d, ftrial, grtrial, Hrtrial
+                    z, φ, fφ, gr, Hr = ztrial, φtrial, ftrial, grtrial, Hrtrial
                     accepted = true
                     break
                 end

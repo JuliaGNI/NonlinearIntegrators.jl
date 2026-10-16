@@ -33,8 +33,9 @@ prob = HarmonicOscillator.lodeproblem([0.5], [0.0]; timespan = (0.0, 10.0), time
 sol = integrate(prob, FreeKnotSpline(4))
 ```
 
-The problem must be a Lagrangian problem. Only its Lagrangian `l(t, q, v, params)` is evaluated,
-through ForwardDiff, so `l` must accept dual numbers. All degrees of freedom share the knots.
+The problem must be a Lagrangian problem. Of its functions, the step evaluates the Lagrangian
+`l(t, q, v, params)`, through ForwardDiff, and the initial guess `v̄` only, so `l` must accept dual
+numbers. Nothing checks `ϑ`, `f` or `ω` against `l`. All degrees of freedom share the knots.
 
 ## The solve
 
@@ -106,7 +107,7 @@ Over many steps, with the integrator itself (`scripts/free_knot_spline_study.jl`
 | ``h = 0.5``, 200 steps: largest error in ``q`` | ``5.8 \cdot 10^{-11}`` |
 | time per step, ``h = 0.5`` | 12 ms |
 
-The rate between ``h = 1`` and ``0.5`` is 6.4. The error at ``h = 0.25`` is at round-off.
+The rate between ``h = 1`` and ``0.5`` is 6.3. The error at ``h = 0.25`` is at round-off.
 
 ## Limits
 
