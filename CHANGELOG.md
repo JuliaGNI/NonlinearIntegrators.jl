@@ -31,26 +31,12 @@ scripts sat in a talk directory, all carrying much the same code.
   `plot_convergence` draws one series against one slope, which cannot show a neural family against a
   polynomial one.
 
-  **The one exception, found by the test written to assert the opposite.**
-  `GeometricProblems.Diagnostics.plot_energy_error` and `plot_invariant_error` cannot compute the
-  energy of a *partitioned or implicit* solution, which is every solution this package produces, so
-  the invariant error is **not** reused — `plot_solution` computes it from `q` and `p` itself, and
-  `relative_invariant_error` is exported for callers who want the number.
-
-  `_invariant_error` branches on `sol isa Union{SolutionPODE, SolutionPDAE}` to decide whether to
-  pass `p`, and that test is `false` for a `GeometricSolution` of a `LODEProblem` even though
-  `SolutionPODE`'s definition names `LODEProblem`: the alias binds `probType` both as a parameter
-  and in its `where` clause, so the constraint does not apply as it reads. Verified —
-  `sol isa SolutionPODE` is `false` while `typeof(sol.problem) <: LODEProblem` is `true`. The
-  `q`-only branch is always taken and a Hamiltonian expecting `(t, q, p, params)` is called with
-  three arguments; on the harmonic oscillator that reaches the three-argument method, which expects
-  `q = [q, v]`, and raises `BoundsError`. A problem whose three-argument Hamiltonian happened to
-  accept a one-dof `q` would return a **silently wrong** energy instead.
-
-  Measured on GeometricProblems 0.8.3 / GeometricSolutions 0.6.5, and held by a `@test_broken` plus
-  an assertion pinning the cause, so a fix upstream flips the test rather than passing unnoticed.
-
-  A second, independent trap in the same place, which would still bite after that is fixed: a
+  `plot_solution` computes the relative invariant error from `q` and `p` itself, and
+  `relative_invariant_error` is exported for callers who want the number. A single solution's
+  invariant error over time is `GeometricProblems.Diagnostics.plot_energy_error`, which works on
+  the solution of a `LODEProblem` from GeometricSolutions 0.6.7 on: before that release no solution
+  matched `SolutionPODE`, so `plot_energy_error` called a Hamiltonian expecting `(t, q, p, params)`
+  without `p` ([#117](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/117)). A
   `lodeproblem` built by `EulerLagrange` carries `NullInvariants`, so there is no `:h` key and the
   Hamiltonian has to be passed as `energy = <function>`.
 
@@ -169,6 +155,44 @@ scripts sat in a talk directory, all carrying much the same code.
   gone. The Aqua version gate, which had no reason of its own, is gone too
   ([#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119)).
 
+- **`[compat]` for `GeometricSolutions` is `0.6.7`**, from `0.6`. A compat-only change: 0.6.7 is
+  the release in which the solution of a `LODEProblem` is a `SolutionPODE`, so
+  `GeometricProblems.Diagnostics.plot_energy_error` passes `p` to the invariant for every solution
+  this package produces. `test/plots.jl` asserts both
+  ([#117](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/117)).
+
+- **The package moves to `GeometricBase` 0.15 and the releases built on it**, in one step,
+  because the registry admits no smaller one: `GeometricSolutions` 0.6.7 needs `GeometricBase`
+  0.15, `GeometricOptimizers` 0.7 and 0.8 cap it at 0.14, and `GeometricOptimizers` 0.9 needs
+  `NeuralNetworkParameters` 0.5, which `SymbolicNeuralNetworks` 0.8 and `AbstractNeuralNetworks`
+  0.8 exclude. The `[compat]` entries:
+
+  | package | from | to |
+  |:--|:--|:--|
+  | `AbstractNeuralNetworks` | `0.8` | `0.9.1` |
+  | `CompactBasisFunctions` | `0.3, 0.4` | `0.4.2` |
+  | `GeometricBase` | `0.14.9` | `0.15` |
+  | `GeometricEquations` | `0.21` | `0.21.5` |
+  | `GeometricIntegratorsBase` | `0.6.3` | `0.6.9` |
+  | `GeometricOptimizers` | `0.7` | `0.9` |
+  | `NeuralNetworkParameters` | `0.3` | `0.5` |
+  | `QuadratureRules` | `0.2` | `0.2.2` |
+  | `SimpleSolvers` | `0.13.3` | `0.14.2` |
+  | `SymbolicNeuralNetworks` | `0.8` | `0.9` |
+  | `GeometricProblems` (test only) | `0.8` | `0.9.1` |
+  | `GeometricIntegrators` (`scripts/` only) | `0.18.4` | `0.18.6` |
+
+  `CompactBasisFunctions`, `GeometricEquations`, `GeometricIntegratorsBase` and `QuadratureRules`
+  move only to their first release that admits `GeometricBase` 0.15, so that each floor can be
+  installed.
+
+  Two call sites change with them, and neither changes a result. `GeometricOptimizers.Adam` and
+  `DecayingStatic` take no element type any more, because the `Optimizer` converts them to the
+  element type of the parameters; the `ShallowNet` and `DenseNet` `TrainingMethod` seeding loops
+  now build `Adam()` and `DecayingStatic(; η₁, η₂, n)`. A `NetworkParameters` has one element type
+  from `NeuralNetworkParameters` 0.5 on, so the `DenseNet` `LSGD` loss converts the fixed `L3`
+  layer to the element type of the `ForwardDiff` iterate before it builds the set.
+
 - **Four test files moved off the top level of `test/`**, because the test convention keeps a test
   file there only where it mirrors `src/<name>.jl`. `test/plots_tests.jl` tests `src/plots.jl` and
   is now `test/plots.jl`. The other three reach source files in more than one directory, or none
@@ -208,32 +232,24 @@ scripts sat in a talk directory, all carrying much the same code.
   solved. Solver methods that do not solve a linear system — `Picard` among them — are built with
   the caller's options unchanged and receive no `linear_solver_method`.
 
-  ⚠️ **`Float16` is excluded and is still exposed to #98.** Both rank-revealing methods are
-  LAPACK-backed, so they accept only `Float32`, `Float64`, `ComplexF32` and `ComplexF64` and
-  refuse anything else by name. The default is therefore added only for a BLAS element type, and
-  half precision keeps the generic `LU` that `SimpleSolvers.default_linear_solver_method` picks
-  for it. Offering it unconditionally instead replaced #98 at `Float16` with an `ArgumentError`
-  raised before the first step — caught by the dictionary regression test, which asserts that the
-  only failures reachable there are the two documented ones. This is a narrower gap than it
-  sounds, since that test already records that whether the Newton solve converges at half
-  precision is not a contract; but it is a gap, and closing it needs a rank-revealing method that
-  does not go through LAPACK.
+  **`Float16` gets the same default.** `SimpleSolvers.PivotedQR` is the pure-Julia
+  Businger–Golub QR from SimpleSolvers 0.14 on, which accepts any `AbstractFloat`, so the
+  half-precision Newton solve no longer falls back to an LU and is no longer exposed to the
+  `SingularException` of #98. Whether the Newton solve converges at half precision is still not a
+  contract; the dictionary regression test records that.
 
   ⚠️ **Two different `PivotedQR`s.** This package exports one of its own — the `OGAFit` that
   truncates the Gram solve of a greedy dictionary fit. Under `using NonlinearIntegrators` the
   unqualified name is that one, so the linear solver is always written
   `SimpleSolvers.PivotedQR` here, and a caller overriding the option has to write it out too.
 
-- **`[compat]` for `SimpleSolvers` moves to `0.13.3`**, a bound about what *runs* rather than
-  what is measured. The floor is 0.13.3, the release that introduced `PivotedQR` and `SVDSolver`.
-  The name sits in a function body, so on 0.13.2 this package still precompiles and loads cleanly,
-  and the missing binding surfaces only as an `UndefVarError` the first time a network integrator
-  is constructed — which is why this is a bound and not a graceful fallback.
-
-  The cap is 0.13 because 0.14 changes what `PivotedQR` is. In 0.13 it is LAPACK-backed and
-  refuses `Float16`; in 0.14 it accepts `Float16`, and the LAPACK-backed method is renamed
-  `LapackPivotedQR`. The `BlasFloat` guard in `initsolver`, and its docstring, describe the 0.13
-  method.
+- **`[compat]` for `SimpleSolvers` moves to `0.14.2`**, a bound about what *runs* rather than
+  what is measured. 0.14 is the release in which `PivotedQR` is the pure-Julia rank-revealing QR
+  that accepts `Float16`; in 0.13.3 the same name is LAPACK-backed and refuses it, and on 0.13.2
+  and earlier it does not exist. The name sits in a function body, so on an older release this
+  package still loads, and the difference surfaces only when a network integrator is constructed
+  — which is why this is a bound and not a fallback. The patch floor, 0.14.2, is the one that
+  `GeometricOptimizers` 0.9 requires.
 
 - **Output goes to `runs/` (data) and `results/` (figures), at the repository root**, and every
   driver takes `--runs-dir` and `--results-dir`. Previously each script derived its output path from
@@ -488,9 +504,7 @@ gets rediscovered:
     [#119](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/119).
   - `test/quality/jet_residual.jl` was never run by the suite; it is a script, and it is now
     `scripts/jet_residual.jl`.
-  - Each `@test_broken` names its issue: #98, and
-    [#117](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/117) for
-    `plot_energy_error`.
+  - Each `@test_broken` names its issue: #98.
 
 - **JET checks the Newton hot path in the suite.** `test/quality/jet.jl` runs in `core`, directly
   after Aqua, and asserts that `JET.report_opt` finds no runtime dispatch in `residual!` for

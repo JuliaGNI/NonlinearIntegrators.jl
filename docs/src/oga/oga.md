@@ -180,7 +180,8 @@ println("weighted_lstsq x = ", Float64.(NonlinearIntegrators.weighted_lstsq(Φ, 
 
 In the full integrator the `Float16` Gram garbage does not merely produce a poor seed: fed
 into the Newton solve it makes the parameter Jacobian singular (two nearly identical neurons
-are nearly linearly dependent), surfacing as a `SingularException` or a `NaN`. The QR
+are nearly linearly dependent), surfacing as a `SingularException` from an LU solve or as a
+`NaN`. The QR
 reformulation, the coherence guard and the ridged fallback together keep the
 seed finite and well-behaved, so the run proceeds at the working precision — and the
 [Studies](@ref) measure how far that gets each variant.

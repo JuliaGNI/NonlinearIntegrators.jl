@@ -268,16 +268,16 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::Tr
         PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
         # The optimizer works in the flat vector; see the same construction in `ShallowNet`'s
         # `initial_params!` for why it is given one directly rather than a flat `NamedTuple`.
-        # `Adam` and the line search are built at the parameter element type, and supply direction
-        # and learning rate respectively — the rate decaying from 1e-3 to 5e-5 over the epoch
+        # `Optimizer` converts `Adam` and the line search to the parameter element type. They
+        # supply direction and learning rate — the rate decaying from 1e-3 to 5e-5 over the epoch
         # budget. Nothing aliases, so `PNN.params` is refreshed from `ps_flat` inside the loop.
         local PT = eltype(PNN.params[1].W)
         ps_flat, layout = NeuralNetworkParameters.flatten(PNN.params)
         loss(p) = mae_loss(network_inputs, labels, PNN,
             NeuralNetworkParameters.unflatten(layout, p))
-        algorithm = GeometricOptimizers.Adam(PT)
+        algorithm = GeometricOptimizers.Adam()
         opt = GeometricOptimizers.Optimizer(ps_flat, loss; algorithm = algorithm,
-            linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
+            linesearch = GeometricOptimizers.DecayingStatic(; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs))
         state = GeometricOptimizers.OptimizerState(algorithm, ps_flat)
         err = zero(PT)
         for ep in 1:nepochs
@@ -337,10 +337,12 @@ function initial_params!(int::GeometricIntegrator{<:DenseNet}, InitialParams::LS
         # of two layers rather than the whole `NetworkParameters`, which `flatten` handles the
         # same way — the layout it returns simply spans those two. Its arrays are `PNN.params`',
         # so the `unflatten!` in the loop writes the optimizer's step through to the network.
+        # A `NetworkParameters` has one element type, so `L3` is converted to that of `p`, which
+        # is a `ForwardDiff.Dual` inside the gradient.
         tem_flat, layout = NeuralNetworkParameters.flatten(tem_ps)
         loss(p) = lsgd_loss(network_inputs, labels, NN,
             NetworkParameters(merge(NeuralNetworkParameters.unflatten(layout, p),
-                (L3 = PNN.params.L3,))))
+                (L3 = map(x -> eltype(p).(x), PNN.params.L3),))))
         algorithm = GeometricOptimizers.GradientMethod()
         # The `Static` line search is not a style choice: `GradientMethod` with any *searching*
         # line search throws `MethodError: no method matching gradient(::GradientCache)` on

@@ -74,33 +74,20 @@ package does not duplicate any of it:
 |:--|:--|
 | a phase portrait, a trajectory, a set of traces | the per-problem recipes, e.g. `GeometricProblems.HarmonicOscillator.plot_phase_portrait` |
 | one method's error against the time step, with its expected order | `GeometricProblems.Diagnostics.plot_convergence` |
-| the relative error of an invariant over time | see the caveat below |
+| the relative error of an invariant over time | `GeometricProblems.Diagnostics.plot_energy_error`, with `energy = <function>` |
 
-!!! warning "`plot_energy_error` does not work on a LODE solution today"
+`plot_energy_error` passes `p` to the invariant for the solution of a `LODEProblem` from
+GeometricSolutions 0.6.7 on, which is the floor of this package. A `lodeproblem` built by
+`EulerLagrange` carries `NullInvariants`, so it has no `:h` key, and the Hamiltonian has to be
+passed as `energy = <function>`. To get the number rather than a figure:
 
-    `GeometricProblems.Diagnostics.plot_energy_error` and `plot_invariant_error` cannot compute the
-    energy of a *partitioned or implicit* solution, which is every solution this package produces.
-    Their `_invariant_error` branches on `sol isa Union{SolutionPODE, SolutionPDAE}` to decide
-    whether to pass `p` to the invariant, and that test is `false` for a `GeometricSolution` of a
-    `LODEProblem` even though `SolutionPODE`'s definition names `LODEProblem` — the alias binds
-    `probType` both as a parameter and in its `where` clause, so the constraint does not apply as it
-    reads. The `q`-only branch is always taken, `p` is never passed, and a Hamiltonian expecting
-    `(t, q, p, params)` is called with three arguments.
+```julia
+using NonlinearIntegrators: relative_invariant_error
+ΔH = relative_invariant_error(sol, hamiltonian, prob.parameters)
+```
 
-    Measured on GeometricProblems 0.8.3 / GeometricSolutions 0.6.5, and guarded by a `@test_broken`
-    in `test/plots.jl` so that a fix upstream is noticed here.
-
-    Until then, take the relative Hamiltonian error from the third panel of
-    [`Diagnostics.plot_solution`](@ref NonlinearIntegrators.Diagnostics.plot_solution), which
-    computes it from `q` *and* `p`, or compute it directly:
-
-    ```julia
-    using NonlinearIntegrators: relative_invariant_error
-    ΔH = relative_invariant_error(sol, hamiltonian, prob.parameters)
-    ```
-
-    The three-argument form gathers the series itself. The vector method is still there for an
-    invariant you have already evaluated.
+The three-argument form gathers the series itself. The vector method is there for an invariant
+you have already evaluated.
 
 The `NonlinearIntegratorsPlots` extension adds the two figures those cannot make, plus
 `Diagnostics.figures`, which turns one archived run into every figure it earns — the entry point a

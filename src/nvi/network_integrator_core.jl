@@ -137,21 +137,14 @@ This is a *default*, not a decision taken away from the caller: a `linear_solver
 to `GeometricIntegrator` wins, so `linear_solver_method = SimpleSolvers.LapackLU()` gives an LU
 solve to anyone who wants a singular Jacobian reported rather than solved.
 
-**`Float16` is left alone**, and keeps whatever `SimpleSolvers.default_linear_solver_method`
-picks for it — the generic `LU`. Both rank-revealing methods are LAPACK-backed (`geqp3`/`tzrzf`
-and `gesdd`), so they accept only `Float32`, `Float64`, `ComplexF32` and `ComplexF64` and refuse
-anything else by name; handing one a half-precision Jacobian raises `ArgumentError` before the
-first step. The consequence to be honest about: **`Float16` is still exposed to #98.** That is a
-narrower gap than it sounds — the Jacobian is ill-conditioned at half precision anyway, and
-`test/unit/network_integrators_unit.jl` already records that whether the Newton solve converges
-there is not a contract — but it is not closed, and closing it would need a rank-revealing method
-that does not go through LAPACK.
+The default holds at every element type, `Float16` included: `SimpleSolvers.PivotedQR` is a
+pure-Julia Businger–Golub QR, not a LAPACK call, so it accepts any `AbstractFloat`. Whether the
+Newton solve converges at half precision is not a contract, because the Jacobian is
+ill-conditioned there anyway.
 """
 function initsolver(solvermethod::Union{Newton, SimpleSolvers.DogLeg},
         method::NetworkIntegratorMethod, caches::CacheDict; kwargs...)
-    options = datatype(caches.problem) <: LinearAlgebra.BlasFloat ?
-              merge((; linear_solver_method = SimpleSolvers.PivotedQR()), values(kwargs)) :
-              values(kwargs)
+    options = merge((; linear_solver_method = SimpleSolvers.PivotedQR()), values(kwargs))
     invoke(initsolver,
         Tuple{SimpleSolvers.NonlinearSolverMethod, GeometricMethod, CacheDict},
         solvermethod, method, caches; options...)

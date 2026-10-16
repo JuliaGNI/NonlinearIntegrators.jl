@@ -230,28 +230,13 @@ import GeometricProblems.Diagnostics as GPD
         # this suite rather than in a caller's figure.
         @test HarmonicOscillator.plot_phase_portrait(sol) isa Figure
 
-        # ...and this one is broken upstream *today*, which is what the check found.
-        #
-        # `GeometricProblems.Diagnostics.plot_energy_error` cannot compute the energy of a
-        # partitioned or implicit solution. Its `_invariant_error` branches on
-        # `sol isa Union{SolutionPODE, SolutionPDAE}` to decide whether to pass `p` to the
-        # invariant — and that test is `false` for a `GeometricSolution` of a `LODEProblem`, even
-        # though `SolutionPODE`'s own definition names `LODEProblem`: the alias is written
-        #
-        #     const SolutionPODE{dType, …, probType, perType} =
-        #         GeometricSolution{dType, …, probType, perType} where {probType <: Union{…}}
-        #
-        # with `probType` bound both as an alias parameter and by the `where`, so the constraint
-        # does not apply the way it reads. The q-only branch is therefore always taken, `p` is never
-        # passed, and `HarmonicOscillator.hamiltonian(t, q, params)` — the three-argument method,
-        # which expects `q = [q, v]` — indexes `q[2]` on a one-element vector.
-        #
-        # Two assertions rather than one `@test_broken`: the first records the symptom, the second
-        # pins the cause, so a fix upstream flips the `@test_broken` to a pass and the second one
-        # says why. Measured on GeometricProblems 0.8.3 / GeometricSolutions 0.6.5.
-        @test_broken GPD.plot_energy_error(sol; energy = ham) isa Figure  # issue #117
-        @test !(sol isa GeometricSolutions.SolutionPODE)   # the cause; should become `false`
+        # `plot_energy_error` passes `p` to the invariant only for a solution that is a
+        # `SolutionPODE` or a `SolutionPDAE`. The solution of a `LODEProblem` is a `SolutionPODE`
+        # from GeometricSolutions 0.6.7 on; with the q-only branch, the three-argument
+        # `HarmonicOscillator.hamiltonian(t, q, params)` indexes `q[2]` on a one-element vector.
         @test typeof(sol.problem) <: GeometricEquations.LODEProblem
+        @test sol isa GeometricSolutions.SolutionPODE
+        @test GPD.plot_energy_error(sol; energy = ham) isa Figure
     end
 
     @testset "plot_solution with more than one degree of freedom" begin

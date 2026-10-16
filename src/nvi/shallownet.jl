@@ -97,10 +97,10 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::
         labels = reshape(network_labels[:, k], 1, extrapolation_substep + 1)
 
         PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
-        # `Adam` and the line search are built at the parameter element type: `Optimizer` does not
-        # convert `Adam`, so an `Adam{Float64}` handed `Float32` parameters would not dispatch.
-        # `Adam` supplies only a direction, so the learning rate is the line search, decaying from
-        # 1e-3 to 5e-5 over the epoch budget.
+        # `Optimizer` converts `Adam` and the line search to the parameter element type, so
+        # neither has to name one and one construction serves every precision. `Adam` supplies
+        # only a direction, so the learning rate is the line search, decaying from 1e-3 to 5e-5
+        # over the epoch budget.
         #
         # The optimizer is given the *flat vector*, which is what it works in anyway: handed a
         # `NamedTuple`, `GeometricOptimizers` flattens it itself inside the `Gradient` it builds
@@ -113,14 +113,14 @@ function initial_params!(int::GeometricIntegrator{<:ShallowNet}, initialParams::
         local PT = eltype(PNN.params[1].W)
         ps_flat, layout = NeuralNetworkParameters.flatten(PNN.params)
         loss(p) = mae_loss(network_inputs, labels, NN, NeuralNetworkParameters.unflatten(layout, p))
-        algorithm = GeometricOptimizers.Adam(PT)
+        algorithm = GeometricOptimizers.Adam()
         # `max_iterations` is the epoch budget: `solve!` runs its own loop and stops on
         # `meets_stopping_criteria`, so the budget has to be an option rather than a `for` range.
         # `warn_iterations = 0` because reaching that budget is the normal outcome here, not a
         # diagnosis — at the default of 1000 against 50 000 epochs, `solve!` would print its
         # warning once per dimension per time step.
         opt = GeometricOptimizers.Optimizer(ps_flat, loss; algorithm = algorithm,
-            linesearch = GeometricOptimizers.DecayingStatic(PT; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs),
+            linesearch = GeometricOptimizers.DecayingStatic(; η₁ = PT(1e-3), η₂ = PT(5e-5), n = nepochs),
             max_iterations = nepochs, warn_iterations = 0)
         state = GeometricOptimizers.OptimizerState(algorithm, ps_flat)
         # `solve!` rather than the hand-rolled epoch loop this used to run: it makes the same
