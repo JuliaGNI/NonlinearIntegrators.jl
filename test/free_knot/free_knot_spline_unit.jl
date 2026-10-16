@@ -74,7 +74,8 @@ end
         sol = integrate(prob, FreeKnotSpline(4))
         q = collect(sol.q[:, 1])
 
-        # RK4 at h/40000: its error, of order (1.25e-5)⁴, is far below the thresholds.
+        # RK4 with 40000 steps per call, so at most h/20000: its error, of order (2.5e-5)⁴, is far
+        # below the thresholds.
         function rk4(q, p, T; n = 40000)
             dt = T / n
             for _ in 1:n

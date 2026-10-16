@@ -73,9 +73,9 @@ Harmonic oscillator (``m = 1``, ``k = 0.5``, ``\bar q = 0.5``) and pendulum
 | ``S`` | oscillator | pendulum |
 |:--|--:|--:|
 | 0 (the cubic) | ``5.9 \cdot 10^{-10}`` | ``5.8 \cdot 10^{-10}`` |
-| 4 | ``1.0 \cdot 10^{-13}`` | ``9.7 \cdot 10^{-14}`` |
+| 4 | ``9.8 \cdot 10^{-14}`` | ``9.6 \cdot 10^{-14}`` |
 | 5 | ``3.3 \cdot 10^{-14}`` | ``3.8 \cdot 10^{-14}`` |
-| 6 | ``1.5 \cdot 10^{-14}`` | ``2.2 \cdot 10^{-14}`` |
+| 6 | ``1.3 \cdot 10^{-14}`` | ``2.1 \cdot 10^{-14}`` |
 
 At these points the Jacobian of the full system has full rank, with row and column equilibration
 at ``\sqrt{\varepsilon}``. The scripts are `scripts/free_knot_rank.jl` and
@@ -199,7 +199,7 @@ function spline_residual(x, S, D, ξ, β, l, t̄, h, params, q̄, p̄)
            sum(p̄ .* spline_q(θ, S, D, zero(eltype(θ)))) -
            spline_action(θ, S, D, ξ, β, l, t̄, h, params)
     θ = x[1:n]
-    vcat(ForwardDiff.gradient(G, θ), q̄ .- spline_q(θ, S, D, zero(eltype(θ))))
+    vcat(ForwardDiff.gradient!(similar(θ), G, θ), q̄ .- spline_q(θ, S, D, zero(eltype(θ))))
 end
 
 # ---- the reduced action with fixed endpoints -------------------------------------------------
@@ -240,7 +240,8 @@ function dense_newton(F, x, tol, iterations)
         all(isfinite, r) || return nothing
         ρ = maximum(abs, r)
         ρ ≤ tol && return x
-        xnew = x - qr(ForwardDiff.jacobian(F, x), ColumnNorm()) \ r
+        J = ForwardDiff.jacobian!(similar(r, length(r), length(x)), F, x)
+        xnew = x - qr(J, ColumnNorm()) \ r
         rnew = F(xnew)
         if ρ ≤ 10_000 * tol && !(maximum(abs, rnew) < ρ / 2)
             return maximum(abs, rnew) < ρ ? xnew : x
@@ -260,8 +261,9 @@ first-order correction for a residual `∇_z A`.
 function reduced_derivatives(A, z, φ)
     nz = length(z)
     y = vcat(z, φ)
-    g = ForwardDiff.gradient(y -> A(y[1:nz], y[(nz + 1):end]), y)
-    H = ForwardDiff.hessian(y -> A(y[1:nz], y[(nz + 1):end]), y)
+    g = ForwardDiff.gradient!(similar(y), y -> A(y[1:nz], y[(nz + 1):end]), y)
+    H = ForwardDiff.hessian!(
+        similar(y, length(y), length(y)), y -> A(y[1:nz], y[(nz + 1):end]), y)
     Hzz, Hzφ = H[1:nz, 1:nz], H[1:nz, (nz + 1):end]
     Hzz⁻¹Hzφ = Hzz \ Hzφ
     gr = g[(nz + 1):end] - Hzz⁻¹Hzφ' * g[1:nz]
@@ -288,7 +290,7 @@ The descent ends when neither test accepts a step of any length.
 """
 function descend_knots(A, z, φ, iterations, newton_iterations, tol)
     inner(z, φ) = dense_newton(
-        z -> ForwardDiff.gradient(z -> A(z, φ), z), z, tol, newton_iterations)
+        z -> ForwardDiff.gradient!(similar(z), z -> A(z, φ), z), z, tol, newton_iterations)
     z = inner(z, φ)
     z === nothing && return nothing
     fφ = A(z, φ)

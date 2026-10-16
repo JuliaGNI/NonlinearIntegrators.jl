@@ -59,7 +59,7 @@ spline with knots ``\tau``. So stage 3 descends towards the best free-knot splin
 point is no better than the cubic, so the descent does not settle there.
 
 **Why the second test is needed.** The gain of the knots over the cubic is of the order of the
-squared error, about ``10^{-20}`` against ``f \approx 3 \cdot 10^{-2}`` on the oscillator below.
+squared error, about ``10^{-20}`` against ``|f| \approx 3 \cdot 10^{-2}`` on the oscillator below.
 That is below the round-off of ``f``, so near the minimum Armijo on ``f`` compares round-off and
 stops the descent at an arbitrary point. Away from a zero of ``q`` that is harmless. Near one, the
 ``c_i`` are about ``10^{-5}`` and change sign, the dead-knot point ``c = 0`` is close, and stage 4
@@ -93,8 +93,8 @@ ill-conditioned but not singular. Row equilibration alone misreads this as a ran
 ``S - 1``.
 
 The prototype is `scripts/free_knot_descent.jl`. Its descent accepts on Armijo alone, which is
-enough for these two steps from ``p = 0``. `scripts/free_knot_rank.jl` holds the earlier
-attempts: Gauss 8 on the whole step, and plain Newton with per-piece quadrature.
+enough for these two steps from ``p = 0``. `scripts/free_knot_rank.jl` holds the two
+alternatives that fall short: Gauss 8 on the whole step, and plain Newton with per-piece quadrature.
 
 Over many steps, with the integrator itself (`scripts/free_knot_spline_study.jl`, oscillator,
 ``S = 4``):
