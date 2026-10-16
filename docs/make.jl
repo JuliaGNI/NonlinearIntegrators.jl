@@ -115,6 +115,7 @@ makedocs(
             "Studies" => "oga/studies.md"
         ],
         "Variational Integrator with Symbolic Expression" => "vise/vise.md",
+        "Free-Knot Spline Integrator" => "free_knot/free_knot_spline.md",
         "Benchmarks" => "benchmarks/benchmarks.md"
     ]
 )

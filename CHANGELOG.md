@@ -14,6 +14,25 @@ scripts sat in a talk directory, all carrying much the same code.
 
 ### Added
 
+- **`FreeKnotSpline(S)`, a variational integrator on a cubic spline with `S` free knots per
+  step.** The ansatz is an explicit cubic plus `S` truncated cubics `cᵢ(t − τᵢ)₊³` with shared
+  knots, and the action is integrated with Gauss 4 on each piece between knots. This is the
+  shallow ReLU³ network without its three rank deficiencies (the scaling gauge, the collapse onto
+  a cubic, and quadrature on the whole step). Plain Newton reaches its accurate stationary point
+  only from uniform knots, so each step solves the cubic step, minimises the action with fixed
+  endpoints over the knots, and finishes with Newton on the full system. The descent accepts a
+  step on Armijo or, where the reduced Hessian is positive definite, when the reduced gradient
+  halves: near a zero of `q` the gain of the knots is below the round-off of the action, and with
+  Armijo alone a step collapsed onto the cubic.
+
+  On the harmonic oscillator at `h = 0.5`, `S = 4`, the endpoint error is `9.6e-14` after one
+  step, against `5.9e-10` for the cubic step, and the energy error stays below `3.2e-13` over 200
+  steps. On the pendulum the first step's error is `9.7e-14`. In the prototype, the descent reached the same point from
+  the uniform knots and from the raw, normalised and orthogonal greedy seeds in 48 of 48 cases,
+  and plain Newton in 8. Each step allocates and runs nested ForwardDiff (12 ms per step there),
+  and the step does not use the framework's nonlinear solver. New manual page "Free-Knot Spline
+  Integrator"; scripts `free_knot_descent.jl` and `free_knot_spline_study.jl`.
+
 - **`ext/NonlinearIntegratorsPlots.jl`, this package's first extension**, on a `Makie` weakdep.
   **Two** plot functions and a theme, in a `NonlinearIntegrators.Diagnostics` submodule:
 

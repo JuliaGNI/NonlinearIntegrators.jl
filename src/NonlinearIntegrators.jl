@@ -10,6 +10,7 @@ import GeometricIntegratorsBase: problem, method, parameters, SolverMethod, hist
                                  update!, solverstate
 import GeometricIntegratorsBase: compute_vectorfields!, _extrapolate!, internal_variables,
                                  nlsolution, integrate!, IODEIntegratorCache, LODEMethod
+import GeometricBase
 import GeometricBase: datatype, timetype, ntime
 import GeometricBase: initialtime, finaltime, timespan, timestep, periodicity,
                       NullPeriodicity
@@ -135,6 +136,10 @@ using Symbolics
 include("vise/vise.jl")
 include("vise/vise_basis.jl")
 export VISE, VISEBasis
+
+# A variational integrator on a cubic spline with free knots, solved by descent on the action.
+include("free_knot/free_knot_spline.jl")
+export FreeKnotSpline
 
 # The plotting API. The data layer — `continuous_solution`, `Trajectory`, the error reductions —
 # and the figure naming scheme are implemented in `src/` rather than in the extension because
