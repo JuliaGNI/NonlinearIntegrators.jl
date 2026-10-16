@@ -178,13 +178,15 @@ scripts sat in a talk directory, all carrying much the same code.
   | `NeuralNetworkParameters` | `0.3` | `0.5` |
   | `QuadratureRules` | `0.2` | `0.2.2` |
   | `SimpleSolvers` | `0.13.3` | `0.14.2` |
+  | `StaticArrays` | `1` | `1.9.13` |
   | `SymbolicNeuralNetworks` | `0.8` | `0.9` |
   | `GeometricProblems` (test only) | `0.8` | `0.9.1` |
   | `GeometricIntegrators` (`scripts/` only) | `0.18.4` | `0.18.6` |
 
   `CompactBasisFunctions`, `GeometricEquations`, `GeometricIntegratorsBase` and `QuadratureRules`
   move only to their first release that admits `GeometricBase` 0.15, so that each floor can be
-  installed.
+  installed. `StaticArrays` moves to 1.9.13, the lowest release that the rest of the dependency
+  set admits, which is what the `Downgrade` job resolves.
 
   Two call sites change with them, and neither changes a result. `GeometricOptimizers.Adam` and
   `DecayingStatic` take no element type any more, because the `Optimizer` converts them to the

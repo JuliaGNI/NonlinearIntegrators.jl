@@ -49,7 +49,7 @@ Random = "1"
 # surfaces only when a network integrator is constructed. That is why this is a bound and not a
 # fallback. The patch floor, 0.14.2, is the one that GeometricOptimizers 0.9 requires.
 SimpleSolvers = "0.14.2"
-StaticArrays = "1"
+StaticArrays = "1.9.13"
 Statistics = "1"
 SymbolicNeuralNetworks = "0.9"
 Symbolics = "7"
