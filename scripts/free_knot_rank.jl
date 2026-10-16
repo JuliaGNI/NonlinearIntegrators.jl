@@ -42,13 +42,15 @@
 #           on a piecewise cubic, not the dynamics.
 #   split — the one accurate stationary point: `S = 4` from the uniform seed, knots spread
 #           evenly with all `cᵢ ≈ 2e-4`, error 1e-13 after one step and 4e-13 after two, and a
-#           spectrum that decays smoothly to ≈ 7e-7 with no gap. Everywhere else the knots merge,
-#           sit at 0 or 1, or leave the element, and the error is the cubic's.
+#           spectrum that decays smoothly to ≈ 7e-7 with no gap. Elsewhere the knots merge, sit
+#           at 0 or 1, or leave the element. At best one knot survives inside, near τ ≈ 0.5
+#           (greedy seeds at S = 4, 5, 6): error 1.6e-11, between the cubic's 5.9e-10 and the
+#           accurate point's 1e-13, with the rank still lost.
 #   gaps  — the same accurate point at `S = 4` from the uniform seed; elsewhere the knots gather
 #           at 0 and 1, and the rows that keep full rank there do so with knots a hair apart.
 #
 # So the free-knot ansatz has an accurate, nondegenerate stationary point, but its basin under
-# Newton is small: the cubic collapse attracts every OGA-like seed, and with Gauss 8 the full
+# Newton is small: no OGA-like seed reaches it, and with Gauss 8 the full
 # rank that remains is the dead-knot kind. Column equilibration matters for the reading: the τ
 # columns scale with `c ≈ 2e-4`, and row equilibration alone (what `newton_jacobian_rank.jl`
 # does) reports `n − (S − 1)` at the accurate point.

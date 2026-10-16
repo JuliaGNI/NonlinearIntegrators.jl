@@ -19,9 +19,10 @@
 #      element, `max(0, z)ᵏ = zᵏ` identically and the whole ansatz is a degree-`k` polynomial —
 #      `3S + 1` parameters onto `k + 2` coefficients.
 #
-# What is measured here is their *combined* effect, the rank, and not the split between them:
-# separating the two needs the pre-activation signs across the element, which this does not
-# collect. What the `S`-dependence does show is an **offset**. Mechanism 1 alone predicts a
+# What is measured here is their *combined* effect, the rank, and not the split between them.
+# Each row also prints the kinks `τᵢ = −bᵢ/wᵢ` and the weights `cᵢ`, which show the mechanism at
+# work: a kink outside `[0, 1]` is a neuron collapsed onto a cubic, and a `cᵢ` near zero is a dead
+# neuron, whose `wᵢ` and `bᵢ` are free. What the `S`-dependence shows is an **offset**. Mechanism 1 alone predicts a
 # deficiency of exactly `S` — one generator per neuron — i.e. 4, 5, 6. Measured on the converged
 # `OGA1d` rows it is 8, 9, 10: the slope is 1, so mechanism 1 accounts for all of the growth, and
 # a constant 4 sits on top of it. Four is what a cubic collapse would contribute, `k + 1`
@@ -139,6 +140,14 @@ for S in (4, 5, 6), (seed_name, seed) in SEEDS
         S, seed_name, n, r, rank(SimpleSolvers.linearsolver(s)), gap, resid, σ[r] / σ[1],
         r < n ? σ[r + 1] / σ[1] : 0.0,
         resid < 1e-8 ? "" : "   NOT CONVERGED — not evidence")
+
+    # The kinks τᵢ = −bᵢ/wᵢ and the output weights cᵢ of the iterate (D = 1: x = (c, p̃, w, b)).
+    # A kink outside [0, 1] makes its neuron a cubic on the element; a `c` near zero is a dead
+    # neuron, whose `w` and `b` are then free.
+    x = st.x
+    c, w, b = x[1:S], x[(S + 2):(2S + 1)], x[(2S + 2):(3S + 1)]
+    println("      τ = ", join(round.(-b ./ w; sigdigits = 3), " "))
+    println("      c = ", join(round.(c; sigdigits = 2), " "))
 end
 
 println()

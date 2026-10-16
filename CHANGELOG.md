@@ -482,7 +482,8 @@ gets rediscovered:
   quadrature error, and the step is the cubic Galerkin step or worse. With a Gauss rule on each
   piece between knots there is an accurate stationary point — `S = 4`, endpoint error 1e-13
   against 6e-10 for the cubic, no gap in the spectrum — but Newton reaches it only from uniform
-  knots; every greedy seed collapses onto the cubic.
+  knots. From the greedy seeds the knots merge, sit at 0 or 1, or leave the element; at best one
+  interior knot survives, with error 1.6e-11 and the rank still lost.
 
 - **`scripts/newton_jacobian_rank.jl`** measures the rank of the Newton Jacobian at a converged
   point, at `S = 4, 5, 6` and three OGA seeds, and prints the residual each row was measured at

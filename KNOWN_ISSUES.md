@@ -249,29 +249,37 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
 - evidence: `julia --startup-file=no --project=scripts scripts/newton_jacobian_rank.jl` reports
   rank 5 of 13 unknowns at `S = 4`, with a gap of fourteen orders between the fifth and sixth
   singular values, and deficiencies of 8, 9 and 10 on the converged `OGA1d` rows at
-  `S = 4, 5, 6`. Rank 5 is a cubic polynomial
-  (4 coefficients) and `p̃`: at the converged point the ansatz is a cubic on the element, and the
-  step is the cubic Galerkin step. Three mechanisms make it so.
+  `S = 4, 5, 6`. The script prints the kinks `τᵢ = −bᵢ/wᵢ` and the weights `cᵢ` of each row,
+  and they show three mechanisms.
 
   - **The scaling gauge.** `relu_k` is positively homogeneous, so `(wᵢ, bᵢ, cᵢ) ↦ (λwᵢ, λbᵢ,
     λ⁻ᵏcᵢ)` leaves the ansatz unchanged: `S` null directions.
   - **The polynomial collapse.** Where every pre-activation keeps one sign across the element,
-    `max(0, z)ᵏ = zᵏ` and the neuron is a cubic. At the converged points the kinks lie at
-    `|τ| ≈ 3` (`OGA1dStable`, with `cᵢ ≈ ±1e6` that cancel) or at 15 and −29 (`OGA1dNormalized`).
-  - **Dead neurons.** Neurons with a kink inside the element converge to `cᵢ ≈ 1e-25` (`OGA1d`,
-    `S = 6`), which leaves their `wᵢ` and `bᵢ` free.
+    `max(0, z)ᵏ = zᵏ` and the neuron is a cubic. `OGA1d` at `S = 4` has its kinks at −3.14,
+    3.14, −1.65 and 1.35, all outside `[0, 1]`: rank 5 is the cubic's 4 coefficients and `p̃`,
+    and the step is the cubic Galerkin step.
+  - **Dead neurons.** `OGA1d` at `S = 5, 6` keeps the same four outside kinks and adds neurons
+    with kinks inside at 0.499 and 0.314 but `cᵢ` of 1e-25 … 1e-27, which leaves their `wᵢ` and
+    `bᵢ` free.
+
+  The converged `OGA1dNormalized` rows at `S = 5, 6` have three and five live kinks inside the
+  element (`cᵢ` up to 1.2e4) and are deficient by 4 and 7, close to the gauge alone. In this
+  configuration `OGA1dStable` does not converge at any `S`, and `OGA1dNormalized` does not at
+  `S = 4`; those rows are not evidence.
 
   The solve is not affected: `initsolver` gives every network integrator
   `SimpleSolvers.PivotedQR`, which returns the minimum-norm step and cannot raise. What the
-  deficiency costs is that `3S + 1` unknowns carry the 5 degrees of freedom of a cubic step.
+  deficiency costs is that `3S + 1` unknowns carry far fewer degrees of freedom; on the `OGA1d`
+  rows, the 5 of a cubic step.
 
   `scripts/free_knot_rank.jl` tests the design that would remove all three: `w = +1`, an explicit
   cubic part, and the kinks as free knots inside the element. With Gauss 8 on the element, which
   ShallowNet uses, the knots die (`cᵢ ≤ 1e-12`) or fit the quadrature error, and the step is the
   cubic's or worse. With a Gauss rule on each piece between knots there is an accurate,
   nondegenerate stationary point — `S = 4`, endpoint error 1e-13 against 6e-10 for the cubic, no
-  gap in the spectrum — but Newton reaches it only from uniform knots; from every OGA-like greedy
-  seed the knots merge, sit at 0 or 1, or leave the element. A fix needs that piecewise
+  gap in the spectrum — but Newton reaches it only from uniform knots. From the OGA-like greedy
+  seeds the knots merge, sit at 0 or 1, or leave the element; at best one interior knot survives
+  near τ ≈ 0.5, with error 1.6e-11 and the rank still lost. A fix needs that piecewise
   quadrature, the explicit cubic, the gauge, and a solve or a seed that reaches the accurate
   point — a globalised step, descent on the action for example.
 - kind: defect
