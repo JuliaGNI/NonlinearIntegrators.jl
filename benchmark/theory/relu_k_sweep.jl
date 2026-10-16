@@ -110,8 +110,8 @@ const PROBLEM_NAMES = split(argval("problems", "harmonic_oscillator,pendulum,dou
 const STRICT = "--strict" in ARGS
 # relu before tanh whatever the order given (and in the report, which reads the ReLU error at the same S)
 const ACTS = filter(in(split(argval("act", "relu,tanh"), ",")), ["relu", "tanh"])
-const VARIANTS = (shallownet = ShallowNet, reversible = ShallowNetReversible, autodiff = ShallowNetAutodiff)
-const VARIANT_NAMES = split(argval("variants", "shallownet,reversible,autodiff"), ",")
+const VARIANTS = (Plain-Shallow-Network = ShallowNet, Time-Reversible = ShallowNetReversible, Fixed-Boundary = ShallowNetAutodiff)
+const VARIANT_NAMES = split(argval("variants", "Plain Shallow Network,Time-Reversible,Fixed-Boundary"), ",")
 all(v -> Symbol(v) in keys(VARIANTS), VARIANT_NAMES) || error("--variants must be among $(keys(VARIANTS))")
 const SOLVER = lowercase(argval("solver", "dogleg"))
 SOLVER in ("dogleg", "newton") || error("--solver must be dogleg or newton, got $SOLVER")
@@ -511,7 +511,7 @@ filled = ReLUᵏ, open = tanh. Every panel has the same fixed size, so the colum
 `fc*` pick the plotted quantity of the network and of the baselines.
 """
 function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, fcc = r -> r.err_cgvi_comp,
-        fsp = r -> r.err_spline, ylab = "max rel. error in q")
+        fsp = r -> r.err_spline, ylab = "Max Relative Error")
     rs = filter(r -> r.problem == pn, rows)
     vs, ks, Ms = unique(r.variant for r in rs), unique(r.k for r in rs), sort(unique(r.M for r in rs))
     Ss = sort(unique(r.S for r in rs))
@@ -525,7 +525,7 @@ function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, f
         length(hs) > 1 && lines!(ax, hs, [base[h] for h in hs]; linewidth = 2, color, kwargs...)
     end
     fig = Figure()
-    Label(fig[0, :], pn; fontsize = 22, font = :bold)
+    # Label(fig[0, :], pn; fontsize = 22, font = :bold)
     for (i, v) in enumerate(vs), (j, k) in enumerate(ks)
         ax = Axis(fig[i, j]; width = 330, height = 240, xscale = log10, yscale = log10, xlabel = "h",
             ylabel = j == 1 ? ylab : "", title = "$v, k = $k", titlesize = 18)
@@ -560,18 +560,18 @@ function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, f
         M > 1 || continue
         push!(elems, [LineElement(color = colors[m], linewidth = 2, linestyle = :dash),
                       MarkerElement(marker = :xcross, color = colors[m], markersize = 12)])
-        push!(labels, "CGVI(P_k), r×$M")
-        push!(elems, [LineElement(color = colors[m], linewidth = 2, linestyle = :dot),
-                      MarkerElement(marker = :cross, color = colors[m], markersize = 12)])
-        push!(labels, "CGVI(S_k), $(M - 1) knots")
+        push!(labels, "CGVI(P_k), Composite Quadrature Rule")
+        # push!(elems, [LineElement(color = colors[m], linewidth = 2, linestyle = :dot),
+        #               MarkerElement(marker = :cross, color = colors[m], markersize = 12)])
+        # push!(labels, "CGVI(S_k), $(M - 1) knots")
     end
     for (w, S) in enumerate(Ss)
         push!(elems, MarkerElement(marker = markers[mod1(w, length(markers))], color = :gray, markersize = 12))
         push!(labels, "S = $S")
     end
-    any(r -> r.act == "relu", rs) && (push!(elems, MarkerElement(marker = :circle, color = :gray, markersize = 12)); push!(labels, "filled: ReLU^k"))
+    any(r -> r.act == "relu", rs) && (push!(elems, MarkerElement(marker = :circle, color = :gray, markersize = 12)); push!(labels, "Filled: ReLU^k"))
     any(r -> r.act == "tanh", rs) && (push!(elems, MarkerElement(marker = :circle, color = :transparent, strokecolor = :gray,
-        strokewidth = 1.8, markersize = 12)); push!(labels, "open: tanh"))
+        strokewidth = 1.8, markersize = 12)); push!(labels, "Open: tanh"))
     Legend(fig[length(vs) + 1, :], elems, labels; orientation = :horizontal, nbanks = 3,
         framevisible = false, labelsize = 15)
     resize_to_layout!(fig)
