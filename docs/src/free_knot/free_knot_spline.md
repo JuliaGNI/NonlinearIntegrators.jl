@@ -57,7 +57,9 @@ those. Each step therefore solves in four stages:
 For a short step, the action with fixed endpoints is a minimum in the trajectory. For a quadratic
 Lagrangian, ``f(\tau) - A(q_{\text{exact}})`` is half the squared energy-norm error of the best
 spline with knots ``\tau``. So stage 3 descends towards the best free-knot spline. A collapsed
-point is no better than the cubic, so the descent does not settle there.
+point is no better than the cubic, so the descent does not settle there. If stage 4 still ends
+with a knot closer than ``10^{-3}`` to a neighbour or to an end of the step, the step raises an
+error.
 
 **Why the second test is needed.** The gain of the knots over the cubic is of the order of the
 squared error, about ``10^{-20}`` against ``|f| \approx 3 \cdot 10^{-2}`` on the oscillator below.
@@ -72,22 +74,24 @@ automatic differentiation, and it still resolves the minimum there.
 ## Measured
 
 Harmonic oscillator (``m = 1``, ``k = 0.5``, ``\bar q = 0.5``) and pendulum
-(``L = \dot q^2 / 2 + 0.5 \cos q``, ``\bar q = 1``), ``h = 0.5``, two steps. In the prototype,
-the descent was started from four knot seeds: uniform knots, and the raw, normalised and
-orthogonal greedy selections of the OGA seeds. Every seed reached the same point, in 4 to 19
-iterations, for ``S = 4, 5, 6`` on both problems: 48 of 48 cases. Plain Newton from the same
-seeds reached it in 8 of 48 cases, all from uniform knots.
-
-Endpoint error after one and after two steps:
+(``L = \dot q^2 / 2 + 0.5 \cos q``, ``\bar q = 1``), ``h = 0.5``. Endpoint error of
+[`FreeKnotSpline`](@ref) after one and after two steps (`scripts/free_knot_spline_study.jl`,
+section 5; the pendulum against RK4 in 256-bit arithmetic):
 
 | ``S`` | oscillator | pendulum |
 |:--|:--|:--|
-| cubic step | ``5.9 \cdot 10^{-10}``, ``2.2 \cdot 10^{-9}`` | ``5.8 \cdot 10^{-10}``, ``2.9 \cdot 10^{-9}`` |
-| 4 | ``9.8 \cdot 10^{-14}``, ``3.6 \cdot 10^{-13}`` | ``9.6 \cdot 10^{-14}``, ``4.7 \cdot 10^{-13}`` |
-| 5 | ``3.3 \cdot 10^{-14}``, ``1.2 \cdot 10^{-13}`` | ``3.8 \cdot 10^{-14}``, ``1.7 \cdot 10^{-13}`` |
-| 6 | ``1.3 \cdot 10^{-14}``, ``4.7 \cdot 10^{-14}`` | ``2.1 \cdot 10^{-14}``, ``6.2 \cdot 10^{-14}`` |
+| 4 | ``9.6 \cdot 10^{-14}``, ``3.6 \cdot 10^{-13}`` | ``9.2 \cdot 10^{-14}``, ``4.6 \cdot 10^{-13}`` |
+| 5 | ``3.4 \cdot 10^{-14}``, ``1.3 \cdot 10^{-13}`` | ``3.2 \cdot 10^{-14}``, ``1.6 \cdot 10^{-13}`` |
+| 6 | ``2.2 \cdot 10^{-14}``, ``6.0 \cdot 10^{-14}`` | ``1.3 \cdot 10^{-14}``, ``5.5 \cdot 10^{-14}`` |
 
-At these points the Jacobian of the full system has full rank, with row and column
+In the prototype, on the same two problems and steps, the descent was started from four knot
+seeds: uniform knots, and the raw, normalised and orthogonal greedy selections of the OGA seeds.
+Every seed reached the same point, in 4 to 19 iterations, for ``S = 4, 5, 6`` on both problems:
+48 of 48 cases. Plain Newton from the same seeds reached it in 8 of 48 cases, all from uniform
+knots. The cubic step there has an endpoint error of ``5.9 \cdot 10^{-10}`` (oscillator) and
+``5.8 \cdot 10^{-10}`` (pendulum) after one step.
+
+At the prototype's points the Jacobian of the full system has full rank, with row and column
 equilibration, at ``\sqrt{\varepsilon}``. Its smallest scaled singular value is ``10^{-7}`` to
 ``10^{-6}``: the ``\tau`` columns scale with ``c \approx 2 \cdot 10^{-4}``, so the system is
 ill-conditioned but not singular. Row equilibration alone misreads this as a rank loss of

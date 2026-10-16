@@ -61,6 +61,15 @@ end
         @test live(τ, c)
     end
 
+    # Without the descent, stage 4 starts from uniform knots and the full Newton solve carries
+    # knots out of the step. The step must raise an error rather than return the collapsed point.
+    @testset "a collapsed step raises an error" begin
+        prob = HarmonicOscillator.lodeproblem([0.5], [0.0];
+            timespan = (0.0, 0.5), timestep = 0.5,
+            parameters = HarmonicOscillator.default_parameters())
+        @test_throws ErrorException integrate(prob, FreeKnotSpline(4; descent_iterations = 0))
+    end
+
     # Near a zero of q, the truncated cubics are about 1e-5 and change sign, and the gain of the
     # knots over the cubic falls below the round-off of the action. A descent that stops on the
     # action alone then leaves Newton next to the dead-knot point, and the step collapses onto

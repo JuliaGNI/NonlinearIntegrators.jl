@@ -46,7 +46,8 @@ stationary too. Each step therefore runs four stages:
 
 For a short step the action with fixed endpoints is a minimum in the trajectory, so stage 3 is
 a descent towards the best spline and cannot settle on a collapsed point, which lies level with
-the cubic. The step raises an error if stage 4 does not converge.
+the cubic. The step raises an error if stage 4 does not converge, or if it ends with a knot
+closer than ``10^{-3}`` to a neighbour or to an end of the step.
 
 # Requirements
 
@@ -64,22 +65,6 @@ guess `v̄` only. It does not evaluate `ϑ`, `f` or `ω`, so nothing checks them
     quadratic Lagrangian exactly on a piecewise cubic.
   - `descent_iterations`: the cap on stage 3.
   - `newton_iterations`: the cap on each Newton solve of stages 1, 2 and 4.
-
-# Measured
-
-Harmonic oscillator (``m = 1``, ``k = 0.5``, ``\bar q = 0.5``) and pendulum
-(``L = \dot q^2/2 + 0.5 \cos q``, ``\bar q = 1``), ``h = 0.5``, endpoint error after one step:
-
-| ``S`` | oscillator | pendulum |
-|:--|--:|--:|
-| 0 (the cubic) | ``5.9 \cdot 10^{-10}`` | ``5.8 \cdot 10^{-10}`` |
-| 4 | ``9.8 \cdot 10^{-14}`` | ``9.6 \cdot 10^{-14}`` |
-| 5 | ``3.3 \cdot 10^{-14}`` | ``3.8 \cdot 10^{-14}`` |
-| 6 | ``1.3 \cdot 10^{-14}`` | ``2.1 \cdot 10^{-14}`` |
-
-At these points the Jacobian of the full system has full rank, with row and column equilibration
-at ``\sqrt{\varepsilon}``. The scripts are `scripts/free_knot_rank.jl` and
-`scripts/free_knot_descent.jl`.
 
 # Note
 
@@ -353,6 +338,8 @@ function GeometricIntegratorsBase.integrate_step!(
         vcat(spline_theta(z, φ, S, D, q̄, Q), p̃), tol, m.newton_iterations)
     x === nothing &&
         error("FreeKnotSpline: the full Newton solve did not converge at t = $t̄.")
+    minimum(diff(vcat(zero(T), sort(spline_τ(x, S, D)), one(T)))) > T(1e-3) ||
+        error("FreeKnotSpline: the knots merged or left the step at t = $t̄.")
 
     copyto!(nlsolution(int), x)
     sol.q .= reshape(spline_q(x[1:(end - D)], S, D, one(T)), size(sol.q))

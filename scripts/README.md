@@ -226,8 +226,8 @@ removes it. Each script prints a table and writes nothing.
 |:--|:--|
 | `newton_jacobian_rank.jl` | the rank of the `ShallowNet` Newton Jacobian at converged points, with the kinks and weights of each neuron |
 | `free_knot_rank.jl` | the explicit cubic plus free knots under plain Newton: Gauss 8 on the step, Gauss 4 on each piece, and knots kept inside by their gaps |
-| `free_knot_descent.jl` | the prototype of the `FreeKnotSpline` solve: descent on the reduced action from four knot seeds, against plain Newton, on the oscillator and the pendulum |
-| `free_knot_spline_study.jl` | the integrator itself: convergence in `h`, and energy and knots over 200 steps |
+| `free_knot_descent.jl` | the frozen prototype of the `FreeKnotSpline` solve, with its own copy of the method: descent on the reduced action from four knot seeds, against plain Newton, on the oscillator and the pendulum |
+| `free_knot_spline_study.jl` | the integrator itself: convergence in `h`, energy and knots over 200 steps, local error per step, and the endpoint error after one and two steps on the oscillator and the pendulum |
 
 ## Retained files
 

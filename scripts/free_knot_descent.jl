@@ -1,6 +1,11 @@
 # Can a solve reach the accurate free-knot stationary point of `free_knot_rank.jl` from the greedy
 # (OGA-like) knot seeds? The standalone prototype of the solve in `FreeKnotSpline`.
 #
+# **A frozen prototype.** It keeps its own copy of the method and does not follow
+# `src/free_knot/free_knot_spline.jl`, which differs from it: here the descent accepts a step on
+# Armijo alone, the inner solve runs a fixed number of iterations, and p̃ is seeded from RK4. Its
+# figures are the prototype's. `free_knot_spline_study.jl` measures `FreeKnotSpline` itself.
+#
 #     julia --startup-file=no --project=scripts scripts/free_knot_descent.jl
 #
 # The ansatz and the quadrature are `free_knot_rank.jl`'s `split` variant:

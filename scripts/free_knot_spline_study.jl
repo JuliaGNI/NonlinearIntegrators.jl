@@ -13,8 +13,12 @@
 #      exact flow from that state. Steps 5 and 14 lie next to a zero of q, where the cᵢ are about
 #      1e-5 and change sign; a step that collapses onto the cubic shows the cubic's local error
 #      there, 1e-11.
+#   5. Endpoint error after one and two steps, h = 0.5, S = 4, 5, 6: the oscillator against its
+#      exact solution, and the pendulum L = v²/2 + k cos q (k = 0.5) from (q, p) = (1, 0) against
+#      RK4 at h/40000 in 256-bit arithmetic.
 
 using NonlinearIntegrators
+using GeometricIntegrators: LODEProblem
 using GeometricIntegratorsBase
 using GeometricIntegratorsBase: nlsolution
 using GeometricProblems.HarmonicOscillator
@@ -77,4 +81,40 @@ let q = 0.5, p = 0.0
             join(round.(knots; digits = 3), " "))
         q, p = qn, pn
     end
+end
+
+println()
+println("5. endpoint error after one and two steps, h = 0.5")
+const KP = 0.5
+function pendulum(T)
+    LODEProblem((p, t, q, v, params) -> (p .= v),
+        (f, t, q, v, params) -> (f .= -params.k .* sin.(q)),
+        (ω, t, q, v, params) -> (ω .= 0),
+        (t, q, v, params) -> v[1]^2 / 2 + params.k * cos(q[1]), (0.0, T), 0.5, [1.0], [0.0];
+        v̄ = (v, t, q, p, params) -> (v .= p), parameters = (k = KP,))
+end
+function rk4(q, p, dt, n)
+    for _ in 1:n
+        k1q, k1p = p, -KP * sin(q)
+        k2q, k2p = p + dt / 2 * k1p, -KP * sin(q + dt / 2 * k1q)
+        k3q, k3p = p + dt / 2 * k2p, -KP * sin(q + dt / 2 * k2q)
+        k4q, k4p = p + dt * k3p, -KP * sin(q + dt * k3q)
+        q += dt / 6 * (k1q + 2k2q + 2k3q + k4q)
+        p += dt / 6 * (k1p + 2k2p + 2k3p + k4p)
+    end
+    q, p
+end
+pendulum_reference = setprecision(256) do
+    dt = big(0.5) / 40000
+    q₁, p₁ = rk4(big(1.0), big(0.0), dt, 40000)
+    q₂, _ = rk4(q₁, p₁, dt, 40000)
+    Float64.((q₁, q₂))
+end
+@printf("%2s %19s  %19s\n", "S", "oscillator", "pendulum")
+for S in (4, 5, 6)
+    qo = collect(integrate(problem(0.5, 1.0), FreeKnotSpline(S)).q[:, 1])
+    qp = collect(integrate(pendulum(1.0), FreeKnotSpline(S)).q[:, 1])
+    @printf("%2d %9.1e %9.1e  %9.1e %9.1e\n", S,
+        abs(qo[2] - exact(0.5)), abs(qo[3] - exact(1.0)),
+        abs(qp[2] - pendulum_reference[1]), abs(qp[3] - pendulum_reference[2]))
 end
