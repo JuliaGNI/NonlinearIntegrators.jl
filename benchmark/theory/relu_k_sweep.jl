@@ -135,7 +135,9 @@ const NVI_MAXIT = 1000
 # ---------------------------------------------------------------------------------------------
 
 const DEFAULT_HS = [0.2, 0.5, 1, 2, 5, 10]
-const LARGE_HS = [0.3, 1, 3, 10]
+const LARGE_HS = [5, 10]
+
+const DP_PARAMETERS = (l₁ = 1.0, l₂ = 1.0, m₁ = 1.0, m₂ = 1.0, g = 1.0)
 
 const ALL_PROBLEMS = [
     (name = "harmonic_oscillator", ics = ([0.5], [0.0]),
@@ -155,13 +157,12 @@ const ALL_PROBLEMS = [
             c.m * c.l^2 * q[2]^2 / 2 + c.m * c.g * c.l * cos(q[1])
         end,
         T = 20.0, hs = DEFAULT_HS),
-    (name = "double_pendulum",
-        ics = let d = DoublePendulum.lodeproblem()
-            (collect(Float64.(d.ics.q)), collect(Float64.(d.ics.p)))
-        end,
+    # m₁ = m₂ = l₁ = l₂ = g = 1 instead of the package defaults (l = 2, 3, m = 1, 2, g = 9.81), and a
+    # milder initial state, so that the motion is not chaotic over T = 20 at the step sizes of the sweep
+    (name = "double_pendulum", ics = ([0.75, 1.5], [0.25, 0.5]),
         build = (q0, p0, ts, h) -> DoublePendulum.lodeproblem(q0, p0; timespan = ts,
-            timestep = h, parameters = DoublePendulum.default_parameters(Float64)),
-        energy = (t, q, p) -> DoublePendulum.hamiltonian(t, q, p, DoublePendulum.default_parameters(Float64)),
+            timestep = h, parameters = DP_PARAMETERS),
+        energy = (t, q, p) -> DoublePendulum.hamiltonian(t, q, p, DP_PARAMETERS),
         T = 20.0, hs = DEFAULT_HS),
     (name = "toda_lattice",
         ics = let d = TodaLattice.lodeproblem(4)
@@ -384,6 +385,8 @@ function run_sweep(run)
                 verdict = !done || unconverged > 0 ? "tanh (unconverged steps)" :
                           ratio < 0.5 ? "tanh better" : ratio > 2 ? "tanh worse" : "tanh ≈ CGVI"
             end
+            # without the CGVI(P_k) run on the same rule (it threw) there is nothing to compare with
+            isnan(err_cc) && (verdict = "no CGVI baseline")
             row = (problem = P.name, variant, activation = actlabel(act, k), k, S, r = rpoints(k), M, h, T,
                 params_SN = variant == "reversible" ? 2S + 1 : 3S + 1, params_CGVI = k + 1, params_spline = k + M,
                 err_sn, err_cgvi = relerr(cg), err_cgvi_comp = err_cc, err_spline = relerr(cs), diff,
@@ -467,7 +470,7 @@ function write_markdown(rows, path)
         println(io, "ReLU: `CONFIRMED` ⇔ every step P_k-equivalent, every step reported converged by the solver " *
                     "(`unconv` counts the steps it does not; `max ‖r‖` is the largest step residual), and " *
                     "diff ≤ max(1e-9, 0.01·err_comp).")
-        println(io, "tanh: no equivalence theorem applies; `tanh better/worse` ⇔ err_tanh/err_comp < 0.5 / > 2. " *
+        println(io, "tanh: no equivalence theorem applies; `tanh better/worse` ⇔ err_tanh/err_comp < 0.5 / > 2. `no CGVI baseline`: CGVI(P_k) on the network's rule threw at this h, so there is nothing to compare with. " *
                     "Wall times: the network's includes compilation for the first h of a run; the CGVI time is " *
                     "that of the four baselines at this h.\n")
 
