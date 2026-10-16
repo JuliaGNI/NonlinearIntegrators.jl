@@ -107,8 +107,8 @@ end
 # Every cell asserts, and any exception fails the run. The Newton Jacobian of these methods is
 # exactly rank deficient (issue #98), but the `SimpleSolvers.PivotedQR` the first testset pins
 # solves it in the minimum-norm sense and has no throwing path, so a `SingularException` from
-# the Newton solve cannot occur. One that does comes from somewhere else — an OGA Gram solve,
-# or a caller's LU — and is a real failure.
+# the Newton solve cannot occur. One that does comes from somewhere else, such as an OGA Gram
+# solve, and is a real failure.
 for row in NETWORK_INTEGRATORS,
     T in TEST_TYPES,
     (seed, seed_name) in row.seeds,

@@ -37,9 +37,9 @@
 #           cubic's residual is orthogonal to the atom — so the rank is full while the ansatz is
 #           the cubic. Where `c` is not dead, the rank is lost, and in three of those rows the
 #           step is *worse* than the cubic (≈ 1e-6). The `τ` scan at the end shows why: at
-#           `S = 1` the stationary `c(τ)` changes sign every ≈ 0.04 in `τ` and reaches 1e6 … 1e9
-#           near the ends — the knot fits the quadrature error of Gauss 8 on a piecewise cubic,
-#           not the dynamics.
+#           `S = 1` the stationary `c(τ)` changes sign 14 times between `τ = 0.02` and 0.98 and
+#           reaches 1.5e6 and 7.9e9 at the ends — the knot fits the quadrature error of Gauss 8
+#           on a piecewise cubic, not the dynamics.
 #   split — the one accurate stationary point: `S = 4` from the uniform seed, knots spread
 #           evenly with all `cᵢ ≈ 2e-4`, error 1e-13 after one step and 4e-13 after two, and a
 #           spectrum that decays smoothly to ≈ 7e-7 with no gap. Everywhere else the knots merge,
