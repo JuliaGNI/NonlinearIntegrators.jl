@@ -149,12 +149,7 @@ assert_no_upcast(q, ::Type{T}) where {T} = @test eltype(q[end]) == T
 # Used by the `Float16` regression test, which asserts a failure there is one of these rather than
 # a new class.
 #
-# `Float32` and `Float64` are not uniformly well conditioned either: the extrapolation cross
-# product in `nvi/network_integrators_unit.jl` raises `SingularException` from the Newton Jacobian
-# on some BLAS builds and not others, which is issue #98. That loop absorbs a `SingularException`
-# whose zero pivot is past any the OGA fit could produce, which is wider than #98 alone — see the
-# note there. Every other integration calls `integrate` directly, where a give-up is a real
-# failure.
+# Every other integration calls `integrate` directly, where a give-up is a real failure.
 const SOLVER_GAVE_UP = Union{SingularException, NonlinearSolverException}
 
 # `initial_trajectory_method` selects which `initial_trajectory!` method runs; `iguess` is the

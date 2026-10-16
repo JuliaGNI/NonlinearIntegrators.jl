@@ -243,61 +243,47 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
 - kind: defect
 - found: 2026-08-14
 
-### K17 · The network-integrator cross product raises `SingularException` from the Newton Jacobian on some BLAS builds, and the test now records it as broken rather than failing
+### K35 · The Newton Jacobian of the ShallowNet integrators is exactly rank deficient at every converged point, by construction of the ansatz.
 
-- location: `SimpleSolvers/src/linear/pivoted_lu.jl:133`
-- evidence: —
-  [#98](https://github.com/JuliaGNI/NonlinearIntegrators.jl/issues/98). The singular matrix is the
-  Jacobian of the integrator's nonlinear system, LU factorised in `SimpleSolvers` — the stack trace
-  runs `integrate_step!` → `solver_step!` → `direction!` → `ldiv!` at
-  `SimpleSolvers/src/linear/pivoted_lu.jl:133`. It is **not** the OGA fit's Gram matrix: the
-  zero-pivot indices 11/12/13 are the last pivots of a 13-unknown system, and `OGA1dStable` is
-  built so that its selected design matrix cannot go rank-deficient at any precision
-  (`src/oga/types.jl:109-111`), which would make it the least likely seed to fail if the fit were
-  the problem.
+- location: `src/nvi/shallownet.jl`
+- evidence: `julia --startup-file=no --project=scripts scripts/newton_jacobian_rank.jl` reports
+  rank 5 of 13 unknowns at `S = 4`, with a gap of fourteen orders between the fifth and sixth
+  singular values, and deficiencies of 8, 9 and 10 on the converged `OGA1d` rows at
+  `S = 4, 5, 6`. The script prints the kinks `τᵢ = −bᵢ/wᵢ` and the weights `cᵢ` of each row,
+  and they show three mechanisms.
 
-  Whether a pivot lands on exactly zero rather than something very small depends on the BLAS build,
-  so the failure tracks the runner image and not anything in the package: ubuntu and windows fail,
-  macOS has not been observed to. The affected combinations are not stable between runs —
-  `OGA1dStable` and `OGA1dNormalized` have both raised it, at `Float64` as well as `Float32`, on all
-  three extrapolation variants.
+  - **The scaling gauge.** `relu_k` is positively homogeneous, so `(wᵢ, bᵢ, cᵢ) ↦ (λwᵢ, λbᵢ,
+    λ⁻ᵏcᵢ)` leaves the ansatz unchanged: `S` null directions.
+  - **The polynomial collapse.** Where every pre-activation keeps one sign across the element,
+    `max(0, z)ᵏ = zᵏ` and the neuron is a cubic. `OGA1d` at `S = 4` has its kinks at −3.14,
+    3.14, −1.65 and 1.35, all outside `[0, 1]`: rank 5 is the cubic's 4 coefficients and `p̃`,
+    and the step is the cubic Galerkin step.
+  - **Dead neurons.** `OGA1d` at `S = 5, 6` keeps the same four outside kinks and adds neurons
+    with kinks inside at 0.499 and 0.314 but `cᵢ` of 1e-25 … 1e-27, which leaves their `wᵢ` and
+    `bᵢ` free.
 
-  `test/nvi/network_integrators_unit.jl` therefore catches `SingularException` in that loop and
-  records `@test_broken`, rather than skipping a named list of cells that one run happened to
-  produce. **This is a deliberate loss of assertion strength**, taken because those matrix entries
-  are required status checks and an intermittent failure in them left no pull request able to
-  satisfy branch protection on its own merits. Any other exception still propagates and fails the
-  run, a quarantined case is reported as broken rather than passing, and the catch prints the cell
-  it absorbed so the spread stays measurable from a CI log.
+  The converged `OGA1dNormalized` rows at `S = 5, 6` have three and five live kinks inside the
+  element (`cᵢ` up to 1.2e4) and are deficient by 4 and 7, close to the gauge alone. In this
+  configuration `OGA1dStable` does not converge at any `S`, and `OGA1dNormalized` does not at
+  `S = 4`; those rows are not evidence.
 
-  **Half closed.** The reading above — LU on a matrix that is *sometimes* singular — was too
-  generous to the problem. The Jacobian is **exactly rank deficient**, at every converged point,
-  by construction rather than by rounding: `scripts/newton_jacobian_rank.jl` measures rank 5 of 13
-  unknowns at `S = 4`, with a gap of **fourteen orders** between the fifth and sixth singular
-  values. Nothing about a pivot landing on zero is accidental; what the BLAS decides is only
-  whether the zero pivot is reached before the factorisation ends.
+  The solve is not affected: `initsolver` gives every network integrator
+  `SimpleSolvers.PivotedQR`, which returns the minimum-norm step and cannot raise. What the
+  deficiency costs is that `3S + 1` unknowns carry far fewer degrees of freedom; on the `OGA1d`
+  rows, the 5 of a cubic step.
 
-  The exception is **impossible rather than intermittent**: `initsolver` hands every
-  network integrator `SimpleSolvers.PivotedQR`, whose `ldiv!` has no throwing path at all (see
-  *Changed* under `[Unreleased]`). What is **not** closed is the deficiency itself — the solve
-  now steps around a null space instead of falling into it, but the null space is still there,
-  and `3S + 1` unknowns still carry far fewer degrees of freedom than that. The quarantine
-  therefore stays until the rank half of the fix lands: the dictionary change that puts the
-  activation kinks inside the element, and the gauge fixing that removes the scaling redundancy.
-
-  The catch is bounded by the largest zero pivot an OGA fit could report. The greedy fit solves a
-  `k × k` Gram matrix with `k ≤ S = 4` (`src/oga/normal_equations.jl`), while the Newton systems
-  in this loop carry 9 or 13 unknowns and #98's pivots are 11/12/13 — so a rank-deficient *fit*
-  is outside the quarantine and still fails the run. That is what keeps the guard on the
-  `network_labels` defect fixed in [0.4.1], which left the Gram matrix rank-deficient for any fit
-  and which this very loop is what caught.
-
-  **What no bound on the pivot can separate is #98 from a poor seed making the Newton Jacobian
-  itself singular** — the same matrix at the same site, which is the case the `Float16` analysis
-  in `docs/src/oga/oga.md` describes. That class is absorbed, and it is the real price rather
-  than the lost assertion. Remove the catch once #98 is resolved.
+  `scripts/free_knot_rank.jl` tests the design that would remove all three: `w = +1`, an explicit
+  cubic part, and the kinks as free knots inside the element. With Gauss 8 on the element, which
+  ShallowNet uses, the knots die (`cᵢ ≤ 1e-12`) or fit the quadrature error, and the step is the
+  cubic's or worse. With a Gauss rule on each piece between knots there is an accurate,
+  nondegenerate stationary point — `S = 4`, endpoint error 1e-13 against 6e-10 for the cubic, no
+  gap in the spectrum — but Newton reaches it only from uniform knots. From the OGA-like greedy
+  seeds the knots merge, sit at 0 or 1, or leave the element; at best one interior knot survives
+  near τ ≈ 0.5, with error 1.6e-11 and the rank still lost. A fix needs that piecewise
+  quadrature, the explicit cubic, the gauge, and a solve or a seed that reaches the accurate
+  point — a globalised step, descent on the action for example.
 - kind: defect
-- found: 2026-09-05
+- found: 2026-10-16
 
 ## Dead code and documentation
 
@@ -504,17 +490,10 @@ exactly `NP`), which is the check now in `test/nvi/dispatch_variants_unit.jl`.
 
 - location: `KNOWN_ISSUES.md`
 - evidence: K1 says "Unlike the two above … that trio", but the two entries it means are closed and
-  are not in this file. K17 cites "[0.4.1]". K25 cites "the *`SymbolicNeuralNetworks` 0.3 → 0.4*
+  are not in this file. K25 cites "the *`SymbolicNeuralNetworks` 0.3 → 0.4*
   entry above", K28 cites "the whole 0.3 → 0.4 entry", K27 cites "the *Added* entry above", and
-  K27 also cites "the kernel table". These are in `CHANGELOG.md`, and `[0.2.0]` and `[0.4.1]` have
+  K27 also cites "the kernel table". These are in `CHANGELOG.md`, and `[0.2.0]` has
   no link definition in this file. The text is word for word, so it stays as written.
 - kind: docs
 - found: 2026-09-26
 
-### K32 · The evidence of K17 starts with `—`, which reads as an empty field.
-
-- location: `KNOWN_ISSUES.md`, K17
-- evidence: The CHANGELOG text reads `** — [#98](…)`, so the dash is part of the entry, and the
-  evidence continues on the next line. The field convention uses `—` alone for "nothing remains".
-- kind: docs
-- found: 2026-09-26
