@@ -112,8 +112,8 @@ const STRICT = "--strict" in ARGS
 const ACTS = filter(in(split(argval("act", "relu,tanh"), ",")), ["relu", "tanh"])
 # the keys are the variant names of the stems, csv files and --variants; VARIANT_LABELS are the names in the figures
 const VARIANTS = (shallownet = ShallowNet, reversible = ShallowNetReversible, autodiff = ShallowNetAutodiff)
-const VARIANT_LABELS = Dict("shallownet" => "Plain Shallow Network", "reversible" => "Time-Reversible",
-    "autodiff" => "Fixed-Boundary")
+const VARIANT_LABELS = Dict("shallownet" => "Plain Shallow Network", "reversible" => "Time Reversible",
+    "autodiff" => "Fixed Boundary")
 const VARIANT_NAMES = split(argval("variants", "shallownet,reversible,autodiff"), ",")
 all(v -> Symbol(v) in keys(VARIANTS), VARIANT_NAMES) || error("--variants must be among $(keys(VARIANTS))")
 const SOLVER = lowercase(argval("solver", "dogleg"))
@@ -179,17 +179,17 @@ const ALL_PROBLEMS = [
         build = (q0, p0, ts, h) -> fmo.lodeproblem(q0, p0; timespan = ts, timestep = h,
             parameters = merge(fmo.default_parameters(), (ε = 1e-2,))),
         energy = (t, q, p) -> fmo.adiabatic_invariant(t, q, p, merge(fmo.default_parameters(), (ε = 1e-2,))),
-        T = 600.0, hs = LARGE_HS),
+        T = 600.0, hs = DEFAULT_HS),
     (name = "kepler", ics = kepler.initial_condition(0.9),
         build = (q0, p0, ts, h) -> kepler.lodeproblem(q0, p0; timespan = ts, timestep = h,
             parameters = kepler.default_parameters()),
         energy = (t, q, p) -> kepler.hamiltonian(t, q, p, kepler.default_parameters()),
-        T = 60.0, hs = LARGE_HS),
+        T = 60.0, hs = DEFAULT_HS),
     (name = "henon_heiles", ics = ([0.1, 0.1], [0.1, 0.1]),   # E ≈ 0.02, quasi-periodic
         build = (q0, p0, ts, h) -> hh.lodeproblem(q0, p0; timespan = ts, timestep = h,
             parameters = hh.default_parameters()),
         energy = (t, q, p) -> hh.hamiltonian(t, q, p, hh.default_parameters()),
-        T = 90.0, hs = LARGE_HS)
+        T = 90.0, hs = DEFAULT_HS)
 ]
 const PROBLEMS = filter(P -> P.name in PROBLEM_NAMES, ALL_PROBLEMS)
 length(PROBLEMS) == length(PROBLEM_NAMES) ||
