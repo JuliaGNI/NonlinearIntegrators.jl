@@ -5,7 +5,7 @@
 # Laid out like scripts/run_nvi.jl: a registry of runs named by stem, a driver that solves and archives
 # each run on its own, and a report that reads the archives. A run is one configuration
 # (problem, variant, activation, k, S, M) over all its step sizes h; it writes one csv,
-# results/relu_k_sweep_<solver>/<stem>.csv, so runs can go to separate processes on a server:
+# results/relu_k_sweep_<solver>_reg<λ>/<stem>.csv, so runs can go to separate processes on a server:
 #
 #   julia --project=benchmark benchmark/theory/relu_k_sweep.jl --list [options] > runs.txt
 #   xargs -P 16 -I{} julia --project=benchmark benchmark/theory/relu_k_sweep.jl {} [options] < runs.txt
@@ -24,8 +24,11 @@
 #
 # Options
 #   --list          print the stems of the selected runs, one per line, and stop
-#   --report        read every csv in results/relu_k_sweep_<solver>/ and write the md, the merged csv
-#                   and the figures; no integration
+#   --report        read every csv in results/relu_k_sweep_<solver>_reg<λ>/ (the --solver and --reg given)
+#                   and write the md, the merged csv and the figures; no integration
+#   --report-best   read every results/relu_k_sweep_<solver>_reg<λ>/, keep per (problem, variant, activation,
+#                   k, S, M, h) the setting with the smallest error in q of the network (ties: fewer
+#                   unconverged steps), and write results/relu_k_sweep_best.{md,csv} and its figures
 #   --k=…           activation powers (default 3,5)
 #   --S=auto|…      widths; `auto` = k+1, 2k, 3k for every k (default), or an explicit list. Every width is
 #                   rounded up to an even number, for every variant: the reversible variant needs mirrored
@@ -67,8 +70,15 @@
 # Hamiltonian, except for the non-autonomous frequency-modulated oscillator, where it is the adiabatic
 # invariant J = H/ω.
 #
-# The report writes results/relu_k_sweep_<solver>.{md,csv} and, per problem <p>,
-# relu_k_sweep_<solver>_<p>_qerr.pdf (error in q) and relu_k_sweep_<solver>_<p>_energy.pdf.
+# The report writes results/relu_k_sweep_<solver>_reg<λ>.{md,csv} and, per problem <p>,
+# relu_k_sweep_<solver>_reg<λ>_<p>_qerr.pdf (error in q) and …_<p>_energy.pdf; --report-best the same
+# with the base name relu_k_sweep_best.
+#
+# A sweep over solvers and regularizations, then the best of them:
+#   for s in dogleg newton; do for l in 0.0 1e-3 1e-5 1e-7; do
+#     xargs -P 16 -I{} julia --project=benchmark benchmark/theory/relu_k_sweep.jl {} --solver=$s --reg=$l < runs.txt
+#   done; done
+#   julia --project=benchmark benchmark/theory/relu_k_sweep.jl --report-best
 
 include(joinpath(@__DIR__, "theory_common.jl"))
 include(joinpath(@__DIR__, "..", "shallownet_benchmark_common.jl"))
@@ -118,8 +128,11 @@ const VARIANT_NAMES = split(argval("variants", "shallownet,reversible,autodiff")
 all(v -> Symbol(v) in keys(VARIANTS), VARIANT_NAMES) || error("--variants must be among $(keys(VARIANTS))")
 const SOLVER = lowercase(argval("solver", "dogleg"))
 SOLVER in ("dogleg", "newton") || error("--solver must be dogleg or newton, got $SOLVER")
-const OUTBASE = "relu_k_sweep_$(SOLVER)"
+const NVI_REG = parse(Float64, argval("reg", "1e-5"))   # regularization_factor of the network solves
+# one directory per (solver, regularization), so that runs with different settings do not overwrite each other
+const OUTBASE = "relu_k_sweep_$(SOLVER)_reg$(NVI_REG)"
 const RUNS_DIR = joinpath(@__DIR__, "..", "results", OUTBASE)
+const BEST_BASE = "relu_k_sweep_best"
 const TANH_BIAS = argval("tanh-bias", "default") == "default" ? (-pi, pi) : Tuple(parse.(Float64, split(argval("tanh-bias", ""), ",")))
 
 even(S) = S + isodd(S)
@@ -128,7 +141,6 @@ rpoints(k) = R_ARG == "auto" ? k + 1 : parse(Int, R_ARG)
 quadrature(k, M) = CompositeQuadrature(GaussLegendreQuadrature(Float64, rpoints(k)), M)
 
 const DT_REF = 0.005
-const NVI_REG = parse(Float64, argval("reg", "1e-5"))   # regularization_factor of the network solves
 const NVI_MAXIT = 1000
 
 # ---------------------------------------------------------------------------------------------
@@ -422,47 +434,88 @@ const INT_COLUMNS = (:k, :S, :r, :M, :params_SN, :params_CGVI, :params_spline, :
     :unconverged, :iterations, :warnings)
 
 "Every row of every run csv, with `act` (relu / tanh) and `err_relu`: the ReLUᵏ error at the same S, M, h."
-function read_runs()
+function read_runs(dir = RUNS_DIR)
     rows = NamedTuple[]
-    for file in sort(filter(endswith(".csv"), readdir(RUNS_DIR; join = true)))
+    m = match(r"^relu_k_sweep_(\w+?)_reg(.+)$", basename(dir))
+    solver, reg = m === nothing ? (SOLVER, NVI_REG) : (String(m[1]), parse(Float64, m[2]))
+    for file in sort(filter(endswith(".csv"), readdir(dir; join = true)))
         lines = readlines(file)
         length(lines) < 2 && continue
         names = Symbol.(split(lines[1], ","))
         cell(n, x) = n in STRING_COLUMNS ? String(x) : n in INT_COLUMNS ? parse(Int, x) : parse(Float64, x)
-        for l in lines[2:end]
-            row = NamedTuple{Tuple(names)}(Tuple(cell(n, x) for (n, x) in zip(names, split(l, ","))))
-            push!(rows, merge(row, (act = startswith(row.activation, "ReLU") ? "relu" : "tanh",)))
+        for (i, l) in enumerate(lines[2:end])
+            fields = split(l, ","; keepempty = true)
+            # a run stopped while writing (time limit, killed job) leaves a truncated last line, and
+            # two jobs on the same stem interleave their lines: skip such a line, but say so
+            if length(fields) != length(names)
+                @warn "skipped line $(i + 1) of $(basename(file)): $(length(fields)) fields, header has $(length(names))"
+                continue
+            end
+            row = NamedTuple{Tuple(names)}(Tuple(cell(n, x) for (n, x) in zip(names, fields)))
+            push!(rows, merge(row, (act = startswith(row.activation, "ReLU") ? "relu" : "tanh", solver, reg)))
         end
     end
+    rows
+end
+
+"`err_relu` for every row: the ReLUᵏ error at the same problem, variant, k, S, M, h (NaN for ReLU rows)."
+function with_relu(rows)
     relu = Dict((r.problem, r.variant, r.k, r.S, r.M, r.h) => r.err_sn for r in rows if r.act == "relu")
     [merge(r, (err_relu = r.act == "tanh" ? get(relu, (r.problem, r.variant, r.k, r.S, r.M, r.h), NaN) : NaN,))
      for r in rows]
 end
 
 function report()
-    rows = read_runs()
+    rows = with_relu(read_runs())
     isempty(rows) && error("no run csv in $RUNS_DIR")
+    write_report(rows, dirname(RUNS_DIR), OUTBASE)
+end
+
+"""
+The best (solver, regularization) per (problem, variant, activation, k, S, M, h) over every directory
+results/relu_k_sweep_<solver>_reg<λ>/: the smallest error in q of the network, ties broken by fewer
+unconverged steps. The chosen setting is in the columns `solver` and `reg`.
+"""
+function report_best()
     outdir = dirname(RUNS_DIR)
-    open(joinpath(outdir, OUTBASE * ".csv"), "w") do io
+    dirs = filter(d -> isdir(d) && occursin(r"^relu_k_sweep_\w+?_reg", basename(d)), readdir(outdir; join = true))
+    candidates = reduce(vcat, read_runs.(dirs); init = NamedTuple[])
+    isempty(candidates) && error("no run csv in $outdir/relu_k_sweep_*_reg*/")
+    groups = Dict{Any, Vector{NamedTuple}}()
+    for r in candidates
+        push!(get!(groups, (r.problem, r.variant, r.activation, r.k, r.S, r.M, r.h), NamedTuple[]), r)
+    end
+    score(r) = (isfinite(r.err_sn) ? r.err_sn : Inf, r.unconverged)
+    rows = sort([argmin(score, g) for g in values(groups)];
+        by = r -> (r.problem, r.variant, r.act, r.k, r.S, r.M, r.h))
+    println("best of ", length(dirs), " settings: ", join(basename.(dirs), ", "))
+    write_report(with_relu(rows), outdir, BEST_BASE; best = true)
+end
+
+function write_report(rows, outdir, base; best = false)
+    open(joinpath(outdir, base * ".csv"), "w") do io
         println(io, join(keys(first(rows)), ","))
         foreach(row -> println(io, join(values(row), ",")), rows)
     end
-    write_markdown(rows, joinpath(outdir, OUTBASE * ".md"))
-    write_plots(rows, outdir)
+    write_markdown(rows, joinpath(outdir, base * ".md"); best)
+    write_plots(rows, outdir, base)
 end
 
 fmt(x) = isnan(x) ? "—" : @sprintf("%.2e", x)
 fmtr(x) = isnan(x) ? "—" : @sprintf("%.4f", x)
 
-function write_markdown(rows, path)
+function write_markdown(rows, path; best = false)
     open(path, "w") do io
         println(io, "# ShallowNet variants (ReLUᵏ / tanh, S) vs CGVI — sweep over k, S, the composite rule and h\n")
         println(io, "r Gauss points on each of M sub-intervals; " *
                     "OGA bias interval ReLU [$(round(BIAS[1]; digits = 2)), $(round(BIAS[2]; digits = 2))], " *
                     "tanh [$(round(TANH_BIAS[1]; digits = 2)), $(round(TANH_BIAS[2]; digits = 2))]; " *
-                    "strict tolerances: $(STRICT ? string(STRICT_OPTS) : "no"); regularization_factor = $(NVI_REG); " *
-                    "ShallowNet solver: $(SOLVER == "dogleg" ? "DogLeg (trust region)" : "Newton + Backtracking") " *
-                    "(as given to the report; the runs must have used the same).")
+                    "strict tolerances: $(STRICT ? string(STRICT_OPTS) : "no"); " *
+                    (best ? "per row the best (solver, regularization_factor) of the sweep, i.e. the smallest " *
+                            "err net (ties: fewer unconverged steps), given in the column `solver / reg`." :
+                     "regularization_factor = $(NVI_REG); ShallowNet solver: " *
+                     "$(SOLVER == "dogleg" ? "DogLeg (trust region)" : "Newton + Backtracking") " *
+                     "(as given to the report; the runs must have used the same)."))
         refchecks = unique((r.problem, r.refcheck) for r in rows)
         println(io, "`err` = max over the grid ‖q − q_ref‖∞ / max‖q_ref‖∞ (reference Gauss(8), dt = $(DT_REF); " *
                     "relative difference to dt/2: " * join(("$p $(fmt(v))" for (p, v) in refchecks), ", ") * "). " *
@@ -494,14 +547,14 @@ function write_markdown(rows, path)
         println(io)
         for pn in unique(r.problem for r in rows)
             println(io, "## $pn\n")
-            println(io, "| variant | activation | r | M | S | h | err net | err CGVI | err comp | err spline | err ReLU^k (same S) | diff | diff P_{k+1} | ΔE net | ΔE CGVI | ΔE comp | ΔE spline | P_k-equiv / spline / degen | unconv / max ‖r‖ | verdict | s (net / CGVI) |")
-            println(io, "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+            println(io, "| variant | activation | r | M | S | h | err net | err CGVI | err comp | err spline | err ReLU^k (same S) | diff | diff P_{k+1} | ΔE net | ΔE CGVI | ΔE comp | ΔE spline | P_k-equiv / spline / degen | unconv / max ‖r‖ | verdict | s (net / CGVI) | solver / reg |")
+            println(io, "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
             for r in filter(r -> r.problem == pn, rows)
                 println(io, "| $(r.variant) | $(r.activation) | $(r.r) | $(r.M) | $(r.S) | $(r.h) | $(fmt(r.err_sn)) | " *
                             "$(fmt(r.err_cgvi)) | $(fmt(r.err_cgvi_comp)) | $(fmt(r.err_spline)) | $(fmt(r.err_relu)) | $(fmt(r.diff)) | " *
                             "$(fmt(r.diff_alt)) | $(fmt(r.herr_sn)) | $(fmt(r.herr_cgvi)) | $(fmt(r.herr_cgvi_comp)) | $(fmt(r.herr_spline)) | " *
                             "$(r.act == "relu" ? "$(r.n_equiv) / $(r.n_spline) / $(r.n_degen)" : "n/a") | $(r.unconverged) / $(fmt(r.max_res)) | $(r.verdict) | " *
-                            "$(isnan(r.sec_sn) ? "—" : @sprintf("%.1f", r.sec_sn)) / $(isnan(r.sec_cgvi) ? "—" : @sprintf("%.2f", r.sec_cgvi)) |")
+                            "$(isnan(r.sec_sn) ? "—" : @sprintf("%.1f", r.sec_sn)) / $(isnan(r.sec_cgvi) ? "—" : @sprintf("%.2f", r.sec_cgvi)) | $(r.solver) / $(r.reg) |")
             end
             println(io)
         end
@@ -519,7 +572,10 @@ filled = ReLUᵏ, open = tanh. Every panel has the same fixed size, so the colum
 function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, fcc = r -> r.err_cgvi_comp,
         fsp = r -> r.err_spline, ylab = "Max Relative Error")
     rs = filter(r -> r.problem == pn, rows)
-    vs, ks, Ms = unique(r.variant for r in rs), unique(r.k for r in rs), sort(unique(r.M for r in rs))
+    # columns in the order of VARIANTS: plain shallow network, time-reversible, fixed boundary
+    vorder = String.(collect(keys(VARIANTS)))
+    vs = sort(unique(r.variant for r in rs); by = v -> something(findfirst(==(v), vorder), length(vorder) + 1))
+    ks, Ms = unique(r.k for r in rs), sort(unique(r.M for r in rs))
     Ss = sort(unique(r.S for r in rs))
     markers = [:circle, :utriangle, :diamond, :rect, :star5, :hexagon]
     colors = Makie.wong_colors()
@@ -533,8 +589,9 @@ function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, f
     fig = Figure()
     # Label(fig[0, :], pn; fontsize = 22, font = :bold)
     for (i, v) in enumerate(vs), (j, k) in enumerate(ks)
-        ax = Axis(fig[i, j]; width = 330, height = 240, xscale = log10, yscale = log10, xlabel = "h",
-            ylabel = j == 1 ? ylab : "", title = "$(get(VARIANT_LABELS, v, v)), k = $k", titlesize = 18)
+        # one row per k, one column per variant
+        ax = Axis(fig[j, i]; width = 330, height = 240, xscale = log10, yscale = log10, xlabel = "h",
+            ylabel = i == 1 ? ylab : "", title = "$(get(VARIANT_LABELS, v, v)), k = $k", titlesize = 18)
         rk = filter(r -> r.variant == v && r.k == k, rs)
         isempty(rk) && continue
         baseline!(ax, rk, fc; color = :black)
@@ -560,9 +617,8 @@ function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, f
     # one legend for the whole figure, below the panels
     elems = Any[LineElement(color = :black, linewidth = 2)]
     labels = String["CGVI(P_k), Gauss(k+1)"]
+    # the legend fills column by column (nbanks rows each): first the CGVI baselines, then the M colours
     for (m, M) in enumerate(Ms)
-        push!(elems, MarkerElement(marker = :rect, color = colors[m], markersize = 12))
-        push!(labels, "M = $M")
         M > 1 || continue
         push!(elems, [LineElement(color = colors[m], linewidth = 2, linestyle = :dash),
                       MarkerElement(marker = :xcross, color = colors[m], markersize = 12)])
@@ -571,6 +627,10 @@ function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, f
         #               MarkerElement(marker = :cross, color = colors[m], markersize = 12)])
         # push!(labels, "CGVI(S_k), $(M - 1) knots")
     end
+    for (m, M) in enumerate(Ms)
+        push!(elems, MarkerElement(marker = :rect, color = colors[m], markersize = 12))
+        push!(labels, "M = $M")
+    end
     for (w, S) in enumerate(Ss)
         push!(elems, MarkerElement(marker = markers[mod1(w, length(markers))], color = :gray, markersize = 12))
         push!(labels, "S = $S")
@@ -578,7 +638,7 @@ function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, f
     any(r -> r.act == "relu", rs) && (push!(elems, MarkerElement(marker = :circle, color = :gray, markersize = 12)); push!(labels, "Filled: ReLU^k"))
     any(r -> r.act == "tanh", rs) && (push!(elems, MarkerElement(marker = :circle, color = :transparent, strokecolor = :gray,
         strokewidth = 1.8, markersize = 12)); push!(labels, "Open: tanh"))
-    Legend(fig[length(vs) + 1, :], elems, labels; orientation = :horizontal, nbanks = 3,
+    Legend(fig[length(ks) + 1, :], elems, labels; orientation = :horizontal, nbanks = 2,
         framevisible = false, labelsize = 15)
     resize_to_layout!(fig)
     save(path, fig)
@@ -586,13 +646,13 @@ function write_plot(rows, path, pn; fsn = r -> r.err_sn, fc = r -> r.err_cgvi, f
 end
 
 "Per problem: error in q and relative energy error."
-function write_plots(rows, outdir)
+function write_plots(rows, outdir, base = OUTBASE)
     for pn in unique(r.problem for r in rows)
         for (name, kw) in (("_qerr.pdf", (;)),
                            ("_energy.pdf", (fsn = r -> r.herr_sn, fc = r -> r.herr_cgvi, fcc = r -> r.herr_cgvi_comp,
-                                fsp = r -> r.herr_spline, ylab = "max rel. energy error")))
+                                fsp = r -> r.herr_spline, ylab = "Max Relative Energy Error")))
             try
-                write_plot(rows, joinpath(outdir, OUTBASE * "_" * pn * name), pn; kw...)
+                write_plot(rows, joinpath(outdir, base * "_" * pn * name), pn; kw...)
             catch e
                 @warn "plot $pn$name failed" exception = e
             end
@@ -608,6 +668,7 @@ end
 function main(args)
     "--list" in args && (foreach(r -> println(stem(r)), SWEEP_RUNS); return true)
     "--report" in args && (report(); return true)
+    "--report-best" in args && (report_best(); return true)
     stems = filter(a -> !startswith(a, "--"), args)
     runs = isempty(stems) ? SWEEP_RUNS : map(sweep_run, stems)
     failed = String[]
