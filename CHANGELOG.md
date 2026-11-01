@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — targeting 0.5.1
+
+### Fixed
+
+- **`DenseNet`'s seeding fits train at the precision of the integrator** (K37 of
+  `KNOWN_ISSUES.md`, relates to #135). `densenet_training_fit` and `densenet_lsgd_fit` built their
+  network with `NeuralNetwork(NN)`, which draws `Float64` parameters, so at `Float32` the fit ran
+  in `Float64` and only its result was converted. They now build it at the element type of the
+  network inputs, which is the integrator's. The element-type assertion of
+  `test/nvi/densenet.jl` passes at `Float32`, where it was `@test_broken`.
+
+### Tests
+
+- **A test counts the `ParameterLayout`s that `DenseNet`'s `components!` builds, and asserts none**
+  (K38). Building a layout per evaluation gives the same values as reading the cached one, so no
+  coefficient test could tell them apart. The test adds a counting method of `parameterlayout` for
+  the type of the cached parameters for one testset, and deletes it after.
+- **A test reaches the early exit of the `Adam` seeding fit** (K39). A network of the basis' layer
+  shapes with `zero` activations has zero output and zero gradient, so with labels of `1e-9` the
+  loss stays below the threshold of `5e-8` and the fit stops after one pass.
+
 ## [0.5.0] — 2026-11-01
 
 The package can plot its own integrators, and the experiment suite that drives them lives in this

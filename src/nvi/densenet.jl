@@ -292,12 +292,13 @@ end
 """
     densenet_training_fit(NN, network_inputs, labels, nepochs, k) -> (params, state, passes)
 
-Fit a new network of the architecture `NN` to `labels` at `network_inputs` with `Adam`, for at most
-`nepochs` passes, and stop early once the loss is below `5e-8`. `k` is the dimension, for the debug
-message. Returns the trained parameters, the optimizer state and the number of passes run.
+Fit a new network of the architecture `NN`, at the element type of `network_inputs`, to `labels` at
+`network_inputs` with `Adam`, for at most `nepochs` passes, and stop early once the loss is below
+`5e-8`. `k` is the dimension, for the debug message. Returns the trained parameters, the optimizer
+state and the number of passes run.
 """
 function densenet_training_fit(NN, network_inputs, labels, nepochs::Int, k::Int)
-    PNN = AbstractNeuralNetworks.NeuralNetwork(NN)
+    PNN = AbstractNeuralNetworks.NeuralNetwork(NN, eltype(network_inputs))
     # The optimizer works in the flat vector; see the same construction in `ShallowNet`'s
     # `initial_params!` for why it is given one directly rather than a flat `NamedTuple`.
     # `Optimizer` converts `Adam` and the line search to the parameter element type. They
@@ -365,15 +366,15 @@ end
 """
     densenet_lsgd_fit(NN, network_inputs, labels, nepochs, S₁, S, k) -> (params, state, passes)
 
-Fit a new network of the architecture `NN`, with hidden widths `S₁` and `S`, to `labels` at
-`network_inputs`: each pass solves the last layer by least squares and takes one `GradientMethod`
-step on the first two. Runs at most `nepochs` passes, and stops early once the loss is below
-`5e-5`. `k` is the dimension, for the debug message. Returns the trained parameters, the optimizer
-state and the number of passes run.
+Fit a new network of the architecture `NN`, with hidden widths `S₁` and `S` and the element type of
+`network_inputs`, to `labels` at `network_inputs`: each pass solves the last layer by least squares
+and takes one `GradientMethod` step on the first two. Runs at most `nepochs` passes, and stops
+early once the loss is below `5e-5`. `k` is the dimension, for the debug message. Returns the
+trained parameters, the optimizer state and the number of passes run.
 """
 function densenet_lsgd_fit(
         NN, network_inputs, labels, nepochs::Int, S₁::Int, S::Int, k::Int)
-    PNN = NeuralNetwork(NN)
+    PNN = NeuralNetwork(NN, eltype(network_inputs))
     local PT = eltype(PNN.params.L1.W)
     # `box_init_plain` takes the element type `PT` of the network, so the weights are drawn at
     # the precision they are stored in.
