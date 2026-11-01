@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in `Float64` and only its result was converted. They now build it at the element type of the
   network inputs, which is the integrator's. The element-type assertion of
   `test/nvi/densenet.jl` passes at `Float32`, where it was `@test_broken`.
+- **The network integrators can be built at `BFloat16`.** The shared constructor built the
+  `extrapolation_substep + 1` warm-start nodes as the step range
+  `zero(T):(one(T) / n):one(T)`, whose length depends on the round-off of its step. At `BFloat16`
+  that range is one node short, or raises `rem not defined for BFloat16`, so every `ShallowNet`,
+  `ShallowNetAutodiff`, their reversible variants and `DenseNet` failed in the constructor. The
+  nodes are now `range(zero(T), one(T); length = n + 1)`, which has `n + 1` nodes from 0 to 1 at
+  every element type; at `Float16`, `Float32` and `Float64` they are bit-identical to before.
+  `test/integration/methods_smoke.jl` checks the nodes at those three types; the suite has no
+  `BFloat16`, because the test environment does not carry `BFloat16s`.
 
 ### Tests
 

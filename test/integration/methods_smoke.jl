@@ -85,3 +85,22 @@ include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
         @debug "VISE{$T} ok" extrapolation_substep=pri.extrapolation_substep
     end
 end
+
+# `network_inputs` holds the `extrapolation_substep + 1` nodes of the warm-start trajectory, from
+# 0 to 1 inclusive. A step range `zero(T):(one(T) / n):one(T)` has a length that depends on the
+# round-off of its step: at `BFloat16` it is one element short, or it raises. The IEEE types
+# below build such a range exactly, so they guard the node values and the shape; the test
+# environment has no `BFloat16`. The expected nodes are the correctly rounded `(0:n) ./ n`,
+# computed in Float64 and converted, not the way the constructor computes them.
+@testset "network inputs ($T, extrapolation_substep = $n)" for T in (
+        Float16, Float32, Float64),
+    n in (3, 7, 10, 30)
+
+    m = ShallowNet(build_shallownet_basis(T; S = 4), gauss(T, 4); show_status = false,
+        bias_interval = [-T(pi), T(pi)], dict_amount = 400, extrapolation_substep = n)
+    x = m.network_inputs
+    @test x isa Matrix{T}
+    @test size(x) == (1, n + 1)
+    @test x[1] == zero(T) && x[end] == one(T)
+    @test vec(x) == T.((0:n) ./ n)
+end
