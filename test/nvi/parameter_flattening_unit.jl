@@ -24,7 +24,8 @@ nested_params() = (L1 = (W = [1.0 2.0; 3.0 4.0], b = [5.0, 6.0]),
         ps = nested_params()
         v, _ = flatten(ps)
 
-        # Depth first in declaration order, which is the order `_param_arrays` walks too.
+        # Depth first in declaration order, which is the order `densenet_pack!` lays out the
+        # Newton unknowns of one dimension in.
         @test v == [1.0, 3.0, 2.0, 4.0, 5.0, 6.0, 7.0, 8.0]
         @test length(v) == flatlength(ps) == 8
     end

@@ -8,6 +8,7 @@ if "core" in GROUPS
     @safetestset "Basis smoke" include("integration/bases_smoke.jl")
     @safetestset "Method smoke" include("integration/methods_smoke.jl")
     @safetestset "Parameter flattening" include("nvi/parameter_flattening_unit.jl")
+    @safetestset "DenseNet seeding loops" include("nvi/densenet.jl")
     @safetestset "OGA kernels" include("oga/oga_kernels.jl")
     @safetestset "VISE" include("vise/vise_unit.jl")
     @safetestset "Scripts archives" include("integration/scripts_archives_tests.jl")

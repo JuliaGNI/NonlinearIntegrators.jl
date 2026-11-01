@@ -163,6 +163,20 @@ All of these predate the move to GeometricOptimizers; none is a regression.
 - kind: defect
 - found: 2026-08-16
 
+### K36 · `DenseNet`'s seeding fits train a `Float64` network at every precision
+
+- location: `src/nvi/densenet.jl`
+- evidence: `densenet_training_fit` and `densenet_lsgd_fit` build the network with
+  `NeuralNetwork(NN)`, which names no element type, so the parameters are `Float64` whatever the
+  precision of the integrator. In `test/nvi/densenet.jl`, an assertion
+  `eltype(params.L1.W) == T` on the parameters that either fit returns fails at `T = Float32`:
+  `Evaluated: Float64 == Float32`, four failures in `Float32`, none in `Float64`. The trained
+  parameters are converted to `Float32` when `initial_params!` writes them into the cache, so the
+  Newton solve runs at the working precision; the fit before it does not. The same
+  `NeuralNetwork(NN)` call is in both `initial_params!` methods on `c709105`.
+- kind: defect
+- found: 2026-11-01
+
 ## Loops and allocation
 
 ### K12 · Four loop-invariant assignments sit inside `for i in 1:S₁`
@@ -176,16 +190,6 @@ All of these predate the move to GeometricOptimizers; none is a regression.
 - kind: defect
 - found: 2026-08-14
 
-### K13 · `flatten_params` accumulates into an untyped `Vector{Any}`
-
-- location: —
-- evidence: and finishes with
-  `vcat(flat_list...)`, a splat whose length is not known to the compiler. `components!` calls
-  it `2 + 2R` times per dimension, `R` being the number of quadrature nodes — also on the
-  Newton path.
-- kind: defect
-- found: 2026-08-14
-
 ## Derivative evaluation
 
 Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
@@ -196,7 +200,7 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
 - location: `src/nvi/shallownet.jl:274-293`
 - evidence: `components!` evaluates
   `DQDθ`/`DVDθ` node by node — the loops at `src/nvi/shallownet.jl:274-293`,
-  `src/nvi/shallownet_reversible.jl:223-242` and `src/nvi/densenet.jl:406-418` — which is
+  `src/nvi/shallownet_reversible.jl:223-242` and `src/nvi/densenet.jl:483-495` — which is
   `2R + 2` calls per dimension per Newton iteration, sixteen of them at the benchmark's
   `R = 8`. `SymbolicNeuralNetworks` evaluates a whole batch through one in-place kernel and a
   single allocation, so the same work is two calls if the nodes are passed as one batch. The
@@ -411,10 +415,10 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.5.
 
 ### K26 · `V_func` returns a 1×1 matrix that both of its call sites immediately unwrap.
 
-- location: `src/nvi/densenet.jl:440`
+- location: `src/nvi/densenet.jl:517`
 - evidence: The shape
   is an honest consequence of the Jacobian of a scalar-in/scalar-out network being 1×1, but it
-  carries no information: the one integrator that consumes it (`src/nvi/densenet.jl:440`)
+  carries no information: the one integrator that consumes it (`src/nvi/densenet.jl:517`)
   strips it with `[1]`, and so do both kernel testsets in
   `test/nvi/dispatch_variants_unit.jl`, one with `vec` and one with `[1]`.
   `ShallowNetBasis` builds the slot as well, and no integrator reads that one at all. Either

@@ -44,7 +44,7 @@
 
 include(joinpath(@__DIR__, "shallownet_benchmark_common.jl"))
 
-using NeuralNetworkParameters: NetworkParameters
+using NeuralNetworkParameters: NeuralNetworkParameters, NetworkParameters
 using GeometricProblems.HarmonicOscillator
 using GeometricProblems.Pendulum
 using GeometricProblems.DoublePendulum
@@ -389,8 +389,8 @@ end
 # end to end the Newton solve amplifies a last-bit difference into a different accepted
 # iterate, so the integrated results are *not* a test of the code generation.
 function codegen_max_rel_diff(::Type{T}, a, b) where {T}
-    va = NI.flatten_params(a)
-    vb = NI.flatten_params(b)
+    va, _ = NeuralNetworkParameters.flatten(a)
+    vb, _ = NeuralNetworkParameters.flatten(b)
     length(va) == length(vb) || return NaN
     scale = max(maximum(abs, va), eps(T))
     return Float64(maximum(abs.(va .- vb)) / scale)

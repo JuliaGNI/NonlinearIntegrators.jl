@@ -350,6 +350,24 @@ scripts sat in a talk directory, all carrying much the same code.
   for the whole repository rather than for the compiled part of it. They stored `ṽ`, twenty-three
   times.
 
+- **`DenseNet` flattens its parameter gradients with `NeuralNetworkParameters.flatten!` and a
+  `ParameterLayout` that its cache keeps**, and the package's own walk — `flatten_params!`,
+  `flatten_params` and `_param_arrays` — is gone. `DenseNetCache` builds the layout once, beside
+  the parameters `ps`, and `components!` hands it to each of its `2 + 2R` flattenings per dimension,
+  so no residual or Jacobian evaluation builds one. The gradients that `dqdθ` and `dvdθ` return are
+  `NetworkParameters` of the type of the parameters, so the one layout serves both, and its order is
+  the order in which `densenet_pack!` lays out the Newton unknowns. One flattening allocates 0 bytes,
+  against 96 bytes on `c709105`, in `Float64` and `Float32` (cold process, Julia 1.13.3). This
+  closes K13 of `KNOWN_ISSUES.md`.
+
+  The two seeding fits of `DenseNet` are functions of their own, `densenet_training_fit` (`Adam`)
+  and `densenet_lsgd_fit` (`GradientMethod`), which return the optimizer state and the number of
+  passes run beside the trained parameters. The bodies of their loops are unchanged; the loop
+  counter is declared before each loop so that it holds the number of passes after it. The new
+  `test/nvi/densenet.jl` asserts that the iteration number of the state equals the passes after
+  each loop, and `test/nvi/dispatch_variants_unit.jl` checks the coefficients that `components!`
+  writes against `ForwardDiff`.
+
 ### Measured
 
 **The OGA fit study's numbers have moved slightly since the archived CSV was written**, and this is
