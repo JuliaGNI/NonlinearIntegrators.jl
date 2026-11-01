@@ -4,10 +4,12 @@
 # here is `TrainingMethod` and the two-dimensional dictionaries (the latter have unit coverage
 # in oga_kernels.jl but are otherwise never driven through an integrator), plus
 # `ShallowNetBasis`'s `symbolic = false` and `cse`/`inplace`. DenseNet dispatch variants and
-# extrapolation cross-products live in densenet_unit.jl.
-# Each testset checks:
+# extrapolation cross-products live in network_integrators_unit.jl.
+# Each testset that integrates checks:
 #   (a) the run stays at the working element type (no silent upcast), and
 #   (b) the final position is finite.
+# The last two testsets check the compiled derivatives, and the coefficients that `DenseNet`'s
+# `components!` builds from them, against `ForwardDiff`.
 
 using Test
 using NonlinearIntegrators
@@ -96,8 +98,8 @@ end
 
     # `dqdθ` and `dvdθ` return a parameter tree; `V_func` returns the velocity itself.
     for field in (:dqdθ, :dvdθ)
-        a = NI.flatten_params(getproperty(default, field)(input, ps))
-        b = NI.flatten_params(getproperty(plain, field)(input, ps))
+        a, _ = NeuralNetworkParameters.flatten(getproperty(default, field)(input, ps))
+        b, _ = NeuralNetworkParameters.flatten(getproperty(plain, field)(input, ps))
         @test length(a) == length(b)
         @test a ≈ b rtol = 1024 * eps(T)
     end
@@ -113,7 +115,8 @@ end
     @test all(isfinite, collect(sol.q[:, 1])[end])
 end
 
-# The inverse of `NI.flatten_params`: walk the layers and their fields in the same order.
+# The inverse of `NeuralNetworkParameters.flatten`: walk the layers and their fields in the same
+# order.
 # That order is not incidental — `components!` writes the flattened gradient into
 # `dqdθc[j, :, d]` and indexes the Newton unknowns by the same layout — so a reference
 # reconstructed this way pins the layout as well as the values.
@@ -159,7 +162,7 @@ end
         "ShallowNetBasis", shallow, 3 * shallow.S), ("DenseNetBasis", dense, dense.NP))
         NN = basis.NN
         ps = AbstractNeuralNetworks.params(AbstractNeuralNetworks.NeuralNetwork(NN, T))
-        θ = NI.flatten_params(ps)
+        θ, _ = NeuralNetworkParameters.flatten(ps)
         t = T(0.37)
 
         # The position and the velocity at `t`, both as functions of the flat parameter
@@ -171,14 +174,69 @@ end
         @test length(θ) == np
         @test eltype(θ) == T
 
-        dqdθ = NI.flatten_params(basis.dqdθ([t], ps))
+        dqdθ, _ = NeuralNetworkParameters.flatten(basis.dqdθ([t], ps))
         @test length(dqdθ) == np
         @test dqdθ ≈ ForwardDiff.gradient(w -> q(w, t), θ) rtol = 1024 * eps(T)
 
-        dvdθ = NI.flatten_params(basis.dvdθ([t], ps))
+        dvdθ, _ = NeuralNetworkParameters.flatten(basis.dvdθ([t], ps))
         @test length(dvdθ) == np
         @test dvdθ ≈ ForwardDiff.gradient(v, θ) rtol = 1024 * eps(T)
 
         @test basis.V_func([t], ps)[1] ≈ v(θ) rtol = 1024 * eps(T)
     end
+end
+
+allocations(f::F, args...) where {F} = (f(args...); @allocated f(args...))
+
+# `DenseNet`'s `components!` flattens the compiled gradients into the Newton coefficients with the
+# `ParameterLayout` that its cache keeps. Each row of `g0_params`, `g1_params`, `dqdθc` and `dvdθc`
+# is checked against `ForwardDiff` over the dimension's stretch of the Newton unknowns `x`, so the
+# test pins the values and the order in which `densenet_pack!` lays out the unknowns. The `D = 2`
+# case reaches the second column of each array. It is Float64 only, because each
+# `CoupledHarmonicOscillator.lodeproblem` call runs EulerLagrange's symbolic code generation.
+@testset "DenseNet components! coefficients ($T, D = $D)" for (T, D) in (
+    (Float64, 1), (Float32, 1), (Float64, 2))
+    Random.seed!(4321)
+    prob = D == 1 ? ho_problem(T) :
+           CoupledHarmonicOscillator.lodeproblem([0.5, -0.3], [0.0, 0.4];
+        timespan = (0.0, 0.2), timestep = 0.1,
+        parameters = (m₁ = 2.0, m₂ = 1.0, k₁ = 1.5, k₂ = 0.3, k = 0.0))
+    basis = build_densenet_basis(T)
+    int = GeometricIntegrator(prob, DenseNet(basis, gauss(T, 8); show_status = false))
+    C = GeometricIntegratorsBase.cache(int, T)
+    NP = basis.NP
+    x = randn(T, D * (NP + 1)) ./ 2
+    sol = (t = zero(T), q = zeros(T, D), p = zeros(T, D))
+    GeometricIntegratorsBase.components!(x, sol, parameters(prob), int)
+
+    template = AbstractNeuralNetworks.params(AbstractNeuralNetworks.NeuralNetwork(basis.NN, T))
+    q(w, s) = basis.NN([s], rebuild_params(w, template))[1]
+    v(w, s) = ForwardDiff.derivative(r -> q(w, r), s)
+    nodes = QuadratureRules.nodes(gauss(T, 8))
+
+    @test eltype(C.g0_params) == eltype(C.dqdθc) == eltype(C.dvdθc) == T
+    for d in 1:D
+        θ = x[((d - 1) * NP + 1):(d * NP)]
+        @test C.g0_params[:, d] ≈ ForwardDiff.gradient(w -> q(w, zero(T)), θ) rtol = 1024 *
+                                                                                     eps(T)
+        @test C.g1_params[:, d] ≈ ForwardDiff.gradient(w -> q(w, one(T)), θ) rtol = 1024 *
+                                                                                    eps(T)
+        for j in eachindex(nodes)
+            @test C.dqdθc[j, :, d] ≈ ForwardDiff.gradient(w -> q(w, nodes[j]), θ) rtol = 1024 *
+                                                                                         eps(T)
+            @test C.dvdθc[j, :, d] ≈ ForwardDiff.gradient(w -> v(w, nodes[j]), θ) rtol = 1024 *
+                                                                                         eps(T)
+        end
+    end
+
+    # The gradient is a `NetworkParameters` of the type of the parameters, so the one layout
+    # serves both; flattening with it is allocation-free and inferred.
+    g = basis.dqdθ([nodes[1]], NeuralNetworkParameters.NetworkParameters(C.ps[1]))
+    dest = view(C.dqdθc, 1, :, 1)
+    @test C.layout == NeuralNetworkParameters.parameterlayout(g)
+    @test length(C.layout) == NP
+    @test allocations(NeuralNetworkParameters.flatten!, dest, g, C.layout) == 0
+    @test allocations(collect, nodes) > 0
+    @test @inferred(NeuralNetworkParameters.flatten!(dest, g, C.layout)) isa
+          AbstractVector{T}
 end
