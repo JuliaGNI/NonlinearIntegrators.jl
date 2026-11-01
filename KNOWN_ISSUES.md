@@ -163,18 +163,32 @@ All of these predate the move to GeometricOptimizers; none is a regression.
 - kind: defect
 - found: 2026-08-16
 
-### K36 · `DenseNet`'s seeding fits train a `Float64` network at every precision
+### K37 · `DenseNet`'s seeding fits train a `Float64` network at every precision
 
 - location: `src/nvi/densenet.jl`
 - evidence: `densenet_training_fit` and `densenet_lsgd_fit` build the network with
   `NeuralNetwork(NN)`, which names no element type, so the parameters are `Float64` whatever the
-  precision of the integrator. In `test/nvi/densenet.jl`, an assertion
-  `eltype(params.L1.W) == T` on the parameters that either fit returns fails at `T = Float32`:
-  `Evaluated: Float64 == Float32`, four failures in `Float32`, none in `Float64`. The trained
-  parameters are converted to `Float32` when `initial_params!` writes them into the cache, so the
-  Newton solve runs at the working precision; the fit before it does not. The same
+  precision of the integrator. In `test/nvi/densenet.jl`, the assertion
+  `eltype(params.L1.W) == T` on the parameters that either fit returns is `@test` at
+  `T = Float64` and `@test_broken` at `T = Float32`, where the element type is `Float64`. The
+  trained parameters are converted to `Float32` when `initial_params!` writes them into the
+  cache, so the Newton solve runs at the working precision; the fit before it does not. The same
   `NeuralNetwork(NN)` call is in both `initial_params!` methods on `c709105`.
+- issue: #135
 - kind: defect
+- found: 2026-11-01
+
+### K39 · No test reaches the early exit of `DenseNet`'s `Adam` seeding fit.
+
+- location: `src/nvi/densenet.jl`
+- evidence: `densenet_training_fit` stops once the loss is below `5e-8`. A mutant that returns
+  `nepochs` in place of the passes run passes `test/nvi/densenet.jl`, because every `Adam` fit
+  there runs its full budget. Labels that the initial network fits exactly do not stop it: with
+  `Random.seed!(7)` before both the labels and the fit, the loss starts at `0.0`, the first step
+  moves `L1.W` by `5.0e-5`, and the loss after it is `3.97e-4`. `Adam` moves each parameter by
+  about its learning rate whatever the size of the gradient, so a fit of a few passes does not
+  reach `5e-8`.
+- kind: missing test
 - found: 2026-11-01
 
 ## Loops and allocation
@@ -226,6 +240,19 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
   numbers, so it is not one to make blind.
 - kind: defect
 - found: 2026-08-14
+
+### K38 · No test sees `DenseNet`'s `components!` build a `ParameterLayout`.
+
+- location: `src/nvi/densenet.jl`
+- evidence: `components!` flattens the compiled gradients with the layout that the cache keeps.
+  Two mutants that build a layout on every evaluation pass `test/nvi/dispatch_variants_unit.jl`:
+  `local layout = NeuralNetworkParameters.parameterlayout(NetworkParameters(ps[1]))` in place of
+  `local layout = cache(int, ST).layout`, and the two-argument
+  `flatten!(view(dqdθc, j, :, d), g)`, which builds a layout per call. Both give the same layout,
+  so the values do not change. The test checks that the cached layout is the layout of the
+  gradient, not that `components!` reads it.
+- kind: missing test
+- found: 2026-11-01
 
 ## Nonlinear solve conditioning
 

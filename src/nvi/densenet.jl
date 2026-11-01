@@ -375,8 +375,8 @@ function densenet_lsgd_fit(
         NN, network_inputs, labels, nepochs::Int, S₁::Int, S::Int, k::Int)
     PNN = NeuralNetwork(NN)
     local PT = eltype(PNN.params.L1.W)
-    # `PT` is passed explicitly: `box_init_plain` used to default to `Float32`, so a
-    # Float64 DenseNet drew its weights at single precision and converted on assignment.
+    # `box_init_plain` takes the element type `PT` of the network, so the weights are drawn at
+    # the precision they are stored in.
     PNN.params.L1.W[:], PNN.params.L1.b[:] = box_init_plain(1, S₁, PT)
     PNN.params.L2.W[:], PNN.params.L2.b[:] = box_init_plain(S₁, S, PT)
     PNN.params.L3.W[:], _ = box_init_plain(S, 1, PT)

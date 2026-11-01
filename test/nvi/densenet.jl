@@ -18,6 +18,16 @@ function densenet_fit_data(::Type{T}) where {T}
     network_inputs, labels
 end
 
+# Both fits build their network with `NeuralNetwork(NN)`, which names no element type, so the
+# parameters they return are `Float64` at every precision.
+function test_fit_eltype(params, ::Type{T}) where {T}
+    if T == Float32
+        @test_broken eltype(params.L1.W) == T  # issue #135, KNOWN_ISSUES.md K37
+    else
+        @test eltype(params.L1.W) == T
+    end
+end
+
 @testset "DenseNet seeding loops count their passes ($T, $nepochs passes)" for T in TEST_TYPES,
     nepochs in (3, 5)
 
@@ -26,25 +36,28 @@ end
     network_inputs, labels = densenet_fit_data(T)
 
     @testset "TrainingMethod (Adam, DecayingStatic)" begin
-        _, state, passes = NI.densenet_training_fit(
+        params, state, passes = NI.densenet_training_fit(
             basis.NN, network_inputs, labels, nepochs, 1)
         @test passes == nepochs
         @test GO.iteration_number(state) == passes
+        test_fit_eltype(params, T)
     end
 
     @testset "LSGD (GradientMethod, Static)" begin
-        _, state, passes = NI.densenet_lsgd_fit(
+        params, state, passes = NI.densenet_lsgd_fit(
             basis.NN, network_inputs, labels, nepochs, basis.S₁, basis.S, 1)
         @test passes == nepochs
         @test GO.iteration_number(state) == passes
+        test_fit_eltype(params, T)
     end
 
     # Labels of size 1e-6 leave a loss of about that size after the least-squares solve of the
     # last layer, below the threshold of 5e-5, so the loop stops after its first pass.
     @testset "LSGD early exit" begin
-        _, state, passes = NI.densenet_lsgd_fit(
+        params, state, passes = NI.densenet_lsgd_fit(
             basis.NN, network_inputs, fill(T(1e-6), size(labels)), nepochs, basis.S₁, basis.S, 1)
         @test passes == 1
         @test GO.iteration_number(state) == passes
+        test_fit_eltype(params, T)
     end
 end
