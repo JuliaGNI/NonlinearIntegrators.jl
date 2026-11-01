@@ -4,7 +4,7 @@
 # here is `TrainingMethod` and the two-dimensional dictionaries (the latter have unit coverage
 # in oga_kernels.jl but are otherwise never driven through an integrator), plus
 # `ShallowNetBasis`'s `symbolic = false` and `cse`/`inplace`. DenseNet dispatch variants and
-# extrapolation cross-products live in densenet_unit.jl.
+# extrapolation cross-products live in network_integrators_unit.jl.
 # Each testset that integrates checks:
 #   (a) the run stays at the working element type (no silent upcast), and
 #   (b) the final position is finite.
