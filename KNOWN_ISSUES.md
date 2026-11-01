@@ -174,9 +174,8 @@ All of these predate the move to GeometricOptimizers; none is a regression.
   trained parameters are converted to `Float32` when `initial_params!` writes them into the
   cache, so the Newton solve runs at the working precision; the fit before it does not. The same
   `NeuralNetwork(NN)` call is in both `initial_params!` methods on `c709105`.
-- issue: #135
 - kind: defect
-- found: 2026-11-01
+- found: 2026-11-01; filed as #135
 
 ### K39 · No test reaches the early exit of `DenseNet`'s `Adam` seeding fit.
 
