@@ -5,12 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — targeting 0.5.0
+## [0.5.0] — 2026-11-01
 
 The package can plot its own integrators, and the experiment suite that drives them lives in this
 repository. It had no `ext/` directory and no `[weakdeps]` at all until now, so every figure ever
 made from a `VISE` or `ShallowNet` run was made by a script carrying its own Makie code — and those
 scripts sat in a talk directory, all carrying much the same code.
+
+### Breaking
+
+- **Julia 1.12 is the floor**, from 1.11 (see *Changed*). A caller on Julia 1.11 can no longer
+  install this version.
+- **The dependency set moves to `GeometricBase` 0.15 and the releases built on it** (see *Changed*
+  for the table): `GeometricOptimizers` 0.9, `NeuralNetworkParameters` 0.5, `AbstractNeuralNetworks`
+  0.9.1, `SymbolicNeuralNetworks` 0.9, `SimpleSolvers` 0.14.2, `GeometricSolutions` 0.6.7. An
+  environment that holds an older release of any of them does not resolve this version.
+- **The internal helpers `flatten_params` and `flatten_params!` are gone**; a caller that reached
+  them qualified uses `NeuralNetworkParameters.flatten` and `flatten!` (see *Changed*). No exported
+  name is removed or renamed; `FreeKnotSpline` is new.
 
 ### Added
 
