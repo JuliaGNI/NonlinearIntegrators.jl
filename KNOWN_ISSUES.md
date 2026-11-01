@@ -168,9 +168,9 @@ All of these predate the move to GeometricOptimizers; none is a regression.
 - location: `src/nvi/shallownet.jl`
 - evidence: `initial_params!` for `TrainingMethod` builds the network with
   `PNN = AbstractNeuralNetworks.NeuralNetwork(NN)`, which names no element type, so the fit runs
-  in `Float64` at `Float32`. This is the defect that `DenseNet`'s two seeding fits had, and the
-  same fix applies: `NeuralNetwork(NN, eltype(network_inputs))`. No test reads the element type
-  of this fit, because it runs inside `initial_params!` and returns nothing.
+  in `Float64` at `Float32`. `DenseNet`'s two seeding fits build their network with
+  `NeuralNetwork(NN, eltype(network_inputs))`, and the same call fixes this one. No test reads the
+  element type of this fit, because it runs inside `initial_params!` and returns nothing.
 - kind: defect
 - found: 2026-11-01
 
@@ -197,7 +197,7 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.4 and writing
 - location: `src/nvi/shallownet.jl:274-293`
 - evidence: `components!` evaluates
   `DQDθ`/`DVDθ` node by node — the loops at `src/nvi/shallownet.jl:274-293`,
-  `src/nvi/shallownet_reversible.jl:223-242` and `src/nvi/densenet.jl:483-495` — which is
+  `src/nvi/shallownet_reversible.jl:223-242` and `src/nvi/densenet.jl:484-496` — which is
   `2R + 2` calls per dimension per Newton iteration, sixteen of them at the benchmark's
   `R = 8`. `SymbolicNeuralNetworks` evaluates a whole batch through one in-place kernel and a
   single allocation, so the same work is two calls if the nodes are passed as one batch. The
@@ -412,10 +412,10 @@ Surfaced while updating to `SymbolicNeuralNetworks` 0.5.
 
 ### K26 · `V_func` returns a 1×1 matrix that both of its call sites immediately unwrap.
 
-- location: `src/nvi/densenet.jl:517`
+- location: `src/nvi/densenet.jl:518`
 - evidence: The shape
   is an honest consequence of the Jacobian of a scalar-in/scalar-out network being 1×1, but it
-  carries no information: the one integrator that consumes it (`src/nvi/densenet.jl:517`)
+  carries no information: the one integrator that consumes it (`src/nvi/densenet.jl:518`)
   strips it with `[1]`, and so do both kernel testsets in
   `test/nvi/dispatch_variants_unit.jl`, one with `vec` and one with `[1]`.
   `ShallowNetBasis` builds the slot as well, and no integrator reads that one at all. Either
