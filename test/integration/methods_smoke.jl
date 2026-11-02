@@ -89,11 +89,11 @@ end
 
 # `network_inputs` holds the `extrapolation_substep + 1` nodes of the warm-start trajectory, from
 # 0 to 1 inclusive. A step range `zero(T):(one(T) / n):one(T)` has a length that depends on the
-# round-off of its step: at `BFloat16` it raises where no `rem` is defined for the type, and is
-# one element short at many `n` where one is. The IEEE types build such a range exactly, so at
-# them this guards the node values and the shape; the `BFloat16` rows are the ones a step range
-# fails. The expected nodes are the correctly rounded `(0:n) ./ n`, computed in Float64 and
-# converted, not the way the constructor computes them.
+# round-off of its step: at `BFloat16` it raises for want of a `rem`, and where the type has a
+# `rem` and an `Integer` conversion it has the wrong length at many `n`. The IEEE types build such
+# a range exactly, so at them this guards the node values and the shape; the `BFloat16` rows are
+# the ones a step range fails. The expected nodes are the correctly rounded `(0:n) ./ n`, computed
+# in Float64 and converted, not the way the constructor computes them.
 @testset "network inputs ($T, extrapolation_substep = $n)" for T in (
         Float16, Float32, Float64, BFloat16),
     n in (3, 7, 10, 30)
