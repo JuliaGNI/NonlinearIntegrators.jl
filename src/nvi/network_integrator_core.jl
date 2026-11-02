@@ -25,9 +25,12 @@ struct NetworkIntegratorCore{T, NNODES, basisType <: Basis{T},
         NNODES = nnodes(quadrature)
         b = SVector{NNODES, T}(QuadratureRules.weights(quadrature))
         c = SVector{NNODES, T}(QuadratureRules.nodes(quadrature))
+        # A length, not a step: the length of `zero(T):(one(T) / n):one(T)` depends on the
+        # round-off of its step. At `BFloat16` it raises for want of a `rem`, and where the type
+        # has a `rem` and an `Integer` conversion it has the wrong length at many `n`.
         network_inputs = reshape(
-            collect(zero(T):(one(T) / extrapolation_substep):one(T)), 1, extrapolation_substep +
-                                                                         1)
+            collect(range(zero(T), one(T); length = extrapolation_substep + 1)),
+            1, extrapolation_substep + 1)
         new{T, NNODES, typeof(basis), ET, IPMT}(
             basis, quadrature, b, c, extrapolation_substep, network_inputs,
             initial_trajectory_method, initial_guess_method, training_epochs, show_status,
