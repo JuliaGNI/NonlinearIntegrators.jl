@@ -5,6 +5,26 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Tests
+
+- **The test-only dependencies have lower bounds that the suite passes at on Julia 1.12.** The
+  Downgrade job resolves `Project.toml` and `test/Project.toml` together at their lower bounds and
+  runs the suite there, and a test dependency without a `[compat]` entry resolves to its oldest
+  release. In `test/Project.toml`:
+  - `JLD2` gets `0.4.55, 0.5.12 - 0.6`. Without an entry it resolves to 0.4.28, which fails to
+    precompile on Julia 1.12. The releases excluded below 0.4.55 and 0.5.12 that were tried fail
+    to precompile or deadlock in `load`, so `scripts/archives.jl` cannot write and read an archive.
+  - `SafeTestsets` gets `0.1`, the release the suite runs with.
+  - `Aqua` goes from `0.8` to `0.8.2`, the first release whose persistent-tasks check puts
+    `@stdlib` on the load path of its precompilation subprocess. With 0.8.0 that subprocess cannot
+    load `Pkg` under `Pkg.test`, and the check fails.
+  - `JET` goes from `0.10` to `0.10.1`. 0.10.0 throws "unhandled LimitedAccuracy" in its
+    captured-variable pass on the `ShallowNetAutodiff` cases of `test/quality/jet.jl`.
+  - `BFloat16s` goes from `0.6` to `0.6.1`. 0.6.0 uses the native `bfloat` type on aarch64 with
+    LLVM 18, and LLVM aborts on `-(::BFloat16)` in the `network_inputs` testset.
+
 ## [0.5.1] — 2026-11-02
 
 ### Fixed
