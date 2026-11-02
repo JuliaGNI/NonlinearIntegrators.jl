@@ -88,7 +88,8 @@ end
 
 # `network_inputs` holds the `extrapolation_substep + 1` nodes of the warm-start trajectory, from
 # 0 to 1 inclusive. A step range `zero(T):(one(T) / n):one(T)` has a length that depends on the
-# round-off of its step: at `BFloat16` it is one element short, or it raises. The IEEE types
+# round-off of its step: at `BFloat16` it raises where no `rem` is defined for the type, and is
+# one element short at many `n` where one is. The IEEE types
 # below build such a range exactly, so they guard the node values and the shape; the test
 # environment has no `BFloat16`. The expected nodes are the correctly rounded `(0:n) ./ n`,
 # computed in Float64 and converted, not the way the constructor computes them.
