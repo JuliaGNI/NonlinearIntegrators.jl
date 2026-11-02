@@ -4,6 +4,7 @@
 # are built once per T and shared across the network methods to keep this fast.
 
 using Test
+using BFloat16s: BFloat16
 using NonlinearIntegrators
 include(joinpath(@__DIR__, "..", "helpers", "testsetup.jl"))
 
@@ -89,12 +90,12 @@ end
 # `network_inputs` holds the `extrapolation_substep + 1` nodes of the warm-start trajectory, from
 # 0 to 1 inclusive. A step range `zero(T):(one(T) / n):one(T)` has a length that depends on the
 # round-off of its step: at `BFloat16` it raises where no `rem` is defined for the type, and is
-# one element short at many `n` where one is. The IEEE types
-# below build such a range exactly, so they guard the node values and the shape; the test
-# environment has no `BFloat16`. The expected nodes are the correctly rounded `(0:n) ./ n`,
-# computed in Float64 and converted, not the way the constructor computes them.
+# one element short at many `n` where one is. The IEEE types build such a range exactly, so at
+# them this guards the node values and the shape; the `BFloat16` rows are the ones a step range
+# fails. The expected nodes are the correctly rounded `(0:n) ./ n`, computed in Float64 and
+# converted, not the way the constructor computes them.
 @testset "network inputs ($T, extrapolation_substep = $n)" for T in (
-        Float16, Float32, Float64),
+        Float16, Float32, Float64, BFloat16),
     n in (3, 7, 10, 30)
 
     m = ShallowNet(build_shallownet_basis(T; S = 4), gauss(T, 4); show_status = false,

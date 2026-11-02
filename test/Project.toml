@@ -13,6 +13,8 @@
 [deps]
 AbstractNeuralNetworks = "60874f82-5ada-4c70-bd1c-fa6be7711c8a"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+# For the `BFloat16` rows of the `network_inputs` testset in `integration/methods_smoke.jl`.
+BFloat16s = "ab4f0b2a-ad5b-11e8-123f-65d77653426b"
 # Loading a backend is what activates the `Makie` weakdep, and with it the
 # `NonlinearIntegratorsPlots` extension. CairoMakie and not GLMakie: it needs neither a GPU nor a
 # display, so it is the backend that works in CI.
@@ -45,6 +47,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 Aqua = "0.8"
+BFloat16s = "0.6.2"
 CairoMakie = "0.15"
 GeometricProblems = "0.9.1"
 JET = "0.10, 0.11, 0.12"

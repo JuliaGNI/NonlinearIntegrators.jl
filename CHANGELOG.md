@@ -23,8 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ShallowNetAutodiff`, their reversible variants and `DenseNet` failed in the constructor. The
   nodes are now `range(zero(T), one(T); length = n + 1)`, which has `n + 1` nodes from 0 to 1 at
   every element type; at `Float16`, `Float32` and `Float64` they are bit-identical to before.
-  `test/integration/methods_smoke.jl` checks the nodes at those three types; the suite has no
-  `BFloat16`, because the test environment does not carry `BFloat16s`.
+  `test/integration/methods_smoke.jl` checks the nodes at those three types and at `BFloat16`,
+  where the old constructor fails; `BFloat16s` is a new test-only dependency for it.
 
 ### Tests
 
