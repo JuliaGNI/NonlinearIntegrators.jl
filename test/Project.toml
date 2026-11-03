@@ -46,10 +46,11 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-# 0.8.2 is the first release whose persistent-tasks check adds `@stdlib` to the load path of its
-# precompilation subprocess. Under `Pkg.test` that load path is only the package and `test/`, so
-# with 0.8.0 the subprocess cannot load `Pkg` and the check fails.
-Aqua = "0.8.2"
+# 0.8.17 is the first release whose persistent-tasks check gives its precompilation subprocess
+# the versions that the test process has loaded. Earlier releases resolve that subprocess's
+# environment anew, so at the lower bounds it gets newer versions than the test process, and on a
+# fresh depot it fails to load them ("done.log was not created").
+Aqua = "0.8.17"
 # 0.6.1 is the first release that keeps the native `bfloat` type off aarch64 below LLVM 19. With
 # 0.6.0 on Julia 1.12 (LLVM 18) on aarch64, LLVM aborts on `-(::BFloat16)` ("Cannot select ...
 # fneg") in the `network_inputs` testset.

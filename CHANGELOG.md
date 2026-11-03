@@ -17,9 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     precompile on Julia 1.12. The releases excluded below 0.4.55 and 0.5.12 that were tried fail
     to precompile or deadlock in `load`, so `scripts/archives.jl` cannot write and read an archive.
   - `SafeTestsets` gets `0.1`, the release the suite runs with.
-  - `Aqua` goes from `0.8` to `0.8.2`, the first release whose persistent-tasks check puts
-    `@stdlib` on the load path of its precompilation subprocess. With 0.8.0 that subprocess cannot
-    load `Pkg` under `Pkg.test`, and the check fails.
+  - `Aqua` goes from `0.8` to `0.8.17`, the first release whose persistent-tasks check gives its
+    precompilation subprocess the versions that the test process has loaded. Earlier releases
+    resolve the subprocess's environment anew: at the lower bounds it then gets newer versions,
+    such as `ForwardDiff` 1.4.7 against the loaded 1.0.0, and in the Downgrade job it failed to
+    load them ("done.log was not created, but precompilation exited"). With 0.8.0 that subprocess
+    also cannot load `Pkg` under `Pkg.test`, because `@stdlib` is not on its load path.
   - `JET` goes from `0.10` to `0.10.1`. 0.10.0 throws "unhandled LimitedAccuracy" in its
     captured-variable pass on the `ShallowNetAutodiff` cases of `test/quality/jet.jl`.
   - `BFloat16s` goes from `0.6` to `0.6.1`. 0.6.0 uses the native `bfloat` type on aarch64 with
