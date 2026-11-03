@@ -49,8 +49,10 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 # 0.8.17 is the first release whose persistent-tasks check gives its precompilation subprocess
 # the versions that the test process has loaded. Earlier releases resolve that subprocess's
 # environment anew, so at the lower bounds it gets newer versions than the test process, and on a
-# fresh depot it fails to load them ("done.log was not created").
-Aqua = "0.8.17"
+# fresh depot it fails to load them ("done.log was not created"). 0.8.17 itself errors when the
+# manifest lists a weak dependency that is not installed, as the Downgrade job's manifest does for
+# `LogExpFunctions` ("Unable to locate `ChangesOfVariables`"); 0.8.18 passes there.
+Aqua = "0.8.18"
 # 0.6.1 is the first release that keeps the native `bfloat` type off aarch64 below LLVM 19. With
 # 0.6.0 on Julia 1.12 (LLVM 18) on aarch64, LLVM aborts on `-(::BFloat16)` ("Cannot select ...
 # fneg") in the `network_inputs` testset.
