@@ -46,10 +46,27 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-Aqua = "0.8"
-BFloat16s = "0.6"
+# 0.8.17 is the first release whose persistent-tasks check gives its precompilation subprocess
+# the versions that the test process has loaded. Earlier releases resolve that subprocess's
+# environment anew, so at the lower bounds it gets newer versions than the test process, and on a
+# fresh depot it fails to load them ("done.log was not created"). 0.8.17 itself errors when the
+# manifest lists a weak dependency that is not installed, as the Downgrade job's manifest does for
+# `LogExpFunctions` ("Unable to locate `ChangesOfVariables`"); 0.8.18 passes there.
+Aqua = "0.8.18"
+# 0.6.1 is the first release that keeps the native `bfloat` type off aarch64 below LLVM 19. With
+# 0.6.0 on Julia 1.12 (LLVM 18) on aarch64, LLVM aborts on `-(::BFloat16)` ("Cannot select ...
+# fneg") in the `network_inputs` testset.
+BFloat16s = "0.6.1"
 CairoMakie = "0.15"
 GeometricProblems = "0.9.1"
-JET = "0.10, 0.11, 0.12"
+# On Julia 1.12, JLD2 0.4.28 (the oldest release the resolve admits), 0.4.46 to 0.4.53 and 0.5.0
+# to 0.5.7 fail to precompile, and 0.4.54 and 0.5.8 to 0.5.11 deadlock in `load`. 0.4.55 and
+# 0.5.12 are the first releases of their series that write and read an archive.
+JLD2 = "0.4.55, 0.5.12 - 0.6"
+# 0.10.1 is the first release whose captured-variable pass strips `LimitedAccuracy` from an
+# inferred type before `widenconst`. 0.10.0 throws "unhandled LimitedAccuracy" on the
+# `ShallowNetAutodiff` cases of `jet.jl`.
+JET = "0.10.1, 0.11, 0.12"
 Logging = "1"
+SafeTestsets = "0.1"
 Test = "1"
