@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+
+- **The dependency set moves to the KernelAbstractions 0.10 releases.** A compat-only change: no
+  source, test, script or documentation file changes. In `Project.toml`, `AbstractNeuralNetworks`
+  goes from `0.9.1` to `0.10`, `GeometricOptimizers` from `0.9` to `0.10`,
+  `SymbolicNeuralNetworks` from `0.9` to `0.10` and `GeometricIntegratorsBase` from `0.6.9` to
+  `0.7`. Two floors follow from these releases: `NeuralNetworkParameters` goes from `0.5` to
+  `0.5.3`, which `GeometricOptimizers` 0.10 requires, and `Symbolics` from `7` to `7.0.2`, which
+  `SymbolicNeuralNetworks` 0.10 requires. In `test/Project.toml`, `GeometricProblems` goes from
+  `0.9.1` to `0.10`, and in `scripts/Project.toml`, `GeometricIntegrators` goes from `0.18.6` to
+  `0.19`, the first release on `GeometricIntegratorsBase` 0.7. It is breaking
+  because the public API takes and returns types of these packages: an environment that holds
+  `AbstractNeuralNetworks` 0.9, `GeometricIntegratorsBase` 0.6 or `KernelAbstractions` 0.9 cannot
+  install this release. The breaking changes of these releases do not reach the package:
+  - `AbstractNeuralNetworks` 0.10 no longer exports `GPU`, which nothing here uses. `CPU()`, the
+    default `backend` of `ShallowNetBasis` and `DenseNetBasis`, is now the POCL backend of
+    KernelAbstractions 0.10, so the backend type parameter of a basis changes; the basis only
+    stores it. `NeuralNetwork(NN)` still draws `Float64` parameters on `CPU()`.
+  - `GeometricOptimizers` 0.10 refuses a non-`isbits` element type in its kernel-backed
+    structured-matrix operations. The seeding fits optimise a flat parameter vector, and every
+    element type the package supports is `isbits`.
+  - `GeometricIntegratorsBase` 0.7 exchanges `SymplecticEulerA` and `SymplecticEulerB`, which
+    nothing here uses.
+  - `GeometricProblems` 0.10 changes `LinearWave`, which nothing here uses.
+
+  The `SimpleSolvers` floor stays at `0.14.2`, which `GeometricOptimizers` 0.10 also requires; the
+  comment above it in `Project.toml` now names 0.10.
+
 ### Tests
 
 - **The test-only dependencies have lower bounds that the suite passes at on Julia 1.12.** The

@@ -29,17 +29,17 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 NonlinearIntegratorsPlots = "Makie"
 
 [compat]
-AbstractNeuralNetworks = "0.9.1"
+AbstractNeuralNetworks = "0.10"
 CompactBasisFunctions = "0.4.2"
 ForwardDiff = "1"
 GeometricBase = "0.15"
 GeometricEquations = "0.21.5"
-GeometricIntegratorsBase = "0.6.9"
-GeometricOptimizers = "0.9"
+GeometricIntegratorsBase = "0.7"
+GeometricOptimizers = "0.10"
 GeometricSolutions = "0.6.7"
 LinearAlgebra = "1"
 Makie = "0.24"
-NeuralNetworkParameters = "0.5"
+NeuralNetworkParameters = "0.5.3"
 QuadratureRules = "0.2.2"
 Random = "1"
 # The floor is 0.14 because `initsolver` in `src/nvi/network_integrator_core.jl` gives every element
@@ -47,10 +47,10 @@ Random = "1"
 # 0.13.3 the same name is LAPACK-backed and refuses `Float16`, and 0.13.2 does not have it. The name
 # sits in a function body, so on an older release the package still loads and the difference
 # surfaces only when a network integrator is constructed. That is why this is a bound and not a
-# fallback. The patch floor, 0.14.2, is the one that GeometricOptimizers 0.9 requires.
+# fallback. The patch floor, 0.14.2, is the one that GeometricOptimizers 0.10 requires.
 SimpleSolvers = "0.14.2"
 StaticArrays = "1.9.13"
 Statistics = "1"
-SymbolicNeuralNetworks = "0.9"
-Symbolics = "7"
+SymbolicNeuralNetworks = "0.10"
+Symbolics = "7.0.2"
 julia = "1.12"
