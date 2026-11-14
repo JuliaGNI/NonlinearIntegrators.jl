@@ -58,7 +58,7 @@ Aqua = "0.8.18"
 # fneg") in the `network_inputs` testset.
 BFloat16s = "0.6.1"
 CairoMakie = "0.15"
-GeometricProblems = "0.9.1"
+GeometricProblems = "0.10"
 # On Julia 1.12, JLD2 0.4.28 (the oldest release the resolve admits), 0.4.46 to 0.4.53 and 0.5.0
 # to 0.5.7 fail to precompile, and 0.4.54 and 0.5.8 to 0.5.11 deadlock in `load`. 0.4.55 and
 # 0.5.12 are the first releases of their series that write and read an archive.
