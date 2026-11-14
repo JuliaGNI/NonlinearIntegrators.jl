@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`GeometricSolutions` 0.7 is admitted.** In `Project.toml`, the `GeometricSolutions` bound goes
+  from `0.6.7` to `0.6.7, 0.7`. The one breaking change of 0.7, a fifth type parameter `tsType`
+  of `EnsembleSolution`, does not reach the package: nothing here uses `EnsembleSolution`, and the
+  package does not re-export `GeometricSolutions`. No other project file changes: the bounds of
+  `test/Project.toml` (`GeometricProblems` `0.10`), `scripts/Project.toml`
+  (`GeometricIntegrators` `0.19`) and the root `GeometricIntegratorsBase` `0.7` already admit the
+  releases that accept `GeometricSolutions` 0.7.
+
 ## [0.6.0] — 2026-11-14
 
 ### Breaking
