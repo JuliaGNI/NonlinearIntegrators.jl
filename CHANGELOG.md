@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`GeometricBase` 0.15.5 and `GeometricIntegratorsBase` 0.7.2 are the floors.** In
+  `Project.toml`, `GeometricBase` goes from `0.15` to `0.15.5` and `GeometricIntegratorsBase` from
+  `0.7` to `0.7.2`, the first releases with `GeometricBase.interface_violations` and its method for
+  `GeometricMethod`, which the new test below calls.
+
+### Tests
+
+- **Each method type of the package keeps the contract of `AbstractMethod`.** The new file
+  `test/quality/interface.jl`, in the group `core`, checks
+  `isempty(GeometricBase.interface_violations(m))` on one instance of each of the seven method
+  types: `ShallowNet`, `ShallowNetAutodiff`, `ShallowNetReversible`,
+  `ShallowNetAutodiffReversible`, `DenseNet`, `VISE` and `FreeKnotSpline`, built at `Float64` as
+  `integration/methods_smoke.jl` builds them, with no integration. A type with a constructor of no
+  argument is checked on that instance too; no type has one now. A second testset walks the
+  subtypes of `AbstractMethod` and fails for each method type of the package without an instance,
+  so a new method type needs one. `test/Project.toml` gets `InteractiveUtils`, for `subtypes`.
+
 ## [0.6.1] — 2026-11-15
 
 ### Changed
