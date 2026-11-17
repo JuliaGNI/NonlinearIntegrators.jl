@@ -2,8 +2,8 @@
 # this package owns. `GeometricBase.interface_violations` calls every property of the contract
 # (`isexplicit`, …, `order`, `name`, …) and, through the method for `GeometricMethod` in
 # `GeometricIntegratorsBase`, the defaults that take no problem; it returns an empty vector for a
-# method that keeps the contract. The instances are built as `integration/methods_smoke.jl` builds
-# them, at `Float64`, with no integration.
+# method that keeps the contract. The instances are built as `integration/methods_smoke.jl` and
+# `free_knot/free_knot_spline_unit.jl` build them, at `Float64`, with no integration.
 
 using Test
 using NonlinearIntegrators
@@ -33,7 +33,7 @@ end
     dnet = build_densenet_basis(Float64; S₁ = 3, S = 3)
     quad = gauss(Float64, 4)
 
-    cases = [
+    cases = GeometricBase.AbstractMethod[
         ShallowNet(net, quad; shallow_kw(Float64)...),
         ShallowNetAutodiff(net, quad; shallow_kw(Float64)...),
         ShallowNetReversible(net, quad; shallow_kw(Float64)...),

@@ -11,8 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`GeometricBase` 0.15.5 and `GeometricIntegratorsBase` 0.7.2 are the floors.** In
   `Project.toml`, `GeometricBase` goes from `0.15` to `0.15.5` and `GeometricIntegratorsBase` from
-  `0.7` to `0.7.2`, the first releases with `GeometricBase.interface_violations` and its method for
-  `GeometricMethod`, which the new test below calls.
+  `0.7` to `0.7.2`. `GeometricIntegratorsBase` 0.7.2 is the first release with the method of
+  `GeometricBase.interface_violations` for `GeometricMethod`, which the new test below calls.
+  `GeometricBase` 0.15.4 already has `interface_violations`; 0.15.5 is the release whose contract
+  lets `order` on a method type answer a string, and the test checks that contract.
 
 ### Tests
 
@@ -21,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `isempty(GeometricBase.interface_violations(m))` on one instance of each of the seven method
   types: `ShallowNet`, `ShallowNetAutodiff`, `ShallowNetReversible`,
   `ShallowNetAutodiffReversible`, `DenseNet`, `VISE` and `FreeKnotSpline`, built at `Float64` as
-  `integration/methods_smoke.jl` builds them, with no integration. A type with a constructor of no
+  `integration/methods_smoke.jl` and `free_knot/free_knot_spline_unit.jl` build them, with no
+  integration. A type with a constructor of no
   argument is checked on that instance too; no type has one now. A second testset walks the
   subtypes of `AbstractMethod` and fails for each method type of the package without an instance,
   so a new method type needs one. `test/Project.toml` gets `InteractiveUtils`, for `subtypes`.
